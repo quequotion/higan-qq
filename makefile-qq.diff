@@ -1,0 +1,27 @@
+diff --git a/bsnes/Makefile b/bsnes/Makefile
+index 65ad25d..918d29a 100644
+--- a/bsnes/Makefile
++++ b/bsnes/Makefile
+@@ -16,8 +16,10 @@ target  := ethos
+ # compiler
+ c       := $(compiler) -std=gnu99
+ cpp     := $(subst cc,++,$(compiler)) -std=gnu++0x
+-flags   := -I. -O3 -fomit-frame-pointer
+-link    := -s
++flags   := -pipe -Ofast -I. -fbranch-target-load-optimize2 -fcx-fortran-rules -fdata-sections -ffloat-store -fgcse-las -fgcse-sm -fgraphite-identity -fipa-matrix-reorg -fipa-pta -floop-block -floop-flatten -floop-interchange -floop-parallelize-all -floop-strip-mine -flto -fmath-errno -fmerge-all-constants -fmodulo-sched -fmodulo-sched-allow-regmoves -fno-enforce-eh-specs -fno-threadsafe-statics -fnothrow-opt -fomit-frame-pointer -fopenmp -freschedule-modulo-scheduled-loops -fsched-pressure -fsched-spec-load -fsched-spec-load-dangerous -fsched-stalled-insns=0 -fsched2-use-superblocks -fschedule-insns -ftree-loop-distribution -ftree-loop-linear -funroll-loops -funroll-all-loops -funsafe-loop-optimizations -fvariable-expansion-in-unroller -maccumulate-outgoing-args -msahf -m64 -mabm -march=corei7-avx -msse4.2 -mavx
++#original: -I. -O3 -fomit-frame-pointer
++link    := -pipe -Ofast -I. -fbranch-target-load-optimize2 -fcx-fortran-rules -fdata-sections -ffloat-store -fgcse-las -fgcse-sm -fgraphite-identity -fipa-matrix-reorg -fipa-pta -floop-block -floop-flatten -floop-interchange -floop-parallelize-all -floop-strip-mine -flto -fmath-errno -fmerge-all-constants -fmodulo-sched -fmodulo-sched-allow-regmoves -fno-enforce-eh-specs -fno-threadsafe-statics -fnothrow-opt -fomit-frame-pointer -fopenmp -freschedule-modulo-scheduled-loops -fsched-pressure -fsched-spec-load -fsched-spec-load-dangerous -fsched-stalled-insns=0 -fsched2-use-superblocks -fschedule-insns -ftree-loop-distribution -ftree-loop-linear -funroll-loops -funroll-all-loops -funsafe-loop-optimizations -fvariable-expansion-in-unroller -maccumulate-outgoing-args -msahf -m64 -mabm -march=corei7-avx -msse4.2 -mavx -s
++#original -s
+ objects := libco
+ 
+ # profile-guided optimization mode
+@@ -28,7 +30,8 @@ ifeq ($(pgo),instrument)
+   flags += -fprofile-generate
+   link += -lgcov
+ else ifeq ($(pgo),optimize)
+-  flags += -fprofile-use
++  flags += -fprofile-use -fprofile-correction
++  link += -lgcov
+ endif
+ 
+ # platform

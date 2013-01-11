@@ -1,0 +1,932 @@
+diff --git a/bsnes/sfc/cartridge/markup.cpp b/bsnes/sfc/cartridge/markup.cpp
+index ddf179d..42876ef 100644
+--- a/bsnes/sfc/cartridge/markup.cpp
++++ b/bsnes/sfc/cartridge/markup.cpp
+@@ -162,7 +162,7 @@ void Cartridge::parse_markup_bsxslot(XML::Node &root) {
+     if(node["id"].data == "rom") {
+       if(bsxflash.memory.size() == 0) continue;
+ 
+-      Mapping m(bsxflash.memory);
++      Mapping m(bsxflash);
+       parse_markup_map(m, node);
+       mapping.append(m);
+     }
+diff --git a/bsnes/sfc/chip/bsx/cartridge/cartridge.cpp b/bsnes/sfc/chip/bsx/cartridge/cartridge.cpp
+index b11bb6f..1046644 100644
+--- a/bsnes/sfc/chip/bsx/cartridge/cartridge.cpp
++++ b/bsnes/sfc/chip/bsx/cartridge/cartridge.cpp
+@@ -20,8 +20,14 @@ void BSXCartridge::power() {
+ 
+ void BSXCartridge::reset() {
+   for(unsigned i = 0; i < 16; i++) r[i] = 0x00;
++  r[0x02] = 0x80;
++  r[0x03] = 0x80;
++  r[0x05] = 0x80;
++  r[0x06] = 0x80;
+   r[0x07] = 0x80;
+   r[0x08] = 0x80;
++  r[0x09] = 0x80;
++  r[0x0b] = 0x80;
+   mmio_commit();
+ }
+ 
+@@ -42,6 +48,8 @@ void BSXCartridge::memory_write(Memory &memory, unsigned addr, uint8 data) {
+ 
+ //mcu_access() allows mcu_read() and mcu_write() to share decoding logic
+ uint8 BSXCartridge::mcu_access(bool write, unsigned addr, uint8 data) {
++
++//BIOS ROM Access
+   if((addr & 0xe08000) == 0x008000) {  //$00-1f:8000-ffff
+     if(r07 == 1) {
+       addr = ((addr & 0x1f0000) >> 1) | (addr & 0x7fff);
+@@ -56,31 +64,145 @@ uint8 BSXCartridge::mcu_access(bool write, unsigned addr, uint8 data) {
+     }
+   }
+ 
+-  if((addr & 0xe0e000) == 0x206000) {  //$20-3f:6000-7fff
+-    return memory_access(write, psram, addr, data);
+-  }
+ 
+-  if((addr & 0xf00000) == 0x400000) {  //$40-4f:0000-ffff
+-    if(r05 == 0) return memory_access(write, psram, addr & 0x0fffff, data);
+-  }
++  //PSRAM Access
++  //LoROM
++  if(r02==0) {
++
++	if((addr & 0xf28000) == 0x700000) { //$70-7d:0000-7fff
++		if(r03==1) return memory_access(write, psram, addr & 0x07ffff, data);
++	}
++
++	if((addr & 0xf08000) == 0xf00000) { //$f0-ff:0000-7fff
++		if(r04==1) return memory_access(write, psram, addr & 0x07ffff, data);
++	}
++
++
++	if((addr & 0xf08000) == 0x008000) { //$00-0f:8000-ffff
++		if(r03==1 && r05==0 && r06==0) return memory_access(write, psram, ((addr & 0x7f0000) >> 1) | (addr & 0x7fff), data);
++	}
++
++	if((addr & 0xf08000) == 0x808000) { //$80-8f:8000-ffff
++		if(r04==1 && r05==0 && r06==0) return memory_access(write, psram, ((addr & 0x7f0000) >> 1) | (addr & 0x7fff), data);
++	}
++
++	if((addr & 0xf08000) == 0x208000) { //$20-2f:8000-ffff
++		if(r03==1 && r05==1 && r06==0) return memory_access(write, psram, ((addr & 0x7f0000) >> 1) | (addr & 0x7fff), data);
++	}
++
++	if((addr & 0xf08000) == 0xa08000) { //$a0-af:8000-ffff
++		if(r04==1 && r05==1 && r06==0) return memory_access(write, psram, ((addr & 0x7f0000) >> 1) | (addr & 0x7fff), data);
++	}
++
++	if((addr & 0xf00000) == 0x400000) { //$40-4f:0000-ffff
++		if(r03==1 && r05==0 && r06==1) return memory_access(write, psram, ((addr & 0x7f0000) >> 1) | (addr & 0x7fff), data);
++	}
++
++	if((addr & 0xf00000) == 0xc00000) { //$c0-cf:0000-ffff
++		if(r04==1 && r05==0 && r06==1) return memory_access(write, psram, ((addr & 0x7f0000) >> 1) | (addr & 0x7fff), data);
++	}
++
++	if((addr & 0xf00000) == 0x600000) { //$60-6f:0000-ffff
++		if(r03==1 && r05==1 && r06==1) return memory_access(write, psram, ((addr & 0x7f0000) >> 1) | (addr & 0x7fff), data);
++	}
++
++	if((addr & 0xf00000) == 0xe00000) { //$e0-ef:0000-ffff
++		if(r04==1 && r05==1 && r06==1) return memory_access(write, psram, ((addr & 0x7f0000) >> 1) | (addr & 0x7fff), data);
++	}
++
++  } else {
++  //HiROM
++	if((addr & 0xe0e000) == 0x206000) { //$20-3f:6000-7fff
++		if(r03==1) return memory_access(write, psram, (addr&0x1fff)|0x6000, data);
++	}
++
++	if((addr & 0xe0e000) == 0xa06000) { //$a0-bf:6000-7fff
++		if(r04==1) return memory_access(write, psram, (addr&0x1fff)|0x6000, data);
++	}
++
+ 
+-  if((addr & 0xf00000) == 0x500000) {  //$50-5f:0000-ffff
+-    if(r06 == 0) return memory_access(write, psram, addr & 0x0fffff, data);
+-  }
++	if((addr & 0xf80000) == 0x400000) { //$40-47:0000-ffff
++		if(r03==1 && r05==0 && r06==0) return memory_access(write, psram, addr & 0x0fffff, data);
++	}
++
++	if((addr & 0xf80000) == 0x500000) { //$50-57:0000-ffff
++		if(r03==1 && r05==1 && r06==0) return memory_access(write, psram, addr & 0x0fffff, data);
++	}
++
++	if((addr & 0xf80000) == 0x600000) { //$60-67:0000-ffff
++		if(r03==1 && r05==0 && r06==1) return memory_access(write, psram, addr & 0x0fffff, data);
++	}
++
++	if((addr & 0xf80000) == 0x700000) { //$70-77:0000-ffff
++		if(r03==1 && r05==1 && r06==1) return memory_access(write, psram, addr & 0x0fffff, data);
++	}
++
++	if((addr & 0xf80000) == 0xc0ffff) { //$c0-c7:0000-ffff
++		if(r04==1 && r05==0 && r06==0) return memory_access(write, psram, addr & 0x0fffff, data);
++	}
++
++	if((addr & 0xf80000) == 0xd00000) { //$d0-d7:0000-ffff
++		if(r04==1 && r05==1 && r06==0) return memory_access(write, psram, addr & 0x0fffff, data);
++	}
++
++	if((addr & 0xf80000) == 0xe00000) { //$e0-e7:0000-ffff
++		if(r04==1 && r05==0 && r06==1) return memory_access(write, psram, addr & 0x0fffff, data);
++	}
++
++	if((addr & 0xf80000) == 0xf00000) { //$f0-f7:0000-ffff
++		if(r04==1 && r05==1 && r06==1) return memory_access(write, psram, addr & 0x0fffff, data);
++	}
+ 
+-  if((addr & 0xf00000) == 0x600000) {  //$60-6f:0000-ffff
+-    if(r03 == 1) return memory_access(write, psram, addr & 0x0fffff, data);
+   }
++
++  //Memory Pack Hole
++  if(r02==0) {
++	if((addr & 0xe08000) == 0x008000) { //$00-1f:8000-ffff
++		if(r09==1 && r0b==0) return cpu.regs.mdr;
++	}
++
++	if((addr & 0xe00000) == 0x400000) { //$40-5f:0000-ffff
++		if(r09==1 && r0b==1) return cpu.regs.mdr;
++	}
++
++	if((addr & 0xe08000) == 0x808000) { //$80-9f:8000-ffff
++		if(r0a==1 && r0b==0) return cpu.regs.mdr;
++	}
++
++	if((addr & 0xe00000) == 0xc00000) { //$c0-df:0000-ffff
++		if(r0a==1 && r0b==1) return cpu.regs.mdr;
++	}
++
++  } else {
++	if((addr & 0xb08000) == 0x008000 //$00-0f|$40-4f:0000-ffff
++	) {
++		if(r09==1 && r0b==0) return cpu.regs.mdr;
++	}
++
++	if((addr & 0xb08000) == 0x208000 //$20-2f|$60-6f:0000-ffff
++	) {
++		if(r09==1 && r0b==1) return cpu.regs.mdr;
++	}
++
++	if((addr & 0xb08000) == 0x808000 //$80-8f|$c0-cf:0000-ffff
++	) {
++		if(r0a==1 && r0b==0) return cpu.regs.mdr;
++	}
++
++	if((addr & 0xb08000) == 0xa08000 //$a0-af|$e0-ef:0000-ffff
++	) {
++		if(r0a==1 && r0b==1) return cpu.regs.mdr;
++	}
+ 
+-  if((addr & 0xf80000) == 0x700000) {  //$70-77:0000-ffff
+-    return memory_access(write, psram, addr & 0x07ffff, data);
+   }
+ 
+-  if(((addr & 0x408000) == 0x008000)  //$00-3f|80-bf:8000-ffff
+-  || ((addr & 0x400000) == 0x400000)  //$40-7f|c0-ff:0000-ffff
++
++// Memory Pack Acess
++  if(((addr & 0x408000) == 0x008000)  //$00-3f|$80-bf:8000-ffff
++  || ((addr & 0x400000) == 0x400000)  //$40-7d|$c0-ff:0000-ffff
+   ) {
+     if(r02 == 0) addr = ((addr & 0x7f0000) >> 1) | (addr & 0x7fff);
+-    Memory &memory = (r01 == 0 ? (Memory&)bsxflash : (Memory&)psram);
++    Memory &memory = (Memory&)bsxflash;
+     return memory_access(write, memory, addr & 0x7fffff, data);
+   }
+ 
+diff --git a/bsnes/sfc/chip/bsx/flash/flash.cpp b/bsnes/sfc/chip/bsx/flash/flash.cpp
+index 17b525b..5cea706 100644
+--- a/bsnes/sfc/chip/bsx/flash/flash.cpp
++++ b/bsnes/sfc/chip/bsx/flash/flash.cpp
+@@ -2,6 +2,26 @@
+ 
+ BSXFlash bsxflash;
+ 
++void BSXFlash::save() {
++	if(memory.size() >= 1) {
++		file MEMPAK;
++		//uint8 filenumber;
++		string mempakpath = {nall::configpath(), "bsnes/bsxmem/"}; //TODO: user configurable path
++		directory::create(mempakpath());
++		string filenm; //char filenm [25];
++		filenm.reserve(mempakpath.length()+9); //mempakpath + filename
++		bool writeisdone = false;
++		sprintf(filenm(), "%smempak.bs", (const char*)mempakpath()); //TODO: user configurable name; foltainer?
++		if (MEMPAK.open(filenm, file::mode::write)) {
++			int x;
++			for (x=0; x <= memory.size()-1; x++) {
++				MEMPAK.write(memory.read(x));
++			}
++			MEMPAK.close();
++		}
++	}
++}
++
+ void BSXFlash::init() {
+ }
+ 
+@@ -26,6 +46,7 @@ void BSXFlash::reset() {
+   regs.flash_enable = false;
+   regs.read_enable  = false;
+   regs.write_enable = false;
++  regs.command_done = false;
+   memory.write_protect(!regs.write_enable);
+ }
+ 
+@@ -34,29 +55,44 @@ unsigned BSXFlash::size() const {
+ }
+ 
+ uint8 BSXFlash::read(unsigned addr) {
+-  if(addr == 0x0002) {
+-    if(regs.flash_enable) return 0x80;
++
++  unsigned addr2 = addr&0xffff;
++
++  if(addr2 == 0x5555 && regs.flash_enable) { return 0x80; }
++
++  if(regs.flash_stat_bsr && addr2 == 0x0002)
++  {
++	return 0xc0;
+   }
+ 
+-  if(addr == 0x5555) {
+-    if(regs.flash_enable) return 0x80;
++  if(regs.flash_stat_gsr && addr2 == 0x0004)
++  {
++	//printf("Read GSR\n");
++	return 0x82;
++  }
++
++  if(regs.flash_stat_csr)
++  {
++	//printf("Read CSR (%x)\n", addr);
++	regs.flash_stat_csr = false;
++	return 0x80;
+   }
+ 
+-  if(regs.read_enable && addr >= 0xff00 && addr <= 0xff13) {
++  if(regs.read_enable && addr2 >= 0xff00 && addr2 <= 0xff13) {
+     //read flash cartridge vendor information
+     switch(addr - 0xff00) {
+       case 0x00: return 0x4d;
+-      case 0x01: return 0x00;
++      case 0x01: return 0x50;
+       case 0x02: return 0x50;
+       case 0x03: return 0x00;
+       case 0x04: return 0x00;
+       case 0x05: return 0x00;
+-      case 0x06: return 0x2a;  //0x2a = 8mbit, 0x2b = 16mbit (not known to exist, though BIOS recognizes ID)
++      case 0x06: return 0x1a;  //0x2a = 8mbit, 0x2b = 16mbit (not known to exist, though BIOS recognizes ID)
+       case 0x07: return 0x00;
+       default:   return 0x00;
+     }
+   }
+-
++  //printf("Read Flash Memory: %x : %x\n", addr, memory.read(addr));
+   return memory.read(addr);
+ }
+ 
+@@ -76,22 +112,130 @@ void BSXFlash::write(unsigned addr, uint8 data) {
+     regs.write_new = data;
+ 
+     if(regs.write_enable && regs.write_old == regs.write_new) {
++	  regs.write_enable = false;
+       return memory.write(addr, data);
+     }
+   } else {
+     if(regs.write_enable) {
++	  regs.write_enable = false;
+       return memory.write(addr, data);
+     }
+   }
++  if(regs.write_enable) {
++	  //printf("Write Flash Memory: %x : %x\n", addr, data);
++	  regs.write_enable = false;
++      return memory.write(addr, data);
++  }
++
+ 
+-  if(addr == 0x0000) {
++  //if(addr == 0x0000 || addr == 0x8000) {
++  if(true) {
+     regs.command <<= 8;
+     regs.command  |= data;
+ 
+-    if((regs.command & 0xffff) == 0x38d0) {
+-      regs.flash_enable = true;
+-      regs.read_enable  = true;
++    switch(regs.command & 0xff)
++	{
++		case 0x00:
++			regs.flash_enable = false;
++			regs.read_enable  = false;
++			regs.write_enable = false;
++			regs.flash_stat_csr = false;
++			regs.flash_stat_gsr = false;
++			regs.flash_stat_bsr = false;
++			regs.command_done = true;
++			break;
++		case 0x38:
++			regs.flash_enable = true;
++			regs.read_enable  = true;
++			regs.flash_stat_csr = false;
++			regs.flash_stat_gsr = false;
++			regs.flash_stat_bsr = false;
++			//regs.command_done = true;
++			break;
++		case 0x10:
++			regs.write_enable = true;
++			regs.flash_stat_csr = true;
++			regs.flash_stat_gsr = false;
++			regs.flash_stat_bsr = false;
++			regs.command_done = true;
++			break;
++		case 0x40:
++			regs.write_enable = true;
++			regs.flash_stat_csr = true;
++			regs.flash_stat_gsr = false;
++			regs.flash_stat_bsr = false;
++			regs.command_done = true;
++			break;
++		case 0x50:
++			regs.flash_stat_csr = false;
++			regs.flash_stat_gsr = false;
++			regs.flash_stat_bsr = false;
++			regs.command_done = true;
++		case 0x70:
++			regs.flash_stat_csr = true;
++			regs.write_enable = false;
++			regs.flash_stat_gsr = false;
++			regs.flash_stat_bsr = false;
++			regs.command_done = true;
++			break;
++		case 0x71:
++			regs.flash_stat_gsr = true;
++			regs.flash_stat_bsr = true;
++			regs.flash_stat_csr = false;
++			regs.flash_enable = true;
++			regs.command_done = true;
++		case 0x72:
++			regs.command_done = true;
++			break;
++		case 0x75:
++			regs.read_enable  = true;
++			regs.flash_stat_csr = false;
++			regs.command_done = true;
++			break;
++		case 0xd0:
++			regs.command_done = true;
++			break;
++		case 0xff:
++			regs.flash_enable = false;
++			regs.read_enable  = false;
++			regs.write_enable = false;
++			regs.flash_stat_csr = false;
++			regs.flash_stat_gsr = false;
++			regs.flash_stat_bsr = false;
++			regs.command_done = true;
++			break;
++
+     }
++
++	if(regs.command_done)
++	{
++		//printf("Flash Command: %x\n", regs.command);
++		memory.write_protect(!regs.write_enable);
++		//Page Erase
++		if (regs.command == 0x20d0) {
++			memory.write_protect(false);
++			int erase_addr = addr & 0xff0000;
++			//printf("Page Erase (Page %x)\n", erase_addr);
++			uint32 x;
++			for (x=0; x < 0xffff; x++) {
++				memory.write(erase_addr+x, 0xff);
++			}
++			memory.write_protect(true);
++		}
++
++		//Chip Erase
++		if (regs.command == 0xa7d0) {
++			memory.write_protect(false);
++			unsigned x;
++			//printf("Chip Erase\n");
++			for (x=0; x < bsxflash.size(); x++) {
++				memory.write(x, 0xff);
++			}
++			memory.write_protect(true);
++		}
++		regs.command = 0;
++		regs.command_done = false;
++	}
+   }
+ 
+   if(addr == 0x2aaa) {
+@@ -105,6 +249,7 @@ void BSXFlash::write(unsigned addr, uint8 data) {
+ 
+     if((regs.command & 0xffffff) == 0xaa5570) {
+       regs.write_enable = false;
++	  regs.flash_enable = true;
+     }
+ 
+     if((regs.command & 0xffffff) == 0xaa55a0) {
+@@ -117,7 +262,12 @@ void BSXFlash::write(unsigned addr, uint8 data) {
+     if((regs.command & 0xffffff) == 0xaa55f0) {
+       regs.flash_enable = false;
+       regs.read_enable  = false;
+-      regs.write_enable = false;
++
++      regs.write_enable = true;
++	  regs.flash_stat_csr = false;
++	  regs.flash_stat_gsr = false;
++	  regs.flash_stat_bsr = false;
++
+     }
+ 
+     memory.write_protect(!regs.write_enable);
+diff --git a/bsnes/sfc/chip/bsx/flash/flash.hpp b/bsnes/sfc/chip/bsx/flash/flash.hpp
+index 3232fb4..4491d59 100644
+--- a/bsnes/sfc/chip/bsx/flash/flash.hpp
++++ b/bsnes/sfc/chip/bsx/flash/flash.hpp
+@@ -1,6 +1,8 @@
++#include <nall/file.hpp>
+ struct BSXFlash : Memory {
+   MappedRAM memory;
+ 
++  void save();
+   void init();
+   void load();
+   void unload();
+@@ -14,12 +16,20 @@ struct BSXFlash : Memory {
+ private:
+   struct {
+     unsigned command;
++	unsigned command2;
+     uint8 write_old;
+     uint8 write_new;
+ 
+     bool flash_enable;
+     bool read_enable;
+     bool write_enable;
++
++	bool command_done; //Giving Flash Command is done.
++
++	bool flash_stat_csr;
++	bool flash_stat_gsr;
++	bool flash_stat_bsr;
++
+   } regs;
+ };
+ 
+diff --git a/bsnes/sfc/chip/bsx/satellaview/satellaview.cpp b/bsnes/sfc/chip/bsx/satellaview/satellaview.cpp
+index a348af7..30553f1 100644
+--- a/bsnes/sfc/chip/bsx/satellaview/satellaview.cpp
++++ b/bsnes/sfc/chip/bsx/satellaview/satellaview.cpp
+@@ -7,7 +7,7 @@ void BSXSatellaview::init() {
+ 
+ void BSXSatellaview::load() {
+   bus.map(Bus::MapMode::Direct, 0x00, 0x3f, 0x2188, 0x219f, {&BSXSatellaview::mmio_read, &bsxsatellaview}, {&BSXSatellaview::mmio_write, &bsxsatellaview});
+-  bus.map(Bus::MapMode::Direct, 0x80, 0xbf, 0x2188, 0x219f, {&BSXSatellaview::mmio_read, &bsxsatellaview}, {&BSXSatellaview::mmio_write, &bsxsatellaview});
++  bus.map(Bus::MapMode::Direct, 0x80, 0xbf, 0x2188, 0x219f, { &BSXSatellaview::mmio_read, &bsxsatellaview }, { &BSXSatellaview::mmio_write, &bsxsatellaview });
+ }
+ 
+ void BSXSatellaview::unload() {
+@@ -17,64 +17,245 @@ void BSXSatellaview::power() {
+ }
+ 
+ void BSXSatellaview::reset() {
++  BSXF.close();
++  regs.BSXF_NUM = 0;
+   memset(&regs, 0x00, sizeof regs);
+ }
+ 
++void BSXSatellaview::BSXfileopen(uint8 filenumber) {
++   BSXF.close();
++   uint16 Signal_Nb=regs.r2188^(regs.r2189*256);
++   string filenm;
++   filenm.reserve(nall::configpath().length()+21+4+3);//configpath + bsxdat path + channel + program
++   sprintf(filenm(), "%sbsnes/bsxdat/BSX%04.4hX-%d.bin", (const char*)nall::configpath(), Signal_Nb, filenumber);
++   BSXF.open(filenm(), file::mode::read);
++   if(BSXF.size()!= -1) {
++     //printf("%02.2hX, %02.2hX, %04.4hX: %s\n",regs.r2189, regs.r2188, Signal_Nb, filenm);
++     regs.BSX_access=true;
++     regs.BSXF_Signal++;
++     float QueueSize = BSXF.size() / 22.;
++     regs.BSXF_Queue = (uint8)(ceil(QueueSize));
++     regs.BSXF_1ST = true;
++     }
++   else {
++     regs.BSX_access=false;
++     regs.BSXF_Signal=0;
++     }
++}
++
++void BSXSatellaview::BSX2fileopen(uint8 filenumber) {
++   BSXF2.close();
++   uint16 Signal_Nb=regs.r218e^(regs.r218f*256);
++   string filenm;
++   filenm.reserve (nall::configpath().length()+21+4+3); //configpath + bsxdat path + channel + program
++   sprintf(filenm(), "%sbsnes/bsxdat/BSX%04.4hX-%d.bin", (const char*)nall::configpath(), Signal_Nb, filenumber);
++   BSXF2.open(filenm(), file::mode::read);
++   if(BSXF2.size()!= -1) {
++     //printf("%02.2hX, %02.2hX, %04.4hX: %s\n",regs.r218f, regs.r218e, Signal_Nb, filenm);
++     regs.BSX2_access=true;
++     regs.BSXF2_Signal++;
++     float QueueSize = BSXF2.size() / 22.;
++     regs.BSXF2_Queue = (uint8)(ceil(QueueSize));
++     regs.BSXF2_1ST = true;
++     }
++   else {
++     regs.BSX2_access=false;
++     regs.BSXF2_Signal=0;
++     }
++}
++
++uint8 BSXSatellaview::GetTime(bool reset_count) {
++		if(reset_count == true) {
++			regs.time_counter = 0;
++			return 0xff;
++		}
++		unsigned counter = regs.time_counter;
++		regs.time_counter++;
++		if(regs.time_counter >= 22) regs.time_counter = 0;
++		if(counter == 0) {
++			time_t rawtime;
++			time(&rawtime);
++			tm *t = localtime(&rawtime);
++
++			regs.time_hour   = t->tm_hour;
++			regs.time_minute = t->tm_min;
++			regs.time_second = t->tm_sec;
++			regs.time_weekday = (t->tm_wday)++;
++			regs.time_day = (t->tm_mday)++;
++			regs.time_month = t->tm_mon;
++			uint16 time_year = (t->tm_year) + 1900;
++			regs.time_yearL = time_year & 0xFF;
++			regs.time_yearH = time_year >> 8;
++		}
++
++		switch(counter) {
++			case  0: return 0x00;  //???
++			case  1: return 0x00;  //???
++			case  2: return 0x00;  //???
++			case  3: return 0x00;  //???
++			case  4: return 0x03;  //???
++			case  5: return 0x01;
++			case  6: return 0x01;
++			case  7: return 0x00;
++			case  8: return 0x00;
++			case  9: return 0x00;
++			case 10: return regs.time_second;
++			case 11: return regs.time_minute;
++			case 12: return regs.time_hour;
++			case 13: return regs.time_weekday;
++			case 14: return regs.time_day;
++			case 15: return regs.time_month;
++			case 16: return regs.time_yearL;  //???
++			case 17: return regs.time_yearH;  //???
++		}
++		return 0;
++}
++
++
+ uint8 BSXSatellaview::mmio_read(unsigned addr) {
+   addr &= 0xffff;
+ 
+   switch(addr) {
+     case 0x2188: return regs.r2188;
+     case 0x2189: return regs.r2189;
+-    case 0x218a: return regs.r218a;
+-    case 0x218c: return regs.r218c;
++    case 0x218a: {
++		if(regs.r2188 == 0 && regs.r2189 == 0) {
++			return 0x01;
++		}
++		if (regs.BSXF_Queue <= 0) {
++			regs.BSXF_NUM++;
++			BSXfileopen(regs.BSXF_NUM-1);
++		}
++		if(!regs.BSX_access && (regs.BSXF_NUM-1) > 0) {
++			regs.BSXF_NUM=1;
++			BSXfileopen(regs.BSXF_NUM-1);
++		}
++		if(regs.BSX_access) {
++			regs.r218b_chk=true;
++			regs.r218c_chk=true;
++			return regs.BSXF_Queue;
++		}
++		else return 0;
++	}
++
++	case 0x218b: {
++		if(regs.r218b_port) {
++			if(regs.r2188 == 0 && regs.r2189 == 0) {
++				regs.r218b = 0x90;
++				return 0x90;
++			}
++			if(regs.BSX_access) {
++				regs.r218b_chk=false;
++				uint8 lol = 0;
++				if (regs.BSXF_1ST) {
++					lol = 0x10;
++					regs.BSXF_1ST = false;
++				}
++				regs.BSXF_Queue--;
++				if (regs.BSXF_Queue==0) { lol |= 0x80; }
++				regs.r218d |= lol;
++				return lol;
++			}
++		}
++		else return 0x00;
++	}
++    case 0x218c: {
++		if(regs.r218c_port) {
++			if(regs.r2188 == 0 && regs.r2189 == 0) {
++				return GetTime(false);
++			}
++			if(regs.BSX_access) {
++			/*	if(!regs.r218c_chk && BSXF.offset() <= 0x48) regs.r218b_chk=true;
++				if(regs.r218c_chk) {
++					//BSXF.seek(0x48);
++					regs.r218c_chk=false;
++					return BSXF.read();
++				} */
++				return BSXF.read();
++			}
++		}
++		else return 0x00;
++	}
++	case 0x218d: {
++		uint8 lol = regs.r218d;
++		regs.r218d = 0;
++		return lol;
++	}
+     case 0x218e: return regs.r218e;
+     case 0x218f: return regs.r218f;
+-    case 0x2190: return regs.r2190;
++    case 0x2190: {
++		if(regs.r218e == 0 && regs.r218f == 0) {
++			return 0x01;
++		}
++		if (regs.BSXF2_Queue <= 0) {
++			regs.BSXF2_NUM++;
++			BSX2fileopen(regs.BSXF2_NUM-1);
++		}
++		if(!regs.BSX2_access && (regs.BSXF2_NUM-1) > 0) {
++			regs.BSXF2_NUM=1;
++			BSX2fileopen(regs.BSXF2_NUM-1);
++		}
++		if(regs.BSX2_access) {
++			regs.r2191_chk=true;
++			regs.r2192_chk=true;
++			return regs.BSXF2_Queue;
++		}
++		else return 0;
++	}
++
++	case 0x2191: {
++	  if(regs.r2191_port) {
++			if(regs.r218e == 0 && regs.r218f == 0) {
++				regs.r2193 = 0x90;
++				return 0x90;
++			}
++			if(regs.BSX2_access) {
++				uint8 lol = 0;
++				if (regs.BSXF2_1ST) {
++					lol = 0x10;
++					regs.BSXF2_1ST = false;
++				}
++				regs.BSXF2_Queue--;
++				if (regs.BSXF2_Queue==0) { lol |= 0x80; }
++				regs.r2193 |= lol;
++				return lol;
++			}
++	  }
++	  else return 0;
++	}
++
+ 
+     case 0x2192: {
+-      unsigned counter = regs.r2192_counter++;
+-      if(regs.r2192_counter >= 18) regs.r2192_counter = 0;
+-
+-      if(counter == 0) {
+-        time_t rawtime;
+-        time(&rawtime);
+-        tm *t = localtime(&rawtime);
+-
+-        regs.r2192_hour   = t->tm_hour;
+-        regs.r2192_minute = t->tm_min;
+-        regs.r2192_second = t->tm_sec;
+-      }
+-
+-      switch(counter) {
+-        case  0: return 0x00;  //???
+-        case  1: return 0x00;  //???
+-        case  2: return 0x00;  //???
+-        case  3: return 0x00;  //???
+-        case  4: return 0x00;  //???
+-        case  5: return 0x01;
+-        case  6: return 0x01;
+-        case  7: return 0x00;
+-        case  8: return 0x00;
+-        case  9: return 0x00;
+-        case 10: return regs.r2192_second;
+-        case 11: return regs.r2192_minute;
+-        case 12: return regs.r2192_hour;
+-        case 13: return 0x00;  //???
+-        case 14: return 0x00;  //???
+-        case 15: return 0x00;  //???
+-        case 16: return 0x00;  //???
+-        case 17: return 0x00;  //???
+-      }
+-    } break;
+ 
+-    case 0x2193: return regs.r2193 & ~0x0c;
+-    case 0x2194: return regs.r2194;
++	  if(regs.r2192_port) {
++		if(regs.r218e == 0 && regs.r218f == 0) {
++			return GetTime(false);
++		}
++		if(regs.BSX2_access) {
++		/*
++			if(!regs.r2192_chk && BSXF2.offset() <= 0x48) regs.r2191_chk=true;
++			if(regs.r2192_chk) {
++				//BSXF2.seek(0x48);
++				regs.r2192_chk=false;
++				return BSXF2.read();
++			} */
++			return BSXF2.read();
++		}
++		else return 0x00;
++	} break;
++
++    case 0x2193: {
++		uint8 lol = regs.r2193;
++		regs.r2193 = 0;
++		return lol;
++	}
++    case 0x2194: return 0xff; //regs.r2194;
+     case 0x2196: return regs.r2196;
+     case 0x2197: return regs.r2197;
+     case 0x2199: return regs.r2199;
+   }
+ 
++ }
+   return cpu.regs.mdr;
+ }
+ 
+@@ -83,11 +264,22 @@ void BSXSatellaview::mmio_write(unsigned addr, uint8 data) {
+ 
+   switch(addr) {
+     case 0x2188: {
+-      regs.r2188 = data;
++	  //printf("Write 2188: %02.2hX\n", regs.r2188);
++	  if (regs.r2188 != data) {
++		regs.BSXF_Signal = 0;
++		regs.BSXF_NUM = 0;
++	  }
++	  else regs.BSXF_Signal++;
++	  regs.r2188 = data;
+     } break;
+ 
+     case 0x2189: {
+-      regs.r2189 = data;
++	  if (regs.r2189 != data) {
++		regs.BSXF_Signal = 0;
++		regs.BSXF_NUM = 0;
++	  }
++	  else regs.BSXF_Signal++;
++	  regs.r2189 = data;
+     } break;
+ 
+     case 0x218a: {
+@@ -95,30 +287,51 @@ void BSXSatellaview::mmio_write(unsigned addr, uint8 data) {
+     } break;
+ 
+     case 0x218b: {
+-      regs.r218b = data;
++	  if (data && 1 == 1) {
++		regs.r218b_port=true;
++		regs.r218b_chk=true;
++	  }
++	  else regs.r218b_port=false;
+     } break;
+ 
+     case 0x218c: {
+-      regs.r218c = data;
++	  if (regs.r2188 == 0 && regs.r2189 == 0) { GetTime(true); }
++	  if (data && 1 == 1) {
++		regs.r218c_port=true;
++		regs.r218c_chk=true;
++	  }
++	  else regs.r218c_port=false;
+     } break;
+ 
+     case 0x218e: {
+-      regs.r218e = data;
++	  if (regs.r218e != data) {
++		regs.BSXF2_Signal = 0;
++		regs.BSXF2_NUM = 0;
++	  }
++	  else regs.BSXF2_Signal++;
++	  regs.r218e = data;
+     } break;
+ 
+     case 0x218f: {
+-      regs.r218e >>= 1;
+-      regs.r218e = regs.r218f - regs.r218e;
+-      regs.r218f >>= 1;
++      //printf("Write 218F: %02.2hX\n", regs.r2189);
++	  if (regs.r218f != data) {
++		regs.BSXF2_Signal = 0;
++		regs.BSXF2_NUM = 0;
++	  }
++	  else regs.BSXF2_Signal++;
++	  regs.r218f = data;
+     } break;
+ 
+     case 0x2191: {
+-      regs.r2191 = data;
+-      regs.r2192_counter = 0;
++      if (data && 1 == 1) regs.r2191_port=true;
++	  else regs.r2191_port=false;
++      regs.time_counter = 0;
+     } break;
+ 
+     case 0x2192: {
+-      regs.r2190 = 0x80;
++	  if (regs.r218e == 0 && regs.r218f == 0) { GetTime(true); }
++	  if (data && 1 == 1) regs.r2192_port=true;
++	  else regs.r2192_port=false;
+     } break;
+ 
+     case 0x2193: {
+diff --git a/bsnes/sfc/chip/bsx/satellaview/satellaview.hpp b/bsnes/sfc/chip/bsx/satellaview/satellaview.hpp
+index 56caf0b..f492058 100644
+--- a/bsnes/sfc/chip/bsx/satellaview/satellaview.hpp
++++ b/bsnes/sfc/chip/bsx/satellaview/satellaview.hpp
+@@ -1,3 +1,5 @@
++#include <nall/file.hpp>
++
+ struct BSXSatellaview {
+   void init();
+   void load();
+@@ -5,6 +7,14 @@ struct BSXSatellaview {
+   void power();
+   void reset();
+ 
++  file BSXF;
++  file BSXF2;
++
++  void BSXfileopen(uint8 filenumber);
++  void BSX2fileopen(uint8 filenumber);
++
++  uint8 GetTime(bool reset_count);
++
+   uint8 mmio_read(unsigned addr);
+   void mmio_write(unsigned addr, uint8 data);
+ 
+@@ -17,8 +27,34 @@ private:
+     uint8 r2198, r2199, r219a, r219b;
+     uint8 r219c, r219d, r219e, r219f;
+ 
+-    uint8 r2192_counter;
+-    uint8 r2192_hour, r2192_minute, r2192_second;
++
++    uint8 time_counter;
++    uint8 time_hour, time_minute, time_second;
++	uint8 time_weekday, time_day, time_month;
++	uint8 time_yearL, time_yearH;
++
++	bool r218b_port, r218c_port;
++	bool r2191_port, r2192_port;
++
++	bool BSX_access;
++	uint8 BSXF_NUM;
++	uint8 BSXF_Signal;
++
++	uint8 BSXF_Queue;
++	bool BSXF_1ST;
++
++	bool BSX2_access;
++	uint8 BSXF2_NUM;
++	uint8 BSXF2_Signal;
++
++	uint8 BSXF2_Queue;
++	bool BSXF2_1ST;
++
++	bool r218b_chk;
++	bool r218c_chk;
++
++	bool r2191_chk;
++	bool r2192_chk;
+   } regs;
+ };
+

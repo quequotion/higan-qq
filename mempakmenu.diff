@@ -1,0 +1,130 @@
+diff --git a/bsnes/emulator/interface.hpp b/bsnes/emulator/interface.hpp
+index c6cd0ce..c148f54 100644
+--- a/bsnes/emulator/interface.hpp
++++ b/bsnes/emulator/interface.hpp
+@@ -85,6 +85,7 @@ struct Interface {
+   virtual void load(unsigned id, const stream &memory, const string &markup = "") {}
+   virtual void save(unsigned id, const stream &memory) {}
+   virtual void unload() {}
++  virtual void saveMemPak () {}
+ 
+   //system interface
+   virtual void connect(unsigned port, unsigned device) {}
+diff --git a/bsnes/sfc/interface/interface.cpp b/bsnes/sfc/interface/interface.cpp
+index 61b5198..04d40ef 100644
+--- a/bsnes/sfc/interface/interface.cpp
++++ b/bsnes/sfc/interface/interface.cpp
+@@ -218,6 +218,10 @@ void Interface::connect(unsigned port, unsigned device) {
+   input.connect(port, (Input::Device)device);
+ }
+ 
++void Interface::saveMemPak() {
++  system.saveMemPak();
++}
++
+ void Interface::power() {
+   system.power();
+ }
+diff --git a/bsnes/sfc/interface/interface.hpp b/bsnes/sfc/interface/interface.hpp
+index 3d84500..fd3453d 100644
+--- a/bsnes/sfc/interface/interface.hpp
++++ b/bsnes/sfc/interface/interface.hpp
+@@ -76,6 +76,7 @@ struct Interface : Emulator::Interface {
+   void load(unsigned id, const stream &stream, const string &markup = "");
+   void save(unsigned id, const stream &stream);
+   void unload();
++  void saveMemPak();
+ 
+   void connect(unsigned port, unsigned device);
+   void power();
+diff --git a/bsnes/sfc/system/system.cpp b/bsnes/sfc/system/system.cpp
+index feb48f0..e8d45df 100644
+--- a/bsnes/sfc/system/system.cpp
++++ b/bsnes/sfc/system/system.cpp
+@@ -160,6 +160,10 @@ void System::unload() {
+   if(cartridge.has_msu1()) msu1.unload();
+ }
+ 
++  void System::saveMemPak() {
++    if(cartridge.has_bs_slot()) bsxflash.save();
++}
++
+ void System::power() {
+   random.seed((unsigned)time(0));
+ 
+diff --git a/bsnes/sfc/system/system.hpp b/bsnes/sfc/system/system.hpp
+index 3bb08ae..39453d5 100644
+--- a/bsnes/sfc/system/system.hpp
++++ b/bsnes/sfc/system/system.hpp
+@@ -11,6 +11,7 @@ struct System : property<System> {
+   void term();
+   void load();
+   void unload();
++  void saveMemPak();
+   void power();
+   void reset();
+ 
+diff --git a/bsnes/target-ethos/general/presentation.cpp b/bsnes/target-ethos/general/presentation.cpp
+index 5c5adab..baa98ec 100644
+--- a/bsnes/target-ethos/general/presentation.cpp
++++ b/bsnes/target-ethos/general/presentation.cpp
+@@ -160,6 +160,7 @@ void Presentation::bootstrap() {
+     iEmulator->power.setText("Power");
+     iEmulator->reset.setText("Reset");
+     iEmulator->unload.setText("Unload");
++    iEmulator->saveMemPak.setText("Save BSX MemPak");
+ 
+     for(auto &port : emulator->port) {
+       auto iPort = new Emulator::Port;
+@@ -193,10 +194,12 @@ void Presentation::bootstrap() {
+     iEmulator->menu.append(iEmulator->controllerSeparator);
+     if(visiblePorts == 0) iEmulator->controllerSeparator.setVisible(false);
+     iEmulator->menu.append(iEmulator->unload);
++    iEmulator->menu.append(iEmulator->saveMemPak);
+ 
+     iEmulator->power.onActivate = {&Utility::power, utility};
+     iEmulator->reset.onActivate = {&Utility::reset, utility};
+     iEmulator->unload.onActivate = {&Utility::unload, utility};
++    iEmulator->saveMemPak.onActivate = {&Utility::saveMemPak, utility};
+ 
+     emulatorList.append(iEmulator);
+   }
+diff --git a/bsnes/target-ethos/general/presentation.hpp b/bsnes/target-ethos/general/presentation.hpp
+index 1a44aa3..29e737d 100644
+--- a/bsnes/target-ethos/general/presentation.hpp
++++ b/bsnes/target-ethos/general/presentation.hpp
+@@ -9,6 +9,7 @@ struct Presentation : Window {
+       Item power;
+       Item reset;
+       Item unload;
++      Item saveMemPak;
+       Separator controllerSeparator;
+       struct Port {
+         Menu menu;
+diff --git a/bsnes/target-ethos/utility/utility.cpp b/bsnes/target-ethos/utility/utility.cpp
+index 1ed9441..8f089f1 100644
+--- a/bsnes/target-ethos/utility/utility.cpp
++++ b/bsnes/target-ethos/utility/utility.cpp
+@@ -120,6 +120,10 @@ void Utility::unload() {
+   stateManager->setVisible(false);
+ }
+ 
++void Utility::saveMemPak() {
++  system().saveMemPak();
++}
++
+ void Utility::saveState(unsigned slot) {
+   if(application->active == nullptr) return;
+   serializer s = system().serialize();
+diff --git a/bsnes/target-ethos/utility/utility.hpp b/bsnes/target-ethos/utility/utility.hpp
+index dc5f3a1..639ff29 100644
+--- a/bsnes/target-ethos/utility/utility.hpp
++++ b/bsnes/target-ethos/utility/utility.hpp
+@@ -13,6 +13,7 @@ struct Utility {
+   void reset();
+   void load();
+   void unload();
++  void saveMemPak();
+ 
+   void saveState(unsigned slot);
+   void loadState(unsigned slot);

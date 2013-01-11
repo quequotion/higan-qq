@@ -1,0 +1,60 @@
+diff --git a/bsnes/Makefile b/bsnes/Makefile
+index 65ad25d..08df7eb 100644
+--- a/bsnes/Makefile
++++ b/bsnes/Makefile
+@@ -6,7 +6,7 @@ gb  := gb
+ gba := gba
+ nds := nds
+ 
+-profile := accuracy
++profile := accuracyfast
+ target  := ethos
+ 
+ # options += debugger
+diff --git a/bsnes/sfc/Makefile b/bsnes/sfc/Makefile
+index 806cf6d..f83bfc8 100644
+--- a/bsnes/sfc/Makefile
++++ b/bsnes/sfc/Makefile
+@@ -15,6 +15,12 @@ ifeq ($(profile),accuracy)
+   sfcsmp := $(sfc)/smp
+   sfcdsp := $(sfc)/dsp
+   sfcppu := $(sfc)/ppu
++else ifeq ($(profile),accuracyfast)
++  flags += -DPROFILE_ACCURACYFAST
++  sfccpu := $(sfc)/cpu
++  sfcsmp := $(sfc)/smp
++  sfcdsp := $(sfc)/alt/dsp
++  sfcppu := $(sfc)/ppu
+ else ifeq ($(profile),compatibility)
+   flags += -DPROFILE_COMPATIBILITY
+   sfccpu := $(sfc)/cpu
+diff --git a/bsnes/sfc/profile-accuracyfast.hpp b/bsnes/sfc/profile-accuracyfast.hpp
+index e69de29..dd0319c 100644
+--- a/bsnes/sfc/profile-accuracyfast.hpp
++++ b/bsnes/sfc/profile-accuracyfast.hpp
+@@ -0,0 +1,12 @@
++namespace Info {
++  static const char Profile[] = "Accuracyfast";
++}
++
++#if defined(DEBUGGER)
++  #error "bsnes: debugger not supported with accuracyfast profile."
++#endif
++
++#include <sfc/cpu/cpu.hpp>
++#include <sfc/smp/smp.hpp>
++#include <sfc/alt/dsp/dsp.hpp>
++#include <sfc/ppu/ppu.hpp>
+diff --git a/bsnes/sfc/sfc.hpp b/bsnes/sfc/sfc.hpp
+index b7167f1..2d62f4f 100644
+--- a/bsnes/sfc/sfc.hpp
++++ b/bsnes/sfc/sfc.hpp
+@@ -57,6 +57,8 @@ namespace SuperFamicom {
+ 
+   #if defined(PROFILE_ACCURACY)
+   #include "profile-accuracy.hpp"
++  #elif defined(PROFILE_ACCURACYFAST)
++  #include "profile-accuracyfast.hpp"
+   #elif defined(PROFILE_COMPATIBILITY)
+   #include "profile-compatibility.hpp"
+   #elif defined(PROFILE_PERFORMANCE)
