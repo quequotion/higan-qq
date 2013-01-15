@@ -1,20 +1,7 @@
-diff --git a/bsnes/sfc/cartridge/markup.cpp b/bsnes/sfc/cartridge/markup.cpp
-index ddf179d..42876ef 100644
---- a/bsnes/sfc/cartridge/markup.cpp
-+++ b/bsnes/sfc/cartridge/markup.cpp
-@@ -162,7 +162,7 @@ void Cartridge::parse_markup_bsxslot(XML::Node &root) {
-     if(node["id"].data == "rom") {
-       if(bsxflash.memory.size() == 0) continue;
- 
--      Mapping m(bsxflash.memory);
-+      Mapping m(bsxflash);
-       parse_markup_map(m, node);
-       mapping.append(m);
-     }
-diff --git a/bsnes/sfc/chip/bsx/cartridge/cartridge.cpp b/bsnes/sfc/chip/bsx/cartridge/cartridge.cpp
-index b11bb6f..1046644 100644
---- a/bsnes/sfc/chip/bsx/cartridge/cartridge.cpp
-+++ b/bsnes/sfc/chip/bsx/cartridge/cartridge.cpp
+diff --git a/higan/sfc/chip/bsx/cartridge/cartridge.cpp b/higan/sfc/chip/bsx/cartridge/cartridge.cpp
+index b11bb6f..e083bda 100755
+--- a/higan/sfc/chip/bsx/cartridge/cartridge.cpp
++++ b/higan/sfc/chip/bsx/cartridge/cartridge.cpp
 @@ -20,8 +20,14 @@ void BSXCartridge::power() {
  
  void BSXCartridge::reset() {
@@ -104,11 +91,13 @@ index b11bb6f..1046644 100644
 +	if((addr & 0xe0e000) == 0xa06000) { //$a0-bf:6000-7fff
 +		if(r04==1) return memory_access(write, psram, (addr&0x1fff)|0x6000, data);
 +	}
-+
  
 -  if((addr & 0xf00000) == 0x500000) {  //$50-5f:0000-ffff
 -    if(r06 == 0) return memory_access(write, psram, addr & 0x0fffff, data);
 -  }
+ 
+-  if((addr & 0xf00000) == 0x600000) {  //$60-6f:0000-ffff
+-    if(r03 == 1) return memory_access(write, psram, addr & 0x0fffff, data);
 +	if((addr & 0xf80000) == 0x400000) { //$40-47:0000-ffff
 +		if(r03==1 && r05==0 && r06==0) return memory_access(write, psram, addr & 0x0fffff, data);
 +	}
@@ -140,11 +129,11 @@ index b11bb6f..1046644 100644
 +	if((addr & 0xf80000) == 0xf00000) { //$f0-f7:0000-ffff
 +		if(r04==1 && r05==1 && r06==1) return memory_access(write, psram, addr & 0x0fffff, data);
 +	}
- 
--  if((addr & 0xf00000) == 0x600000) {  //$60-6f:0000-ffff
--    if(r03 == 1) return memory_access(write, psram, addr & 0x0fffff, data);
-   }
 +
+   }
+ 
+-  if((addr & 0xf80000) == 0x700000) {  //$70-77:0000-ffff
+-    return memory_access(write, psram, addr & 0x07ffff, data);
 +  //Memory Pack Hole
 +  if(r02==0) {
 +	if((addr & 0xe08000) == 0x008000) { //$00-1f:8000-ffff
@@ -183,9 +172,7 @@ index b11bb6f..1046644 100644
 +	) {
 +		if(r0a==1 && r0b==1) return cpu.regs.mdr;
 +	}
- 
--  if((addr & 0xf80000) == 0x700000) {  //$70-77:0000-ffff
--    return memory_access(write, psram, addr & 0x07ffff, data);
++
    }
  
 -  if(((addr & 0x408000) == 0x008000)  //$00-3f|80-bf:8000-ffff
@@ -201,10 +188,10 @@ index b11bb6f..1046644 100644
      return memory_access(write, memory, addr & 0x7fffff, data);
    }
  
-diff --git a/bsnes/sfc/chip/bsx/flash/flash.cpp b/bsnes/sfc/chip/bsx/flash/flash.cpp
-index 17b525b..5cea706 100644
---- a/bsnes/sfc/chip/bsx/flash/flash.cpp
-+++ b/bsnes/sfc/chip/bsx/flash/flash.cpp
+diff --git a/higan/sfc/chip/bsx/flash/flash.cpp b/higan/sfc/chip/bsx/flash/flash.cpp
+index 1a3a1f7..a4deb7d 100755
+--- a/higan/sfc/chip/bsx/flash/flash.cpp
++++ b/higan/sfc/chip/bsx/flash/flash.cpp
 @@ -2,6 +2,26 @@
  
  BSXFlash bsxflash;
@@ -213,7 +200,7 @@ index 17b525b..5cea706 100644
 +	if(memory.size() >= 1) {
 +		file MEMPAK;
 +		//uint8 filenumber;
-+		string mempakpath = {nall::configpath(), "bsnes/bsxmem/"}; //TODO: user configurable path
++		string mempakpath = {nall::configpath(), "higan/bsxmem/"}; //TODO: user configurable path
 +		directory::create(mempakpath());
 +		string filenm; //char filenm [25];
 +		filenm.reserve(mempakpath.length()+9); //mempakpath + filename
@@ -240,52 +227,50 @@ index 17b525b..5cea706 100644
    memory.write_protect(!regs.write_enable);
  }
  
-@@ -34,29 +55,44 @@ unsigned BSXFlash::size() const {
- }
- 
+@@ -36,29 +57,42 @@ unsigned BSXFlash::size() const {
  uint8 BSXFlash::read(unsigned addr) {
+   if(readonly) return memory.read(bus.mirror(addr, memory.size()));
+ 
 -  if(addr == 0x0002) {
 -    if(regs.flash_enable) return 0x80;
-+
 +  unsigned addr2 = addr&0xffff;
 +
-+  if(addr2 == 0x5555 && regs.flash_enable) { return 0x80; }
-+
-+  if(regs.flash_stat_bsr && addr2 == 0x0002)
-+  {
-+	return 0xc0;
++  if(addr2 == 0x5555 && regs.flash_enable) {
++       return 0x80;
    }
  
 -  if(addr == 0x5555) {
 -    if(regs.flash_enable) return 0x80;
-+  if(regs.flash_stat_gsr && addr2 == 0x0004)
-+  {
-+	//printf("Read GSR\n");
-+	return 0x82;
++  if(regs.flash_stat_bsr && addr2 == 0x0002) {
++       return 0xc0;
 +  }
 +
-+  if(regs.flash_stat_csr)
-+  {
-+	//printf("Read CSR (%x)\n", addr);
-+	regs.flash_stat_csr = false;
-+	return 0x80;
++  if(regs.flash_stat_gsr && addr2 == 0x0004) {
++       //printf("Read GSR\n");
++       return 0x82;
++  }
++
++  if(regs.flash_stat_csr) {
++       //printf("Read CSR (%x)\n", addr);
++       regs.flash_stat_csr = false;
++       return 0x80;
    }
  
 -  if(regs.read_enable && addr >= 0xff00 && addr <= 0xff13) {
 +  if(regs.read_enable && addr2 >= 0xff00 && addr2 <= 0xff13) {
      //read flash cartridge vendor information
      switch(addr - 0xff00) {
-       case 0x00: return 0x4d;
--      case 0x01: return 0x00;
-+      case 0x01: return 0x50;
-       case 0x02: return 0x50;
-       case 0x03: return 0x00;
-       case 0x04: return 0x00;
-       case 0x05: return 0x00;
--      case 0x06: return 0x2a;  //0x2a = 8mbit, 0x2b = 16mbit (not known to exist, though BIOS recognizes ID)
-+      case 0x06: return 0x1a;  //0x2a = 8mbit, 0x2b = 16mbit (not known to exist, though BIOS recognizes ID)
-       case 0x07: return 0x00;
-       default:   return 0x00;
+     case 0x00: return 0x4d;
+-    case 0x01: return 0x00;
++    case 0x01: return 0x50;
+     case 0x02: return 0x50;
+     case 0x03: return 0x00;
+     case 0x04: return 0x00;
+     case 0x05: return 0x00;
+-    case 0x06: return 0x2a;  //0x2a = 8mbit, 0x2b = 16mbit (not known to exist, though BIOS recognizes ID)
++    case 0x06: return 0x1a;  //0x2a = 8mbit, 0x2b = 16mbit (not known to exist, though BIOS recognizes ID)
+     case 0x07: return 0x00;
+     default:   return 0x00;
      }
    }
 -
@@ -293,7 +278,7 @@ index 17b525b..5cea706 100644
    return memory.read(addr);
  }
  
-@@ -76,22 +112,130 @@ void BSXFlash::write(unsigned addr, uint8 data) {
+@@ -70,22 +104,130 @@ void BSXFlash::write(unsigned addr, uint8 data) {
      regs.write_new = data;
  
      if(regs.write_enable && regs.write_old == regs.write_new) {
@@ -428,7 +413,7 @@ index 17b525b..5cea706 100644
    }
  
    if(addr == 0x2aaa) {
-@@ -105,6 +249,7 @@ void BSXFlash::write(unsigned addr, uint8 data) {
+@@ -99,6 +241,7 @@ void BSXFlash::write(unsigned addr, uint8 data) {
  
      if((regs.command & 0xffffff) == 0xaa5570) {
        regs.write_enable = false;
@@ -436,7 +421,7 @@ index 17b525b..5cea706 100644
      }
  
      if((regs.command & 0xffffff) == 0xaa55a0) {
-@@ -117,7 +262,12 @@ void BSXFlash::write(unsigned addr, uint8 data) {
+@@ -111,7 +254,12 @@ void BSXFlash::write(unsigned addr, uint8 data) {
      if((regs.command & 0xffffff) == 0xaa55f0) {
        regs.flash_enable = false;
        regs.read_enable  = false;
@@ -450,20 +435,21 @@ index 17b525b..5cea706 100644
      }
  
      memory.write_protect(!regs.write_enable);
-diff --git a/bsnes/sfc/chip/bsx/flash/flash.hpp b/bsnes/sfc/chip/bsx/flash/flash.hpp
-index 3232fb4..4491d59 100644
---- a/bsnes/sfc/chip/bsx/flash/flash.hpp
-+++ b/bsnes/sfc/chip/bsx/flash/flash.hpp
-@@ -1,6 +1,8 @@
+diff --git a/higan/sfc/chip/bsx/flash/flash.hpp b/higan/sfc/chip/bsx/flash/flash.hpp
+index 1a0d467..af9a26a 100755
+--- a/higan/sfc/chip/bsx/flash/flash.hpp
++++ b/higan/sfc/chip/bsx/flash/flash.hpp
+@@ -1,7 +1,9 @@
 +#include <nall/file.hpp>
  struct BSXFlash : Memory {
    MappedRAM memory;
+   bool readonly;
  
 +  void save();
    void init();
    void load();
    void unload();
-@@ -14,12 +16,20 @@ struct BSXFlash : Memory {
+@@ -15,12 +17,20 @@ struct BSXFlash : Memory {
  private:
    struct {
      unsigned command;
@@ -484,19 +470,10 @@ index 3232fb4..4491d59 100644
    } regs;
  };
  
-diff --git a/bsnes/sfc/chip/bsx/satellaview/satellaview.cpp b/bsnes/sfc/chip/bsx/satellaview/satellaview.cpp
-index a348af7..30553f1 100644
---- a/bsnes/sfc/chip/bsx/satellaview/satellaview.cpp
-+++ b/bsnes/sfc/chip/bsx/satellaview/satellaview.cpp
-@@ -7,7 +7,7 @@ void BSXSatellaview::init() {
- 
- void BSXSatellaview::load() {
-   bus.map(Bus::MapMode::Direct, 0x00, 0x3f, 0x2188, 0x219f, {&BSXSatellaview::mmio_read, &bsxsatellaview}, {&BSXSatellaview::mmio_write, &bsxsatellaview});
--  bus.map(Bus::MapMode::Direct, 0x80, 0xbf, 0x2188, 0x219f, {&BSXSatellaview::mmio_read, &bsxsatellaview}, {&BSXSatellaview::mmio_write, &bsxsatellaview});
-+  bus.map(Bus::MapMode::Direct, 0x80, 0xbf, 0x2188, 0x219f, { &BSXSatellaview::mmio_read, &bsxsatellaview }, { &BSXSatellaview::mmio_write, &bsxsatellaview });
- }
- 
- void BSXSatellaview::unload() {
+diff --git a/higan/sfc/chip/bsx/satellaview/satellaview.cpp b/higan/sfc/chip/bsx/satellaview/satellaview.cpp
+index d988657..0114310 100755
+--- a/higan/sfc/chip/bsx/satellaview/satellaview.cpp
++++ b/higan/sfc/chip/bsx/satellaview/satellaview.cpp
 @@ -17,64 +17,245 @@ void BSXSatellaview::power() {
  }
  
@@ -511,7 +488,7 @@ index a348af7..30553f1 100644
 +   uint16 Signal_Nb=regs.r2188^(regs.r2189*256);
 +   string filenm;
 +   filenm.reserve(nall::configpath().length()+21+4+3);//configpath + bsxdat path + channel + program
-+   sprintf(filenm(), "%sbsnes/bsxdat/BSX%04.4hX-%d.bin", (const char*)nall::configpath(), Signal_Nb, filenumber);
++   sprintf(filenm(), "%shigan/bsxdat/BSX%04.4hX-%d.bin", (const char*)nall::configpath(), Signal_Nb, filenumber);
 +   BSXF.open(filenm(), file::mode::read);
 +   if(BSXF.size()!= -1) {
 +     //printf("%02.2hX, %02.2hX, %04.4hX: %s\n",regs.r2189, regs.r2188, Signal_Nb, filenm);
@@ -532,7 +509,7 @@ index a348af7..30553f1 100644
 +   uint16 Signal_Nb=regs.r218e^(regs.r218f*256);
 +   string filenm;
 +   filenm.reserve (nall::configpath().length()+21+4+3); //configpath + bsxdat path + channel + program
-+   sprintf(filenm(), "%sbsnes/bsxdat/BSX%04.4hX-%d.bin", (const char*)nall::configpath(), Signal_Nb, filenumber);
++   sprintf(filenm(), "%shigan/bsxdat/BSX%04.4hX-%d.bin", (const char*)nall::configpath(), Signal_Nb, filenumber);
 +   BSXF2.open(filenm(), file::mode::read);
 +   if(BSXF2.size()!= -1) {
 +     //printf("%02.2hX, %02.2hX, %04.4hX: %s\n",regs.r218f, regs.r218e, Signal_Nb, filenm);
@@ -868,10 +845,12 @@ index a348af7..30553f1 100644
      } break;
  
      case 0x2193: {
-diff --git a/bsnes/sfc/chip/bsx/satellaview/satellaview.hpp b/bsnes/sfc/chip/bsx/satellaview/satellaview.hpp
-index 56caf0b..f492058 100644
---- a/bsnes/sfc/chip/bsx/satellaview/satellaview.hpp
-+++ b/bsnes/sfc/chip/bsx/satellaview/satellaview.hpp
+diff --git a/higan/sfc/chip/bsx/satellaview/satellaview.hpp b/higan/sfc/chip/bsx/satellaview/satellaview.hpp
+old mode 100755
+new mode 100644
+index 56caf0b..954b918
+--- a/higan/sfc/chip/bsx/satellaview/satellaview.hpp
++++ b/higan/sfc/chip/bsx/satellaview/satellaview.hpp
 @@ -1,3 +1,5 @@
 +#include <nall/file.hpp>
 +
@@ -929,4 +908,4 @@ index 56caf0b..f492058 100644
 +	bool r2192_chk;
    } regs;
  };
-
+ 

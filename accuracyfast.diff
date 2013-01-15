@@ -1,21 +1,23 @@
-diff --git a/bsnes/Makefile b/bsnes/Makefile
-index 65ad25d..08df7eb 100644
---- a/bsnes/Makefile
-+++ b/bsnes/Makefile
+diff --git a/higan/Makefile b/higan/Makefile
+index 65ad25d..08df7eb 100755
+--- a/higan/Makefile
++++ b/higan/Makefile
 @@ -6,7 +6,7 @@ gb  := gb
  gba := gba
- nds := nds
+ # nds := nds
  
 -profile := accuracy
 +profile := accuracyfast
  target  := ethos
  
  # options += debugger
-diff --git a/bsnes/sfc/Makefile b/bsnes/sfc/Makefile
-index 806cf6d..f83bfc8 100644
---- a/bsnes/sfc/Makefile
-+++ b/bsnes/sfc/Makefile
-@@ -15,6 +15,12 @@ ifeq ($(profile),accuracy)
+diff --git a/higan/sfc/Makefile b/higan/sfc/Makefile
+index 806cf6d..f83bfc8 100755
+--- a/higan/sfc/Makefile
++++ b/higan/sfc/Makefile
+@@ -13,6 +13,12 @@ ifeq ($(profile),accuracy)
+   flags += -DPROFILE_ACCURACY
+   sfccpu := $(sfc)/cpu
    sfcsmp := $(sfc)/smp
    sfcdsp := $(sfc)/dsp
    sfcppu := $(sfc)/ppu
@@ -25,13 +27,13 @@ index 806cf6d..f83bfc8 100644
 +  sfcsmp := $(sfc)/smp
 +  sfcdsp := $(sfc)/alt/dsp
 +  sfcppu := $(sfc)/ppu
- else ifeq ($(profile),compatibility)
-   flags += -DPROFILE_COMPATIBILITY
+ else ifeq ($(profile),balanced)
+   flags += -DPROFILE_BALANCED
    sfccpu := $(sfc)/cpu
-diff --git a/bsnes/sfc/profile-accuracyfast.hpp b/bsnes/sfc/profile-accuracyfast.hpp
+diff --git a/higan/sfc/profile-accuracyfast.hpp b/higan/sfc/profile-accuracyfast.hpp
 index e69de29..dd0319c 100644
---- a/bsnes/sfc/profile-accuracyfast.hpp
-+++ b/bsnes/sfc/profile-accuracyfast.hpp
+--- a/higan/sfc/profile-accuracyfast.hpp
++++ b/higan/sfc/profile-accuracyfast.hpp
 @@ -0,0 +1,12 @@
 +namespace Info {
 +  static const char Profile[] = "Accuracyfast";
@@ -45,16 +47,16 @@ index e69de29..dd0319c 100644
 +#include <sfc/smp/smp.hpp>
 +#include <sfc/alt/dsp/dsp.hpp>
 +#include <sfc/ppu/ppu.hpp>
-diff --git a/bsnes/sfc/sfc.hpp b/bsnes/sfc/sfc.hpp
-index b7167f1..2d62f4f 100644
---- a/bsnes/sfc/sfc.hpp
-+++ b/bsnes/sfc/sfc.hpp
+diff --git a/higan/sfc/sfc.hpp b/higan/sfc/sfc.hpp
+index b7167f1..2d62f4f 100755
+--- a/higan/sfc/sfc.hpp
++++ b/higan/sfc/sfc.hpp
 @@ -57,6 +57,8 @@ namespace SuperFamicom {
  
    #if defined(PROFILE_ACCURACY)
    #include "profile-accuracy.hpp"
 +  #elif defined(PROFILE_ACCURACYFAST)
 +  #include "profile-accuracyfast.hpp"
-   #elif defined(PROFILE_COMPATIBILITY)
-   #include "profile-compatibility.hpp"
+   #elif defined(PROFILE_BALANCED)
+   #include "profile-balanced.hpp"
    #elif defined(PROFILE_PERFORMANCE)

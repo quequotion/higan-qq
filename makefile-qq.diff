@@ -1,7 +1,7 @@
-diff --git a/bsnes/Makefile b/bsnes/Makefile
-index 65ad25d..918d29a 100644
---- a/bsnes/Makefile
-+++ b/bsnes/Makefile
+diff --git a/higan/Makefile b/higan/Makefile
+index 65ad25d..918d29a 100755
+--- a/higan/Makefile
++++ b/higan/Makefile
 @@ -16,8 +16,10 @@ target  := ethos
  # compiler
  c       := $(compiler) -std=gnu99
