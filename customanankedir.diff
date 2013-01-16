@@ -1,0 +1,135 @@
+diff --git a/ananke/bsx-satellaview.cpp b/ananke/bsx-satellaview.cpp
+index 4ebc7bf..fac59cb 100644
+--- a/ananke/bsx-satellaview.cpp
++++ b/ananke/bsx-satellaview.cpp
+@@ -1,6 +1,6 @@
+ string Ananke::createBsxSatellaviewDatabase(vector<uint8_t> &buffer, Markup::Node &document, const string &manifest) {
+   string pathname = {
+-    userpath(), "Emulation/BS-X Satellaview/",
++    userpath(), "ROMS/higan/BS-X Satellaview/",
+     document["release/information/name"].text(),
+     " (", document["release/information/region"].text(), ")",
+     " (", document["release/information/revision"].text(), ")",
+@@ -22,7 +22,7 @@ string Ananke::createBsxSatellaviewDatabase(vector<uint8_t> &buffer, Markup::Nod
+ 
+ string Ananke::createBsxSatellaviewHeuristic(vector<uint8_t> &buffer) {
+   string pathname = {
+-    userpath(), "Emulation/BS-X Satellaview/",
++    userpath(), "ROMS/higan/BS-X Satellaview/",
+     nall::basename(information.name),
+     " (!).bs/"
+   };
+diff --git a/ananke/famicom.cpp b/ananke/famicom.cpp
+index 00f945e..ce4f116 100644
+--- a/ananke/famicom.cpp
++++ b/ananke/famicom.cpp
+@@ -8,7 +8,7 @@ void Ananke::copyFamicomSaves(const string &pathname) {
+ 
+ string Ananke::createFamicomHeuristic(vector<uint8_t> &buffer) {
+   string pathname = {
+-    userpath(), "Emulation/Famicom/",
++    userpath(), "ROMS/higan/Famicom/",
+     nall::basename(information.name),
+     " (!).fc/"
+   };
+diff --git a/ananke/game-boy-advance.cpp b/ananke/game-boy-advance.cpp
+index 30b93f5..138ef4f 100644
+--- a/ananke/game-boy-advance.cpp
++++ b/ananke/game-boy-advance.cpp
+@@ -14,7 +14,7 @@ void Ananke::copyGameBoyAdvanceSaves(const string &pathname) {
+ 
+ string Ananke::createGameBoyAdvanceHeuristic(vector<uint8_t> &buffer) {
+   string pathname = {
+-    userpath(), "Emulation/Game Boy Advance/",
++    userpath(), "ROMS/higan/Game Boy Advance/",
+     nall::basename(information.name),
+     " (!).gba/"
+   };
+diff --git a/ananke/game-boy.cpp b/ananke/game-boy.cpp
+index 3daca00..d488e8b 100644
+--- a/ananke/game-boy.cpp
++++ b/ananke/game-boy.cpp
+@@ -17,7 +17,7 @@ string Ananke::createGameBoyHeuristic(vector<uint8_t> &buffer) {
+ 
+   string pathname = {
+     userpath(),
+-    "Emulation/Game Boy", (info.info.cgb ? " Color" : ""), "/",
++    "ROMS/higan/Game Boy", (info.info.cgb ? " Color" : ""), "/",
+     nall::basename(information.name),
+     " (!).", (info.info.cgb ? "gbc" : "gb"), "/"
+   };
+diff --git a/ananke/sufami-turbo.cpp b/ananke/sufami-turbo.cpp
+index 15e304a..9ea2081 100644
+--- a/ananke/sufami-turbo.cpp
++++ b/ananke/sufami-turbo.cpp
+@@ -8,7 +8,7 @@ void Ananke::copySufamiTurboSaves(const string &pathname) {
+ 
+ string Ananke::createSufamiTurboDatabase(vector<uint8_t> &buffer, Markup::Node &document, const string &manifest) {
+   string pathname = {
+-    userpath(), "Emulation/Sufami Turbo/",
++    userpath(), "ROMS/higan/Sufami Turbo/",
+     document["release/information/name"].text(),
+     " (", document["release/information/region"].text(), ")",
+     " (", document["release/information/revision"].text(), ")",
+@@ -31,7 +31,7 @@ string Ananke::createSufamiTurboDatabase(vector<uint8_t> &buffer, Markup::Node &
+ 
+ string Ananke::createSufamiTurboHeuristic(vector<uint8_t> &buffer) {
+   string pathname = {
+-    userpath(), "Emulation/Sufami Turbo/",
++    userpath(), "ROMS/higan/Sufami Turbo/",
+     nall::basename(information.name),
+     " (!).st/"
+   };
+diff --git a/ananke/super-famicom.cpp b/ananke/super-famicom.cpp
+index da991fb..8460df8 100644
+--- a/ananke/super-famicom.cpp
++++ b/ananke/super-famicom.cpp
+@@ -14,7 +14,7 @@ void Ananke::copySuperFamicomSaves(const string &pathname) {
+ 
+ string Ananke::createSuperFamicomDatabase(vector<uint8_t> &buffer, Markup::Node &document, const string &manifest) {
+   string pathname = {
+-    userpath(), "Emulation/Super Famicom/",
++    userpath(), "ROMS/higan/Super Famicom/",
+     document["release/information/name"].text(),
+     " (", document["release/information/region"].text(), ")",
+     " (", document["release/information/revision"].text(), ")",
+@@ -45,7 +45,7 @@ string Ananke::createSuperFamicomDatabase(vector<uint8_t> &buffer, Markup::Node
+ 
+ string Ananke::createSuperFamicomHeuristic(vector<uint8_t> &buffer) {
+   string pathname = {
+-    userpath(), "Emulation/Super Famicom/",
++    userpath(), "ROMS/higan/Super Famicom/",
+     nall::basename(information.name),
+     " (!).sfc/"
+   };
+diff --git a/bsnes/sfc/profile-accuracyfast.hpp b/bsnes/sfc/profile-accuracyfast.hpp
+deleted file mode 100644
+index 282527c..0000000
+--- a/bsnes/sfc/profile-accuracyfast.hpp
++++ /dev/null
+@@ -1,12 +0,0 @@
+-namespace Info {
+-  static const char Profile[] = "Accuracyfast";
+-}
+-
+-#if defined(DEBUGGER)
+-  #error "bsnes: debugger not supported with accuracyfast profile."
+-#endif
+-
+-#include <sfc/cpu/cpu.hpp>
+-#include <sfc/smp/smp.hpp>
+-#include <sfc/alt/dsp/dsp.hpp>
+-#include <sfc/ppu/ppu.hpp>
+diff --git a/higan/Makefile b/higan/Makefile
+index 30e25ad..cbb362e 100755
+--- a/higan/Makefile
++++ b/higan/Makefile
+@@ -23,7 +23,7 @@ link    := -pipe -Ofast -I. -fbranch-target-load-optimize2 -fcx-fortran-rules -f
+ objects := libco
+ 
+ # profile-guided optimization mode
+-# pgo := instrument
++ pgo := instrument
+ # pgo := optimize
+ 
+ ifeq ($(pgo),instrument)
