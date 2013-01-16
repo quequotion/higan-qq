@@ -102,34 +102,3 @@ index da991fb..8460df8 100644
      nall::basename(information.name),
      " (!).sfc/"
    };
-diff --git a/bsnes/sfc/profile-accuracyfast.hpp b/bsnes/sfc/profile-accuracyfast.hpp
-deleted file mode 100644
-index 282527c..0000000
---- a/bsnes/sfc/profile-accuracyfast.hpp
-+++ /dev/null
-@@ -1,12 +0,0 @@
--namespace Info {
--  static const char Profile[] = "Accuracyfast";
--}
--
--#if defined(DEBUGGER)
--  #error "bsnes: debugger not supported with accuracyfast profile."
--#endif
--
--#include <sfc/cpu/cpu.hpp>
--#include <sfc/smp/smp.hpp>
--#include <sfc/alt/dsp/dsp.hpp>
--#include <sfc/ppu/ppu.hpp>
-diff --git a/higan/Makefile b/higan/Makefile
-index 30e25ad..cbb362e 100755
---- a/higan/Makefile
-+++ b/higan/Makefile
-@@ -23,7 +23,7 @@ link    := -pipe -Ofast -I. -fbranch-target-load-optimize2 -fcx-fortran-rules -f
- objects := libco
- 
- # profile-guided optimization mode
--# pgo := instrument
-+ pgo := instrument
- # pgo := optimize
- 
- ifeq ($(pgo),instrument)
