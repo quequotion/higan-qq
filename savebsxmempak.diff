@@ -72,7 +72,7 @@ index 91450e2..9fc6bd6 100644
      iEmulator->menu.setText(emulator->information.name);
      iEmulator->power.setText("Power");
      iEmulator->reset.setText("Reset");
-+    iEmulator->savemempak.setText("Save BSX Mempak")
++    iEmulator->savemempak.setText("Save BSX Mempak");
      iEmulator->unload.setText("Unload");
  
      for(auto& port : emulator->port) {
