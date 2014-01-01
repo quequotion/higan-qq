@@ -1,3 +1,7 @@
+diff --git a/Makefile b/Makefile
+index 1222d8c..3daf9b3 100644
+--- a/Makefile
++++ b/Makefile
 @@ -13,8 +13,10 @@ target  := ethos
  # console := true
  
