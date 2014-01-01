@@ -1,0 +1,50 @@
+diff -urN ./ui/general/main-window.cpp ../../bsnes-sx2_v009/ui/general/main-window.cpp
+--- ./ui/general/main-window.cpp	2011-08-12 07:14:22.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/main-window.cpp	2012-01-22 20:42:30.000000000 +0900
+@@ -28,6 +28,15 @@
+ 
+   systemLoadCartridgeSuperGameBoy.setText("Load Super Game Boy Cartridge ...");
+   systemLoadCartridgeSpecial.append(systemLoadCartridgeSuperGameBoy);
+
++  systemSaveMemoryPack.setText("Save Memory Pack");
++  system.append(systemSaveMemoryPack);
+ 
+   system.append(systemSeparator1);
+ 
+@@ -265,6 +282,15 @@
+   systemLoadCartridgeBsx.onTick = [] { singleSlotLoader.loadCartridgeBsx(); };
+   systemLoadCartridgeSufamiTurbo.onTick = [] { doubleSlotLoader.loadCartridgeSufamiTurbo(); };
+   systemLoadCartridgeSuperGameBoy.onTick = [] { singleSlotLoader.loadCartridgeSuperGameBoy(); };
++  
++  systemSaveMemoryPack.onTick = [] { SNES::bsxflash.save(); };
+ 
+   systemPower.onTick = [] {
+     SNES::system.power();
+diff -urN ./ui/general/main-window.hpp ../../bsnes-sx2_v009/ui/general/main-window.hpp
+--- ./ui/general/main-window.hpp	2011-08-12 06:43:39.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/main-window.hpp	2012-01-22 20:23:11.000000000 +0900
+@@ -6,10 +6,16 @@
+   Item systemLoadCartridgeBsx;
+   Item systemLoadCartridgeSufamiTurbo;
+   Item systemLoadCartridgeSuperGameBoy;
++  Item systemSaveMemoryPack;
+   Separator systemSeparator1;
+   Item systemPower;
+   Item systemReset;
+   Separator systemSeparator2;
+   Menu systemPort1;
+   RadioItem systemPort1None;
+   RadioItem systemPort1Gamepad;
+diff -urN ./ui/general/slot-loader.cpp ../../bsnes-sx2_v009/ui/general/slot-loader.cpp
+--- ./ui/general/slot-loader.cpp	2011-08-08 17:26:43.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/slot-loader.cpp	2012-01-11 09:30:20.000000000 +0900
+@@ -35,7 +35,7 @@
+ 
+   slotBrowse.onTick = []() {
+     FileBrowser::Mode fileMode = (singleSlotLoader.mode == Mode::SuperGameBoy
+-    ? FileBrowser::Mode::GameBoy : FileBrowser::Mode::Satellaview);
++    ? FileBrowser::Mode::GameBoy : (singleSlotLoader.mode == Mode::Bsx || singleSlotLoader.mode == Mode::BsxSlotted) ? FileBrowser::Mode::Satellaview : FileBrowser::Mode::XBand); //hard dependency on xband patch
+     fileBrowser.fileOpen(fileMode, [](string filename) {
+       singleSlotLoader.slotPath.setText(filename);
+     });
+ 

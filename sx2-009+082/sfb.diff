@@ -1,0 +1,285 @@
+diff -urN ./snes/cartridge/cartridge.hpp ../../bsnes-sx2_v009/snes/cartridge/cartridge.hpp
+--- ./snes/cartridge/cartridge.hpp	2011-06-26 14:06:35.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/cartridge/cartridge.hpp	2012-01-22 20:38:25.000000000 +0900
+@@ -6,6 +6,8 @@
+     Bsx,
+     SufamiTurbo,
+     SuperGameBoy,
++	SFBox,
+   };
+diff -urN ./snes/chip/chip.hpp ../../bsnes-sx2_v009/snes/chip/chip.hpp
+--- ./snes/chip/chip.hpp	2011-06-26 11:54:51.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/chip.hpp	2012-01-22 20:24:33.000000000 +0900
+@@ -18,6 +18,8 @@
+ #include <snes/chip/sufamiturbo/sufamiturbo.hpp>
+ #include <snes/chip/msu1/msu1.hpp>
+ #include <snes/chip/link/link.hpp>
++#include <snes/chip/sfbox/sfbox.hpp>
+ 
+ void Coprocessor::step(unsigned clocks) {
+   clock += clocks * (uint64)cpu.frequency;
+diff -urN ./snes/chip/sfbox/sfbox.cpp ../../bsnes-sx2_v009/snes/chip/sfbox/sfbox.cpp
+--- ./snes/chip/sfbox/sfbox.cpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/sfbox/sfbox.cpp	2012-01-23 00:41:36.000000000 +0900
+@@ -0,0 +1,91 @@
++#include <snes/snes.hpp>
++
++//#ifdef SFBOX_CPP
++
++namespace SNES {
++
++SFBox sfbox;
++
++void SFBox::init() {
++}
++
++void SFBox::load() {
++  //Force MMIO Map
++  bus.map(Bus::MapMode::Direct, 0x00, 0x3f, 0x4201, 0x4201, { &SFBox::mmio_read, &sfbox }, { &SFBox::mmio_write, &sfbox });
++  bus.map(Bus::MapMode::Direct, 0x00, 0x3f, 0x4213, 0x4213, { &SFBox::mmio_read, &sfbox }, { &SFBox::mmio_write, &sfbox });
++  bus.map(Bus::MapMode::Direct, 0x80, 0xbf, 0x4201, 0x4201, { &SFBox::mmio_read, &sfbox }, { &SFBox::mmio_write, &sfbox });
++  bus.map(Bus::MapMode::Direct, 0x80, 0xbf, 0x4213, 0x4213, { &SFBox::mmio_read, &sfbox }, { &SFBox::mmio_write, &sfbox });
++  
++}
++
++void SFBox::unload() {
++}
++
++void SFBox::power() {
++  reset();
++}
++
++void SFBox::reset() {
++  reg_write = 0;
++  e6_count = 0;
++  e6_data = 0x03020850; //01815d  50
++}
++
++uint8 SFBox::memory_access(bool write, Memory &memory, unsigned addr, uint8 data) {
++  if(write == 0) return memory_read(memory, addr);
++  memory_write(memory, addr, data);
++}
++
++uint8 SFBox::memory_read(Memory &memory, unsigned addr) {
++  addr = bus.mirror(addr, memory.size());
++  return memory.read(addr);
++}
++
++void SFBox::memory_write(Memory &memory, unsigned addr, uint8 data) {
++  addr = bus.mirror(addr, memory.size());
++  return memory.write(addr, data);
++}
++
++//mcu_access() allows mcu_read() and mcu_write() to share decoding logic
++uint8 SFBox::mcu_access(bool write, unsigned addr, uint8 data) {
++  return cpu.regs.mdr;
++}
++
++uint8 SFBox::mcu_read(unsigned addr) {
++  return mcu_access(0, addr);
++}
++
++void SFBox::mcu_write(unsigned addr, uint8 data) {
++  //mcu_access(1, addr, data);
++}
++
++uint8 SFBox::mmio_read(unsigned addr) {
++  switch(reg_write) {
++	case 0x20:
++		return 0x00;
++	case 0x22:
++		return 0x00;
++	case 0xe6:
++		return (0x20 | (SFBox::e6out() << 1));
++	case 0xee:
++		return 0xcf;
++	case 0xfe:
++		return 0xcf;
++	case 0xff:
++		return 0x20;
++	default:
++		return 0x20;
++  }
++}
++
++void SFBox::mmio_write(unsigned addr, uint8 data) {
++  reg_write = data;
++  if(data == 0xe6) e6_count++;
++}
++
++bool SFBox::e6out() {
++	return (e6_data >> (e6_count - 1)) & 1;
++}
++
++}
++//#endif
+diff -urN ./snes/chip/sfbox/sfbox.hpp ../../bsnes-sx2_v009/snes/chip/sfbox/sfbox.hpp
+--- ./snes/chip/sfbox/sfbox.hpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/sfbox/sfbox.hpp	2012-01-24 00:13:03.000000000 +0900
+@@ -0,0 +1,30 @@
++class SFBox {
++public:
++  MappedRAM sram;
++
++  void init();
++  void load();
++  void unload();
++  void power();
++  void reset();
++
++  uint8 memory_access(bool write, Memory &memory, unsigned addr, uint8 data);
++  uint8 memory_read(Memory &memory, unsigned addr);
++  void memory_write(Memory &memory, unsigned addr, uint8 data);
++
++  uint8 mcu_access(bool write, unsigned addr, uint8 data = 0x00);
++  uint8 mcu_read(unsigned addr);
++  void mcu_write(unsigned addr, uint8 data);
++
++  uint8 mmio_read(unsigned addr);
++  void mmio_write(unsigned addr, uint8 data);
++  
++  bool e6out();
++
++private:
++  uint8 reg_write;
++  uint8 e6_count;
++  unsigned int e6_data;
++};
++
++extern SFBox sfbox;
+diff -urN ./snes/Makefile ../../bsnes-sx2_v009/snes/Makefile
+--- ./snes/Makefile	2011-06-26 11:54:42.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/Makefile	2012-01-22 20:34:55.000000000 +0900
+@@ -5,7 +5,7 @@
+ snes_objects += snes-nss snes-icd2 snes-superfx snes-sa1 snes-necdsp snes-hitachidsp
+ snes_objects += snes-bsx snes-srtc snes-sdd1 snes-spc7110
+ snes_objects += snes-obc1 snes-st0018 snes-sufamiturbo
+-snes_objects += snes-msu1 snes-link
++snes_objects += snes-msu1 snes-link snes-sfbox //mutually exclusive with snes-xband patch
+ objects += $(snes_objects)
+ 
+ ifeq ($(profile),accuracy)
+diff -urN ./snes/cpu/core/disassembler/disassembler.cpp ../../bsnes-sx2_v009/snes/cpu/core/disassembler/disassembler.cpp
+--- ./snes/cpu/core/disassembler/disassembler.cpp	2010-08-19 13:18:17.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/cpu/core/disassembler/disassembler.cpp	2012-01-24 19:28:14.000000000 +0900
+@@ -55,3 +55,5 @@
+ obj/snes-sufamiturbo.o: $(snes)/chip/sufamiturbo/sufamiturbo.cpp $(snes)/chip/sufamiturbo/*
+ obj/snes-msu1.o       : $(snes)/chip/msu1/msu1.cpp $(snes)/chip/msu1/*
+ obj/snes-link.o       : $(snes)/chip/link/link.cpp $(snes)/chip/link/*
++obj/snes-sfbox.o      : $(snes)/chip/sfbox/sfbox.cpp $(snes)/chip/sfbox/*
+diff -urN ./snes/system/system.cpp ../../bsnes-sx2_v009/snes/system/system.cpp
+--- ./snes/system/system.cpp	2011-06-26 11:56:32.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/system/system.cpp	2012-01-22 20:39:09.000000000 +0900
+@@ -83,6 +83,8 @@
+   st0018.init();
+   msu1.init();
+   link.init();
++  sfbox.init();
+ 
+   video.init();
+   audio.init();
+@@ -107,6 +109,8 @@
+   if(cartridge.mode() == Cartridge::Mode::Bsx) bsxcartridge.load();
+   if(cartridge.mode() == Cartridge::Mode::SufamiTurbo) sufamiturbo.load();
+   if(cartridge.mode() == Cartridge::Mode::SuperGameBoy) icd2.load();
++  if(cartridge.mode() == Cartridge::Mode::SFBox) sfbox.load();
+ 
+   if(cartridge.has_bsx_slot()) bsxflash.load();
+   if(cartridge.has_nss_dip()) nss.load();
+@@ -131,6 +135,8 @@
+   if(cartridge.mode() == Cartridge::Mode::Bsx) bsxcartridge.unload();
+   if(cartridge.mode() == Cartridge::Mode::SufamiTurbo) sufamiturbo.unload();
+   if(cartridge.mode() == Cartridge::Mode::SuperGameBoy) icd2.unload();
++  if(cartridge.mode() == Cartridge::Mode::SFBox) sfbox.unload();
+ 
+   if(cartridge.has_bsx_slot()) bsxflash.unload();
+   if(cartridge.has_nss_dip()) nss.unload();
+@@ -167,6 +173,8 @@
+   if(expansion() == ExpansionPortDevice::BSX) bsxsatellaview.power();
+   if(cartridge.mode() == Cartridge::Mode::Bsx) bsxcartridge.power();
+   if(cartridge.mode() == Cartridge::Mode::SuperGameBoy) icd2.power();
++  if(cartridge.mode() == Cartridge::Mode::SFBox) sfbox.power();
+ 
+   if(cartridge.has_bsx_slot()) bsxflash.power();
+   if(cartridge.has_nss_dip()) nss.power();
+@@ -205,6 +213,8 @@
+ 
+   if(cartridge.mode() == Cartridge::Mode::Bsx) bsxcartridge.reset();
+   if(cartridge.mode() == Cartridge::Mode::SuperGameBoy) icd2.reset();
++  if(cartridge.mode() == Cartridge::Mode::SFBox) sfbox.reset();
+ 
+   if(cartridge.has_bsx_slot()) bsxflash.reset();
+   if(cartridge.has_nss_dip()) nss.reset();
+diff -urN ./ui/cartridge/cartridge.cpp ../../bsnes-sx2_v009/ui/cartridge/cartridge.cpp
+--- ./ui/cartridge/cartridge.cpp	2011-08-19 18:05:14.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/cartridge/cartridge.cpp	2012-01-22 20:42:07.000000000 +0900
+@@ -81,6 +90,28 @@
+   utility.cartridgeLoaded();
+   return true;
+ }
++
++bool Cartridge::loadSFBox(const char *basename) {
++  unload();
++  if(loadCartridge(SNES::cartridge.rom, baseXML, basename) == false) return false;
++  baseName = nall::basename(basename);
++  SNES::cartridge.load(SNES::Cartridge::Mode::SFBox, { baseXML });
++  foreach(memory, SNES::cartridge.nvram) loadMemory(memory);
++  utility.cartridgeLoaded();
++  return true;
++}
+ 
+ void Cartridge::unload() {
+   patch.applied = false;
+diff -urN ./ui/cartridge/cartridge.hpp ../../bsnes-sx2_v009/ui/cartridge/cartridge.hpp
+--- ./ui/cartridge/cartridge.hpp	2011-08-19 17:55:48.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/cartridge/cartridge.hpp	2012-01-22 20:43:19.000000000 +0900
+@@ -1,13 +1,16 @@
+ struct Cartridge {
+   bool loadNormal(const char *basename);
+   bool loadBsxSlotted(const char *basename, const char *slotname);
+   bool loadBsx(const char *basename, const char *slotname);
+   bool loadSufamiTurbo(const char *basename, const char *slotAname, const char *slotBname);
+   bool loadSuperGameBoy(const char *basename, const char *slotname);
++  bool loadSFBox(const char *basename);
+   void unload();
+diff -urN ./ui/general/main-window.cpp ../../bsnes-sx2_v009/ui/general/main-window.cpp
+--- ./ui/general/main-window.cpp	2011-08-12 07:14:22.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/main-window.cpp	2012-01-22 20:42:30.000000000 +0900
+@@ -28,6 +28,15 @@
+ 
+   systemLoadCartridgeSuperGameBoy.setText("Load Super Game Boy Cartridge ...");
+   systemLoadCartridgeSpecial.append(systemLoadCartridgeSuperGameBoy);
++  
++  systemLoadCartridgeSFB.setText("Load Super Famicom Box ...");
++  systemLoadCartridgeSpecial.append(systemLoadCartridgeSFB);
+ 
+   system.append(systemSeparator1);
+ 
+@@ -265,6 +282,15 @@
+   systemLoadCartridgeBsx.onTick = [] { singleSlotLoader.loadCartridgeBsx(); };
+   systemLoadCartridgeSufamiTurbo.onTick = [] { doubleSlotLoader.loadCartridgeSufamiTurbo(); };
+   systemLoadCartridgeSuperGameBoy.onTick = [] { singleSlotLoader.loadCartridgeSuperGameBoy(); };
++  systemLoadCartridgeSFB.onTick = [] {
++	fileBrowser.fileOpen(FileBrowser::Mode::Cartridge, [](string filename) {
++      cartridge.loadSFBox(filename);
++    });
++  };
+ 
+   systemPower.onTick = [] {
+     SNES::system.power();
+diff -urN ./ui/general/main-window.hpp ../../bsnes-sx2_v009/ui/general/main-window.hpp
+--- ./ui/general/main-window.hpp	2011-08-12 06:43:39.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/main-window.hpp	2012-01-22 20:23:11.000000000 +0900
+@@ -6,10 +6,16 @@
+   Item systemLoadCartridgeBsx;
+   Item systemLoadCartridgeSufamiTurbo;
+   Item systemLoadCartridgeSuperGameBoy;
++  Item systemLoadCartridgeSFB;
+   Separator systemSeparator1;
+   Item systemPower;
+   Item systemReset;
+   Separator systemSeparator2;
+   Menu systemPort1;
+   RadioItem systemPort1None;
+   RadioItem systemPort1Gamepad;
+

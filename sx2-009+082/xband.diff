@@ -1,0 +1,676 @@
+diff -urN ./nall/snes/cartridge.hpp ../../bsnes-sx2_v009/nall/snes/cartridge.hpp
+--- ./nall/snes/cartridge.hpp	2011-08-20 22:26:51.000000000 +0900
++++ ../../bsnes-sx2_v009/nall/snes/cartridge.hpp	2012-01-09 15:45:48.000000000 +0900
+@@ -35,6 +35,7 @@
+     ModeBsx,
+     ModeSufamiTurbo,
+     ModeSuperGameBoy,
++	ModeXBand,
+   };
+ 
+   enum Type {
+@@ -47,6 +48,7 @@
+     TypeSuperGameBoy1Bios,
+     TypeSuperGameBoy2Bios,
+     TypeGameBoy,
++	TypeXBand,
+     TypeUnknown,
+   };
+ 
+@@ -67,6 +69,7 @@
+     BSCHiROM,
+     BSXROM,
+     STROM,
++	XBANDROM,
+   };
+ 
+   enum DSP1MemoryMapper {
+@@ -103,6 +106,7 @@
+   bool has_st010;
+   bool has_st011;
+   bool has_st018;
++  bool has_xband_slot;
+ };
+ 
+ SNESCartridge::SNESCartridge(const uint8_t *data, unsigned size) {
+@@ -131,6 +135,12 @@
+     xmlMemoryMap = xml.transform("'", "\"");
+     return;
+   }
++  
++  if(type == TypeXBand) {
++    xml.append("<cartridge/>");
++    xmlMemoryMap = xml.transform("'", "\"");
++    return;
++  }
+ 
+   xml.append("<cartridge");
+   if(region == NTSC) {
+@@ -529,6 +539,20 @@
+     xml.append("    <map address='80-bf:3800-38ff'/>\n");
+     xml.append("  </setarisc>\n");
+   }
++  
++  if(type == TypeXBand) {
++	xml.append("  <xband>\n");
++	xml.append("    <mcu>\n");
++	xml.append("      <map address='00-3f:8000-ffff'>\n");
++	xml.append("      <map address='80-bf:8000-ffff'>\n");
++	xml.append("      <map address='40-7d:0000-ffff'>\n");
++	xml.append("      <map address='c0-df:0000-ffff'>\n");
++	xml.append("    </mcu>\n");
++	xml.append("    <mmio>\n");
++	xml.append("      <map address='e0-ff:0000-ffff'>\n");
++	xml.append("    </mmio>\n");
++	xml.append("  </xband>\n");
++  }
+ 
+   xml.append("</cartridge>\n");
+   xmlMemoryMap = xml.transform("'", "\"");
+diff -urN ./snes/cartridge/cartridge.cpp ../../bsnes-sx2_v009/snes/cartridge/cartridge.cpp
+--- ./snes/cartridge/cartridge.cpp	2011-07-03 22:28:19.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/cartridge/cartridge.cpp	2012-01-19 15:05:30.000000000 +0900
+@@ -30,6 +30,7 @@
+   has_st0018     = false;
+   has_msu1       = false;
+   has_link       = false;
++  has_xband_slot = false;
+ 
+   nvram.reset();
+diff -urN ./snes/cartridge/cartridge.hpp ../../bsnes-sx2_v009/snes/cartridge/cartridge.hpp
+--- ./snes/cartridge/cartridge.hpp	2011-06-26 14:06:35.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/cartridge/cartridge.hpp	2012-01-22 20:38:25.000000000 +0900
+@@ -6,6 +6,8 @@
+     Bsx,
+     SufamiTurbo,
+     SuperGameBoy,
++	XBand,
+   };
+ 
+   enum class Region : unsigned {
+@@ -20,6 +22,7 @@
+     SufamiTurboA,
+     SufamiTurboB,
+     GameBoy,
++	XBand,
+   };
+ 
+   MappedRAM rom;
+@@ -47,6 +50,7 @@
+   readonly<bool> has_st0018;
+   readonly<bool> has_msu1;
+   readonly<bool> has_link;
++  readonly<bool> has_xband_slot;
+ 
+   struct NonVolatileRAM {
+     const string id;
+@@ -96,6 +102,7 @@
+   void parse_xml_bsx(const char*);
+   void parse_xml_sufami_turbo(const char*, bool);
+   void parse_xml_gameboy(const char*);
++  void parse_xml_xband(const char*);
+ 
+   void xml_parse_rom(xml_element&);
+   void xml_parse_ram(xml_element&);
+@@ -115,6 +122,7 @@
+   void xml_parse_setarisc(xml_element&);
+   void xml_parse_msu1(xml_element&);
+   void xml_parse_link(xml_element&);
++  void xml_parse_xband(xml_element&);
+ 
+   unsigned xml_parse_hex(const string&);
+   unsigned xml_parse_unsigned(const string&);
+diff -urN ./snes/cartridge/xml.cpp ../../bsnes-sx2_v009/snes/cartridge/xml.cpp
+--- ./snes/cartridge/xml.cpp	2011-07-03 23:07:58.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/cartridge/xml.cpp	2012-01-11 09:25:54.000000000 +0900
+@@ -13,6 +13,8 @@
+     parse_xml_sufami_turbo(list[2], 1);
+   } else if(mode == Mode::SuperGameBoy) {
+     parse_xml_gameboy(list[1]);
++  } else if(mode == Mode::XBand) {
++	parse_xml_xband(list[1]);
+   }
+ }
+ 
+@@ -50,6 +52,7 @@
+         if(node.name == "setarisc") xml_parse_setarisc(node);
+         if(node.name == "msu1") xml_parse_msu1(node);
+         if(node.name == "link") xml_parse_link(node);
++		if(node.name == "xband") xml_parse_xband(node);
+       }
+     }
+   }
+@@ -65,6 +68,9 @@
+ void Cartridge::parse_xml_gameboy(const char *data) {
+ }
+ 
++void Cartridge::parse_xml_xband(const char *data) {
++}
++
+ void Cartridge::xml_parse_rom(xml_element &root) {
+   foreach(leaf, root.element) {
+     if(leaf.name == "map") {
+@@ -702,6 +708,34 @@
+     }
+   }
+ }
++
++void Cartridge::xml_parse_xband(xml_element &root) {
++  if(mode != Mode::XBand) return;
++
++  foreach(node, root.element) {
++    if(node.name == "mcu") {
++      foreach(leaf, node.element) {
++        if(leaf.name == "map") {
++          Mapping m({ &XBAND::mcu_read, &xband }, { &XBAND::mcu_write, &xband });
++          foreach(attr, leaf.attribute) {
++            if(attr.name == "address") xml_parse_address(m, attr.content);
++          }
++          mapping.append(m);
++        }
++      }
++    } else if(node.name == "mmio") {
++      foreach(leaf, node.element) {
++        if(leaf.name == "map") {
++          Mapping m({ &XBAND::mmio_read, &xband }, { &XBAND::mmio_write, &xband });
++          foreach(attr, leaf.attribute) {
++            if(attr.name == "address") xml_parse_address(m, attr.content);
++          }
++          mapping.append(m);
++        }
++      }
++    }
++  }
++}
+ 
+ unsigned Cartridge::xml_parse_hex(const string &s) {
+   return hex(s);
+diff -urN ./snes/chip/chip.hpp ../../bsnes-sx2_v009/snes/chip/chip.hpp
+--- ./snes/chip/chip.hpp	2011-06-26 11:54:51.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/chip.hpp	2012-01-22 20:24:33.000000000 +0900
+@@ -18,6 +18,8 @@
+ #include <snes/chip/sufamiturbo/sufamiturbo.hpp>
+ #include <snes/chip/msu1/msu1.hpp>
+ #include <snes/chip/link/link.hpp>
++#include <snes/chip/xband/xband.hpp>
+ 
+ void Coprocessor::step(unsigned clocks) {
+   clock += clocks * (uint64)cpu.frequency;
+diff -urN ./snes/chip/xband/xband.cpp ../../bsnes-sx2_v009/snes/chip/xband/xband.cpp
+--- ./snes/chip/xband/xband.cpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/xband/xband.cpp	2012-01-14 18:55:21.000000000 +0900
+@@ -0,0 +1,220 @@
++#include <snes/snes.hpp>
++
++//#ifdef XBAND_CPP
++
++namespace SNES {
++
++XBAND xband;
++
++void XBAND::init() {
++}
++
++void XBAND::load() {
++  sram.map(allocate<uint8>(0x10000, 0xff), 0x10000);
++  sram.write_protect(false);
++  cartridge.nvram.append({ ".xbs", sram.data(), sram.size() });
++  //Force Memory Map
++  bus.map(Bus::MapMode::Direct, 0x00, 0x3f, 0x8000, 0xffff, { &XBAND::mcu_read, &xband }, { &XBAND::mcu_write, &xband });
++  bus.map(Bus::MapMode::Direct, 0x40, 0x7d, 0x0000, 0xffff, { &XBAND::mcu_read, &xband }, { &XBAND::mcu_write, &xband });
++  bus.map(Bus::MapMode::Direct, 0x80, 0xbf, 0x8000, 0xffff, { &XBAND::mcu_read, &xband }, { &XBAND::mcu_write, &xband });
++  bus.map(Bus::MapMode::Direct, 0xc0, 0xdf, 0x0000, 0xffff, { &XBAND::mcu_read, &xband }, { &XBAND::mcu_write, &xband });
++  //Force MMIO Map
++  bus.map(Bus::MapMode::Direct, 0xe0, 0xff, 0x0000, 0xffff, { &XBAND::mmio_read, &xband }, { &XBAND::mmio_write, &xband });
++  
++}
++
++void XBAND::unload() {
++}
++
++void XBAND::power() {
++  reset();
++}
++
++void XBAND::reset() {
++  mapset = 0x00;
++  read_96 = false;
++}
++
++uint8 XBAND::memory_access(bool write, Memory &memory, unsigned addr, uint8 data) {
++  if(write == 0) return memory_read(memory, addr);
++  memory_write(memory, addr, data);
++}
++
++uint8 XBAND::memory_read(Memory &memory, unsigned addr) {
++  addr = bus.mirror(addr, memory.size());
++  return memory.read(addr);
++}
++
++void XBAND::memory_write(Memory &memory, unsigned addr, uint8 data) {
++  addr = bus.mirror(addr, memory.size());
++  return memory.write(addr, data);
++}
++
++//mcu_access() allows mcu_read() and mcu_write() to share decoding logic
++uint8 XBAND::mcu_access(bool write, unsigned addr, uint8 data) {
++ if(mapset == 0x00) {
++  if(within<0x00, 0x1f, 0x8000, 0xffff>(addr)) {
++    addr = (addr & 0x3f0000 >> 1) | (addr & 0xffff);
++    return memory_access(write, cartridge.rom, addr, data);
++  }
++  if(within<0x80, 0x9f, 0x8000, 0xffff>(addr)) {
++    addr = ((addr & 0x3f0000 >> 1) | (addr & 0xffff));
++    return memory_access(write, cartridge.rom, addr, data);
++  }
++  
++  if(within<0x40, 0x7d, 0x0000, 0xffff>(addr)) {
++	addr = ((addr & 0x3f0000 >> 1) | (addr & 0xffff));
++	return memory_access(write, cartridge.rom, addr, data);
++  }
++  if(within<0xc0, 0xdf, 0x0000, 0xffff>(addr)) {
++	addr = ((addr & 0x3f0000 >> 1) | (addr & 0xffff));
++	return memory_access(write, cartridge.rom, addr, data);
++  }
++  
++  /*
++  if(within<0xe0, 0xfa, 0x0000, 0xffff>(addr)
++  || within<0xfb, 0xfb, 0x0000, 0xbfff>(addr)
++  || within<0xfc, 0xff, 0x0000, 0xffff>(addr)
++  || within<0x60, 0x7d, 0x0000, 0xffff>(addr)) {
++    return memory_access(write, sram, (addr & 0xffff), data);
++  }
++  
++  if(within<0xfb, 0xfb, 0xc000, 0xc9ff>(addr)
++  || within<0xfb, 0xfb, 0xfa00, 0xfbff>(addr)) {
++	switch(addr & 0x1ff) {
++		case 0x0f8:
++			break;
++		case 0x0fa:
++			break;
++		case 0x108:   //CARD! bit 0: XBAND Card check
++			return 0x01;
++		case 0x110:
++			break;
++		case 0x112:
++			break;
++		case 0x130:
++			break;
++		case 0x138:
++			break;
++		case 0x140:
++			break;
++		case 0x168:
++			break;
++		case 0x188:   //???
++			return 0x00;
++		case 0x192:
++			return 0xff;
++		case 0x196:   //d53898: DIAL-UP!
++			return 0x80;
++		case 0x1b0:   // ??
++			return 0xff;
++		case 0x1b2:   //For running XBAND
++			return 0x46;
++		case 0x1ba:
++			break;
++		case 0x1bc:
++			return 0x08;
++		case 0x1be:
++			break;
++	}
++		return 0xff;
++  }
++  
++  if(within<0xfb, 0xfb, 0xfc00, 0xffff>(addr)) {
++	return 0xff;
++  }
++  */
++  return cpu.regs.mdr;
++ }
++}
++
++uint8 XBAND::mcu_read(unsigned addr) {
++  return mcu_access(0, addr);
++}
++
++void XBAND::mcu_write(unsigned addr, uint8 data) {
++  mcu_access(1, addr, data);
++}
++
++uint8 XBAND::mmio_read(unsigned addr) {  
++  if(within<0xe0, 0xfa, 0x0000, 0xffff>(addr)
++  || within<0xfb, 0xfb, 0x0000, 0xbfff>(addr)
++  || within<0xfc, 0xff, 0x0000, 0xffff>(addr)
++  || within<0x60, 0x7d, 0x0000, 0xffff>(addr)) {
++    return memory_read(sram, (addr & 0xffff));
++  }
++  
++  if(within<0xfb, 0xfb, 0xc000, 0xc9ff>(addr)
++  || within<0xfb, 0xfb, 0xfa00, 0xfbff>(addr)) {
++	switch(addr & 0x1ff) {
++		case 0x0f8:
++			break;
++		case 0x0fa:
++			break;
++		case 0x108:   //CARD! bit 0: XBAND Card check
++			return 0x01;
++		case 0x110:
++			break;
++		case 0x112:
++			break;
++		case 0x130:
++			break;
++		case 0x138:
++			break;
++		case 0x140:
++			break;
++		case 0x168:
++			break;
++		case 0x188:   //???
++			return 0x00;
++		case 0x192:
++			return 0xff;
++		case 0x196:   //d53898: DIAL-UP!
++			return 0x80;
++		case 0x1b0:   // ??
++			return 0xff;
++		case 0x1b2:   //For running XBAND
++			return 0x46;
++		case 0x1ba:
++			break;
++		case 0x1bc:
++			return 0x08;
++		case 0x1be:
++			break;
++	}
++		return 0x00;
++  }
++  
++  /*
++  switch(addr) {
++    case 0xfbc108:   //CARD! bit 0: XBAND Card check
++		return 0x01;
++	case 0xfbc188:   //???
++		return 0x00;
++	case 0xfbc192:
++		break;
++	case 0xfbc196:   //d53898: DIAL-UP!
++		return 0x80;
++	case 0xfbc1b0:   // ??
++		break;
++	case 0xfbc1b2:   //For running XBAND
++		return 0x46;
++	case 0xfbc1ba:
++		break;
++	case 0xfbc1bc:
++		return 0x08;
++	case 0xfbc1be:
++		break;
++  }
++  */
++  return 0xff;
++}
++
++void XBAND::mmio_write(unsigned addr, uint8 data) {
++  if(within<0xe0, 0xfa, 0x0000, 0xffff>(addr)) {
++    return memory_write(sram, (addr & 0x1fffff), data);
++  }
++}
++
++}
++//#endif
+diff -urN ./snes/chip/xband/xband.hpp ../../bsnes-sx2_v009/snes/chip/xband/xband.hpp
+--- ./snes/chip/xband/xband.hpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/xband/xband.hpp	2012-01-13 09:28:07.000000000 +0900
+@@ -0,0 +1,28 @@
++class XBAND {
++public:
++  MappedRAM sram;
++
++  void init();
++  void load();
++  void unload();
++  void power();
++  void reset();
++
++  uint8 memory_access(bool write, Memory &memory, unsigned addr, uint8 data);
++  uint8 memory_read(Memory &memory, unsigned addr);
++  void memory_write(Memory &memory, unsigned addr, uint8 data);
++
++  uint8 mcu_access(bool write, unsigned addr, uint8 data = 0x00);
++  uint8 mcu_read(unsigned addr);
++  void mcu_write(unsigned addr, uint8 data);
++
++  uint8 mmio_read(unsigned addr);
++  void mmio_write(unsigned addr, uint8 data);
++
++private:
++  uint8 mapset;
++  
++  bool read_96;
++};
++
++extern XBAND xband;
+diff -urN ./snes/Makefile ../../bsnes-sx2_v009/snes/Makefile
+--- ./snes/Makefile	2011-06-26 11:54:42.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/Makefile	2012-01-22 20:34:55.000000000 +0900
+@@ -5,7 +5,7 @@
+ snes_objects += snes-nss snes-icd2 snes-superfx snes-sa1 snes-necdsp snes-hitachidsp
+ snes_objects += snes-bsx snes-srtc snes-sdd1 snes-spc7110
+ snes_objects += snes-obc1 snes-st0018 snes-sufamiturbo
+-snes_objects += snes-msu1 snes-link
++snes_objects += snes-msu1 snes-link snes-xband //mutually exclusive with snes-sfbox
+ objects += $(snes_objects)
+ 
+ ifeq ($(profile),accuracy)
+diff -urN ./snes/cpu/core/disassembler/disassembler.cpp ../../bsnes-sx2_v009/snes/cpu/core/disassembler/disassembler.cpp
+--- ./snes/cpu/core/disassembler/disassembler.cpp	2010-08-19 13:18:17.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/cpu/core/disassembler/disassembler.cpp	2012-01-24 19:28:14.000000000 +0900
+@@ -55,3 +55,5 @@
+ obj/snes-sufamiturbo.o: $(snes)/chip/sufamiturbo/sufamiturbo.cpp $(snes)/chip/sufamiturbo/*
+ obj/snes-msu1.o       : $(snes)/chip/msu1/msu1.cpp $(snes)/chip/msu1/*
+ obj/snes-link.o       : $(snes)/chip/link/link.cpp $(snes)/chip/link/*
++obj/snes-xband.o      : $(snes)/chip/xband/xband.cpp $(snes)/chip/xband/*
+diff -urN ./snes/system/system.cpp ../../bsnes-sx2_v009/snes/system/system.cpp
+--- ./snes/system/system.cpp	2011-06-26 11:56:32.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/system/system.cpp	2012-01-22 20:39:09.000000000 +0900
+@@ -83,6 +83,8 @@
+   st0018.init();
+   msu1.init();
+   link.init();
++  xband.init();
+ 
+   video.init();
+   audio.init();
+@@ -107,6 +109,8 @@
+   if(cartridge.mode() == Cartridge::Mode::Bsx) bsxcartridge.load();
+   if(cartridge.mode() == Cartridge::Mode::SufamiTurbo) sufamiturbo.load();
+   if(cartridge.mode() == Cartridge::Mode::SuperGameBoy) icd2.load();
++  if(cartridge.mode() == Cartridge::Mode::XBand) xband.load();
+ 
+   if(cartridge.has_bsx_slot()) bsxflash.load();
+   if(cartridge.has_nss_dip()) nss.load();
+@@ -131,6 +135,8 @@
+   if(cartridge.mode() == Cartridge::Mode::Bsx) bsxcartridge.unload();
+   if(cartridge.mode() == Cartridge::Mode::SufamiTurbo) sufamiturbo.unload();
+   if(cartridge.mode() == Cartridge::Mode::SuperGameBoy) icd2.unload();
++  if(cartridge.mode() == Cartridge::Mode::XBand) xband.unload();
+ 
+   if(cartridge.has_bsx_slot()) bsxflash.unload();
+   if(cartridge.has_nss_dip()) nss.unload();
+@@ -167,6 +173,8 @@
+   if(expansion() == ExpansionPortDevice::BSX) bsxsatellaview.power();
+   if(cartridge.mode() == Cartridge::Mode::Bsx) bsxcartridge.power();
+   if(cartridge.mode() == Cartridge::Mode::SuperGameBoy) icd2.power();
++  if(cartridge.mode() == Cartridge::Mode::XBand) xband.power();
+ 
+   if(cartridge.has_bsx_slot()) bsxflash.power();
+   if(cartridge.has_nss_dip()) nss.power();
+@@ -205,6 +213,8 @@
+ 
+   if(cartridge.mode() == Cartridge::Mode::Bsx) bsxcartridge.reset();
+   if(cartridge.mode() == Cartridge::Mode::SuperGameBoy) icd2.reset();
++  if(cartridge.mode() == Cartridge::Mode::XBand) xband.reset();
+ 
+   if(cartridge.has_bsx_slot()) bsxflash.reset();
+   if(cartridge.has_nss_dip()) nss.reset();
+diff -urN ./ui/cartridge/cartridge.cpp ../../bsnes-sx2_v009/ui/cartridge/cartridge.cpp
+--- ./ui/cartridge/cartridge.cpp	2011-08-19 18:05:14.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/cartridge/cartridge.cpp	2012-01-22 20:42:07.000000000 +0900
+@@ -81,6 +90,28 @@
+   utility.cartridgeLoaded();
+   return true;
+ }
++
++bool Cartridge::loadXBand(const char *basename, const char *slotname) {
++  unload();
++  if(loadCartridge(SNES::cartridge.rom, baseXML, basename) == false) return false;
++  //loadCartridge(SNES::XBAND, xBandXML, slotname);
++  baseName = nall::basename(basename);
++  //xBandName = nall::basename(slotname);
++  SNES::cartridge.load(SNES::Cartridge::Mode::XBand, { baseXML, xBandXML });
++  foreach(memory, SNES::cartridge.nvram) loadMemory(memory);
++  utility.cartridgeLoaded();
++  return true;
++}
+ 
+ void Cartridge::unload() {
+   patch.applied = false;
+diff -urN ./ui/cartridge/cartridge.hpp ../../bsnes-sx2_v009/ui/cartridge/cartridge.hpp
+--- ./ui/cartridge/cartridge.hpp	2011-08-19 17:55:48.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/cartridge/cartridge.hpp	2012-01-22 20:43:19.000000000 +0900
+@@ -1,13 +1,16 @@
+ struct Cartridge {
+   bool loadNormal(const char *basename);
+   bool loadBsxSlotted(const char *basename, const char *slotname);
+   bool loadBsx(const char *basename, const char *slotname);
+   bool loadSufamiTurbo(const char *basename, const char *slotAname, const char *slotBname);
+   bool loadSuperGameBoy(const char *basename, const char *slotname);
++  bool loadXBand(const char *basename, const char *slotname);
+   void unload();
+ 
+-  string baseName, bsxName, sufamiTurboAName, sufamiTurboBName, gameBoyName;
+-  string baseXML, bsxXML, sufamiTurboAXML, sufamiTurboBXML, gameBoyXML;
++  string baseName, bsxName, sufamiTurboAName, sufamiTurboBName, gameBoyName, xBandName;
++  string baseXML, bsxXML, sufamiTurboAXML, sufamiTurboBXML, gameBoyXML, xBandXML;
+ 
+   struct Patch {
+     bool applied;
+diff -urN ./ui/general/file-browser.cpp ../../bsnes-sx2_v009/ui/general/file-browser.cpp
+--- ./ui/general/file-browser.cpp	2011-08-08 17:26:26.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/file-browser.cpp	2012-01-09 09:26:49.000000000 +0900
+@@ -76,6 +76,13 @@
+       filters.append(".sgb");
+       break;
+     }
++	
++	case Mode::XBand: {
++	  setTitle("Load XBAND Game Cartridge");
++	  filters.append(".sfc");
++	  break;
++	}
++	
+   }
+ 
+   setFolder(activePath);
+diff -urN ./ui/general/file-browser.hpp ../../bsnes-sx2_v009/ui/general/file-browser.hpp
+--- ./ui/general/file-browser.hpp	2011-03-25 03:03:57.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/file-browser.hpp	2012-01-09 09:25:22.000000000 +0900
+@@ -6,7 +6,7 @@
+   Button upButton;
+   ListView contentsBox;
+ 
+-  enum class Mode : unsigned { Cartridge, Satellaview, SufamiTurbo, GameBoy } mode;
++  enum class Mode : unsigned { Cartridge, Satellaview, SufamiTurbo, GameBoy, XBand } mode;
+   void fileOpen(Mode mode, function<void (string)> callback);
+   void create();
+ 
+diff -urN ./ui/general/main-window.cpp ../../bsnes-sx2_v009/ui/general/main-window.cpp
+--- ./ui/general/main-window.cpp	2011-08-12 07:14:22.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/main-window.cpp	2012-01-22 20:42:30.000000000 +0900
+@@ -28,6 +28,15 @@
+ 
+   systemLoadCartridgeSuperGameBoy.setText("Load Super Game Boy Cartridge ...");
+   systemLoadCartridgeSpecial.append(systemLoadCartridgeSuperGameBoy);
++  
++  systemLoadCartridgeXBand.setText("Load XBAND Cartridge ...");
++  systemLoadCartridgeSpecial.append(systemLoadCartridgeXBand);
+ 
+   system.append(systemSeparator1);
+ 
+@@ -265,6 +282,15 @@
+   systemLoadCartridgeBsx.onTick = [] { singleSlotLoader.loadCartridgeBsx(); };
+   systemLoadCartridgeSufamiTurbo.onTick = [] { doubleSlotLoader.loadCartridgeSufamiTurbo(); };
+   systemLoadCartridgeSuperGameBoy.onTick = [] { singleSlotLoader.loadCartridgeSuperGameBoy(); };
++  systemLoadCartridgeXBand.onTick = [] { singleSlotLoader.loadCartridgeXBand(); };
++  
+ 
+   systemPower.onTick = [] {
+     SNES::system.power();
+diff -urN ./ui/general/main-window.hpp ../../bsnes-sx2_v009/ui/general/main-window.hpp
+--- ./ui/general/main-window.hpp	2011-08-12 06:43:39.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/main-window.hpp	2012-01-22 20:23:11.000000000 +0900
+@@ -6,10 +6,16 @@
+   Item systemLoadCartridgeBsx;
+   Item systemLoadCartridgeSufamiTurbo;
+   Item systemLoadCartridgeSuperGameBoy;
++  Item systemLoadCartridgeXBand;
+   Separator systemSeparator1;
+   Item systemPower;
+   Item systemReset;
+   Separator systemSeparator2;
+   Menu systemPort1;
+   RadioItem systemPort1None;
+   RadioItem systemPort1Gamepad;
+diff -urN ./ui/general/slot-loader.cpp ../../bsnes-sx2_v009/ui/general/slot-loader.cpp
+--- ./ui/general/slot-loader.cpp	2011-08-08 17:26:43.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/slot-loader.cpp	2012-01-11 09:30:20.000000000 +0900
+@@ -35,7 +35,7 @@
+ 
+   slotBrowse.onTick = []() {
+     FileBrowser::Mode fileMode = (singleSlotLoader.mode == Mode::SuperGameBoy
+-    ? FileBrowser::Mode::GameBoy : FileBrowser::Mode::Satellaview);
++    ? FileBrowser::Mode::GameBoy : (singleSlotLoader.mode == Mode::Bsx || singleSlotLoader.mode == Mode::BsxSlotted) ? FileBrowser::Mode::Satellaview : FileBrowser::Mode::XBand); //hard dependency on bsx patch
+     fileBrowser.fileOpen(fileMode, [](string filename) {
+       singleSlotLoader.slotPath.setText(filename);
+     });
+@@ -71,6 +71,15 @@
+   okButton.setFocused();
+ }
+ 
++void SingleSlotLoader::loadCartridgeXBand() {
++  mode = Mode::XBand;
++  setTitle("Load XBAND cartridge");
++  basePath.setText("");
++  slotPath.setText("");
++  setVisible();
++  okButton.setFocused();
++}
++
+ void SingleSlotLoader::load() {
+   setVisible(false);
+ 
+@@ -89,6 +98,9 @@
+       cartridge.loadSuperGameBoy(basePath.text(), slotPath.text());
+       break;
+     }
++	case Mode::XBand: {
++	  cartridge.loadXBand(basePath.text(), slotPath.text());
++	}
+   }
+ }
+diff -urN ./ui/general/slot-loader.hpp ../../bsnes-sx2_v009/ui/general/slot-loader.hpp
+--- ./ui/general/slot-loader.hpp	2011-02-15 12:38:20.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/slot-loader.hpp	2012-01-09 09:28:03.000000000 +0900
+@@ -16,8 +16,9 @@
+   void loadCartridgeBsxSlotted();
+   void loadCartridgeBsx();
+   void loadCartridgeSuperGameBoy();
++  void loadCartridgeXBand();
+ 
+-  enum class Mode : unsigned { BsxSlotted, Bsx, SuperGameBoy } mode;
++  enum class Mode : unsigned { BsxSlotted, Bsx, SuperGameBoy, XBand } mode;
+   void load();
+ };
+ 

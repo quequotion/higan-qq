@@ -1,5 +1,5 @@
 diff --git a/higan/Makefile b/higan/Makefile
-index 65ad25d..08df7eb 100755
+index 65ad25d..08df7eb 100644
 --- a/higan/Makefile
 +++ b/higan/Makefile
 @@ -6,7 +6,7 @@ gb  := gb
@@ -12,7 +12,7 @@ index 65ad25d..08df7eb 100755
  
  # options += debugger
 diff --git a/higan/sfc/Makefile b/higan/sfc/Makefile
-index 806cf6d..f83bfc8 100755
+index 806cf6d..f83bfc8 100644
 --- a/higan/sfc/Makefile
 +++ b/higan/sfc/Makefile
 @@ -13,6 +13,12 @@ ifeq ($(profile),accuracy)
@@ -48,7 +48,7 @@ index e69de29..dd0319c 100644
 +#include <sfc/alt/dsp/dsp.hpp>
 +#include <sfc/ppu/ppu.hpp>
 diff --git a/higan/sfc/sfc.hpp b/higan/sfc/sfc.hpp
-index b7167f1..2d62f4f 100755
+index b7167f1..2d62f4f 100644
 --- a/higan/sfc/sfc.hpp
 +++ b/higan/sfc/sfc.hpp
 @@ -57,6 +57,8 @@ namespace SuperFamicom {

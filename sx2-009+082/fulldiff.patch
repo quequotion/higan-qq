@@ -1,0 +1,6260 @@
+diff -urN ./cc32.bat ../../bsnes-sx2_v009/cc32.bat
+--- ./cc32.bat	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/cc32.bat	2012-05-10 20:56:20.000000000 +0900
+@@ -0,0 +1,3 @@
++windres.exe -F pe-i386 "ui\resource.rc" "obj\resource.o"
++@mingw32-make -f Makefile32 -j 8
++@pause
+\ No newline at end of file
+diff -urN ./cc.bat ../../bsnes-sx2_v009/cc.bat
+--- ./cc.bat	2011-03-15 10:31:20.000000000 +0900
++++ ../../bsnes-sx2_v009/cc.bat	2011-10-27 18:46:52.000000000 +0900
+@@ -1,2 +1,2 @@
+ @mingw32-make -j 8
+-@pause
++@pause
+\ No newline at end of file
+diff -urN ./Makefile ../../bsnes-sx2_v009/Makefile
+--- ./Makefile	2011-08-20 23:01:06.000000000 +0900
++++ ../../bsnes-sx2_v009/Makefile	2012-07-13 14:17:11.000000000 +0900
+@@ -2,10 +2,11 @@
+ 
+ snes := snes
+ gameboy := gameboy
+-profile := accuracy
++profile := compatibility
+ ui := ui
++platform := win
+ 
+-# options += debugger
++#options += debugger
+ 
+ # compiler
+ c       := $(compiler) -std=gnu99
+@@ -35,7 +36,7 @@
+   link += -mwindows
+ # link += -mconsole
+   link += -mthreads -s -luuid -lkernel32 -luser32 -lgdi32 -lcomctl32 -lcomdlg32 -lshell32 -lole32
+-  link += -enable-stdcall-fixup -Wl,-enable-auto-import -Wl,-enable-runtime-pseudo-reloc
++  link += -Wl,-enable-auto-import -Wl,-enable-runtime-pseudo-reloc
+ else
+   unknown_platform: help;
+ endif
+diff -urN ./Makefile32 ../../bsnes-sx2_v009/Makefile32
+--- ./Makefile32	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/Makefile32	2012-08-05 22:10:32.000000000 +0900
+@@ -0,0 +1,80 @@
++include nall/Makefile
++
++snes := snes
++gameboy := gameboy
++profile := compatibility
++ui := ui
++platform := win
++
++#options += debugger
++
++# compiler
++c       := $(compiler) -std=gnu99
++cpp     := $(subst cc,++,$(compiler)) -std=gnu++0x
++flags   := -m32 -O3 -fomit-frame-pointer -I.
++link    := -m32
++objects := libco
++
++# profile-guided optimization mode
++# pgo := instrument
++# pgo := optimize
++
++ifeq ($(pgo),instrument)
++  flags += -fprofile-generate
++  link += -lgcov
++else ifeq ($(pgo),optimize)
++  flags += -fprofile-use
++endif
++
++flags := $(flags) $(foreach o,$(call strupper,$(options)),-D$o)
++
++# platform
++ifeq ($(platform),x)
++  link += -s -ldl -lX11 -lXext
++else ifeq ($(platform),osx)
++else ifeq ($(platform),win)
++  link += -mwindows
++# link += -mconsole
++  link += -mthreads -s -luuid -lkernel32 -luser32 -lgdi32 -lcomctl32 -lcomdlg32 -lshell32 -lole32
++  link += -Wl,-enable-auto-import -Wl,-enable-runtime-pseudo-reloc
++else
++  unknown_platform: help;
++endif
++
++# implicit rules
++compile = \
++  $(strip \
++    $(if $(filter %.c,$<), \
++      $(c) $(flags) $1 -c $< -o $@, \
++      $(if $(filter %.cpp,$<), \
++        $(cpp) $(flags) $1 -c $< -o $@ \
++      ) \
++    ) \
++  )
++
++%.o: $<; $(call compile)
++
++all: build;
++
++obj/libco.o: libco/libco.c libco/*
++
++include $(ui)/Makefile
++
++# targets
++clean:
++	-@$(call delete,obj/*.o)
++	-@$(call delete,obj/*.a)
++	-@$(call delete,obj/*.so)
++	-@$(call delete,obj/*.dylib)
++	-@$(call delete,obj/*.dll)
++	-@$(call delete,*.res)
++	-@$(call delete,*.pgd)
++	-@$(call delete,*.pgc)
++	-@$(call delete,*.ilk)
++	-@$(call delete,*.pdb)
++	-@$(call delete,*.manifest)
++
++archive-all:
++	tar -cjf bsnes.tar.bz2 data gameboy libco nall obj out phoenix ruby snes ui ui-gameboy ui-libsnes Makefile cc.bat clean.bat sync.sh
++
++help:;
+diff -urN ./nall/file.hpp ../../bsnes-sx2_v009/nall/file.hpp
+--- ./nall/file.hpp	2011-08-20 22:26:51.000000000 +0900
++++ ../../bsnes-sx2_v009/nall/file.hpp	2011-10-30 22:16:57.000000000 +0900
+@@ -46,8 +46,8 @@
+ 
+     uint8_t read() {
+       if(!fp) return 0xff;                       //file not open
+-      if(file_mode == mode::write) return 0xff;  //reads not permitted
+-      if(file_offset >= file_size) return 0xff;  //cannot read past end of file
++      if(file_mode == mode::write) return 0xfe;  //reads not permitted
++      if(file_offset >= file_size) return 0xfd;  //cannot read past end of file
+       buffer_sync();
+       return buffer[(file_offset++) & buffer_mask];
+     }
+diff -urN ./nall/snes/cartridge.hpp ../../bsnes-sx2_v009/nall/snes/cartridge.hpp
+--- ./nall/snes/cartridge.hpp	2011-08-20 22:26:51.000000000 +0900
++++ ../../bsnes-sx2_v009/nall/snes/cartridge.hpp	2012-01-09 15:45:48.000000000 +0900
+@@ -35,6 +35,7 @@
+     ModeBsx,
+     ModeSufamiTurbo,
+     ModeSuperGameBoy,
++	ModeXBand,
+   };
+ 
+   enum Type {
+@@ -47,6 +48,7 @@
+     TypeSuperGameBoy1Bios,
+     TypeSuperGameBoy2Bios,
+     TypeGameBoy,
++	TypeXBand,
+     TypeUnknown,
+   };
+ 
+@@ -67,6 +69,7 @@
+     BSCHiROM,
+     BSXROM,
+     STROM,
++	XBANDROM,
+   };
+ 
+   enum DSP1MemoryMapper {
+@@ -103,6 +106,7 @@
+   bool has_st010;
+   bool has_st011;
+   bool has_st018;
++  bool has_xband_slot;
+ };
+ 
+ SNESCartridge::SNESCartridge(const uint8_t *data, unsigned size) {
+@@ -131,6 +135,12 @@
+     xmlMemoryMap = xml.transform("'", "\"");
+     return;
+   }
++  
++  if(type == TypeXBand) {
++    xml.append("<cartridge/>");
++    xmlMemoryMap = xml.transform("'", "\"");
++    return;
++  }
+ 
+   xml.append("<cartridge");
+   if(region == NTSC) {
+@@ -529,6 +539,20 @@
+     xml.append("    <map address='80-bf:3800-38ff'/>\n");
+     xml.append("  </setarisc>\n");
+   }
++  
++  if(type == TypeXBand) {
++	xml.append("  <xband>\n");
++	xml.append("    <mcu>\n");
++	xml.append("      <map address='00-3f:8000-ffff'>\n");
++	xml.append("      <map address='80-bf:8000-ffff'>\n");
++	xml.append("      <map address='40-7d:0000-ffff'>\n");
++	xml.append("      <map address='c0-df:0000-ffff'>\n");
++	xml.append("    </mcu>\n");
++	xml.append("    <mmio>\n");
++	xml.append("      <map address='e0-ff:0000-ffff'>\n");
++	xml.append("    </mmio>\n");
++	xml.append("  </xband>\n");
++  }
+ 
+   xml.append("</cartridge>\n");
+   xmlMemoryMap = xml.transform("'", "\"");
+Binary files ./obj/gameboy-apu.o and ../../bsnes-sx2_v009/obj/gameboy-apu.o differ
+Binary files ./obj/gameboy-cartridge.o and ../../bsnes-sx2_v009/obj/gameboy-cartridge.o differ
+Binary files ./obj/gameboy-cpu.o and ../../bsnes-sx2_v009/obj/gameboy-cpu.o differ
+Binary files ./obj/gameboy-lcd.o and ../../bsnes-sx2_v009/obj/gameboy-lcd.o differ
+Binary files ./obj/gameboy-memory.o and ../../bsnes-sx2_v009/obj/gameboy-memory.o differ
+Binary files ./obj/gameboy-scheduler.o and ../../bsnes-sx2_v009/obj/gameboy-scheduler.o differ
+Binary files ./obj/gameboy-system.o and ../../bsnes-sx2_v009/obj/gameboy-system.o differ
+Binary files ./obj/libco.o and ../../bsnes-sx2_v009/obj/libco.o differ
+Binary files ./obj/phoenix.o and ../../bsnes-sx2_v009/obj/phoenix.o differ
+Binary files ./obj/resource.o and ../../bsnes-sx2_v009/obj/resource.o differ
+Binary files ./obj/ruby.o and ../../bsnes-sx2_v009/obj/ruby.o differ
+Binary files ./obj/snes-bsx.o and ../../bsnes-sx2_v009/obj/snes-bsx.o differ
+Binary files ./obj/snes-cartridge.o and ../../bsnes-sx2_v009/obj/snes-cartridge.o differ
+Binary files ./obj/snes-cheat.o and ../../bsnes-sx2_v009/obj/snes-cheat.o differ
+Binary files ./obj/snes-controller.o and ../../bsnes-sx2_v009/obj/snes-controller.o differ
+Binary files ./obj/snes-cpucore.o and ../../bsnes-sx2_v009/obj/snes-cpucore.o differ
+Binary files ./obj/snes-cpu.o and ../../bsnes-sx2_v009/obj/snes-cpu.o differ
+Binary files ./obj/snes-dsp.o and ../../bsnes-sx2_v009/obj/snes-dsp.o differ
+Binary files ./obj/snes-hitachidsp.o and ../../bsnes-sx2_v009/obj/snes-hitachidsp.o differ
+Binary files ./obj/snes-icd2.o and ../../bsnes-sx2_v009/obj/snes-icd2.o differ
+Binary files ./obj/snes-link.o and ../../bsnes-sx2_v009/obj/snes-link.o differ
+Binary files ./obj/snes-memory.o and ../../bsnes-sx2_v009/obj/snes-memory.o differ
+Binary files ./obj/snes-msu1.o and ../../bsnes-sx2_v009/obj/snes-msu1.o differ
+Binary files ./obj/snes-necdsp.o and ../../bsnes-sx2_v009/obj/snes-necdsp.o differ
+Binary files ./obj/snes-nss.o and ../../bsnes-sx2_v009/obj/snes-nss.o differ
+Binary files ./obj/snes-obc1.o and ../../bsnes-sx2_v009/obj/snes-obc1.o differ
+Binary files ./obj/snes-ppu.o and ../../bsnes-sx2_v009/obj/snes-ppu.o differ
+Binary files ./obj/snes-sa1.o and ../../bsnes-sx2_v009/obj/snes-sa1.o differ
+Binary files ./obj/snes-sdd1.o and ../../bsnes-sx2_v009/obj/snes-sdd1.o differ
+Binary files ./obj/snes-sfbox.o and ../../bsnes-sx2_v009/obj/snes-sfbox.o differ
+Binary files ./obj/snes-smpcore.o and ../../bsnes-sx2_v009/obj/snes-smpcore.o differ
+Binary files ./obj/snes-smp.o and ../../bsnes-sx2_v009/obj/snes-smp.o differ
+Binary files ./obj/snes-spc7110.o and ../../bsnes-sx2_v009/obj/snes-spc7110.o differ
+Binary files ./obj/snes-srtc.o and ../../bsnes-sx2_v009/obj/snes-srtc.o differ
+Binary files ./obj/snes-st0018.o and ../../bsnes-sx2_v009/obj/snes-st0018.o differ
+Binary files ./obj/snes-sufamiturbo.o and ../../bsnes-sx2_v009/obj/snes-sufamiturbo.o differ
+Binary files ./obj/snes-superfx.o and ../../bsnes-sx2_v009/obj/snes-superfx.o differ
+Binary files ./obj/snes-system.o and ../../bsnes-sx2_v009/obj/snes-system.o differ
+Binary files ./obj/snes-xband.o and ../../bsnes-sx2_v009/obj/snes-xband.o differ
+Binary files ./obj/ui-cartridge.o and ../../bsnes-sx2_v009/obj/ui-cartridge.o differ
+Binary files ./obj/ui-debugger.o and ../../bsnes-sx2_v009/obj/ui-debugger.o differ
+Binary files ./obj/ui-general.o and ../../bsnes-sx2_v009/obj/ui-general.o differ
+Binary files ./obj/ui-input.o and ../../bsnes-sx2_v009/obj/ui-input.o differ
+Binary files ./obj/ui-main.o and ../../bsnes-sx2_v009/obj/ui-main.o differ
+Binary files ./obj/ui-path.o and ../../bsnes-sx2_v009/obj/ui-path.o differ
+Binary files ./obj/ui-settings.o and ../../bsnes-sx2_v009/obj/ui-settings.o differ
+Binary files ./obj/ui-tools.o and ../../bsnes-sx2_v009/obj/ui-tools.o differ
+Binary files ./obj/ui-utility.o and ../../bsnes-sx2_v009/obj/ui-utility.o differ
+Binary files ./out/bsxdat/BSX0001-0.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-0.bin differ
+Binary files ./out/bsxdat/BSX0001-10.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-10.bin differ
+Binary files ./out/bsxdat/BSX0001-11.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-11.bin differ
+Binary files ./out/bsxdat/BSX0001-12.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-12.bin differ
+Binary files ./out/bsxdat/BSX0001-13.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-13.bin differ
+Binary files ./out/bsxdat/BSX0001-14.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-14.bin differ
+Binary files ./out/bsxdat/BSX0001-15.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-15.bin differ
+Binary files ./out/bsxdat/BSX0001-16.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-16.bin differ
+Binary files ./out/bsxdat/BSX0001-17.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-17.bin differ
+Binary files ./out/bsxdat/BSX0001-18.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-18.bin differ
+Binary files ./out/bsxdat/BSX0001-19.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-19.bin differ
+Binary files ./out/bsxdat/BSX0001-1.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-1.bin differ
+Binary files ./out/bsxdat/BSX0001-20.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-20.bin differ
+Binary files ./out/bsxdat/BSX0001-21.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-21.bin differ
+Binary files ./out/bsxdat/BSX0001-22.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-22.bin differ
+Binary files ./out/bsxdat/BSX0001-23.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-23.bin differ
+Binary files ./out/bsxdat/BSX0001-24.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-24.bin differ
+Binary files ./out/bsxdat/BSX0001-25.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-25.bin differ
+Binary files ./out/bsxdat/BSX0001-26.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-26.bin differ
+Binary files ./out/bsxdat/BSX0001-27.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-27.bin differ
+Binary files ./out/bsxdat/BSX0001-28.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-28.bin differ
+Binary files ./out/bsxdat/BSX0001-29.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-29.bin differ
+Binary files ./out/bsxdat/BSX0001-2.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-2.bin differ
+Binary files ./out/bsxdat/BSX0001-30.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-30.bin differ
+Binary files ./out/bsxdat/BSX0001-31.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-31.bin differ
+Binary files ./out/bsxdat/BSX0001-32.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-32.bin differ
+Binary files ./out/bsxdat/BSX0001-33.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-33.bin differ
+Binary files ./out/bsxdat/BSX0001-34.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-34.bin differ
+Binary files ./out/bsxdat/BSX0001-35.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-35.bin differ
+Binary files ./out/bsxdat/BSX0001-36.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-36.bin differ
+Binary files ./out/bsxdat/BSX0001-37.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-37.bin differ
+Binary files ./out/bsxdat/BSX0001-38.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-38.bin differ
+Binary files ./out/bsxdat/BSX0001-39.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-39.bin differ
+Binary files ./out/bsxdat/BSX0001-3.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-3.bin differ
+Binary files ./out/bsxdat/BSX0001-40.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-40.bin differ
+Binary files ./out/bsxdat/BSX0001-41.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-41.bin differ
+Binary files ./out/bsxdat/BSX0001-42.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-42.bin differ
+Binary files ./out/bsxdat/BSX0001-43.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-43.bin differ
+Binary files ./out/bsxdat/BSX0001-44.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-44.bin differ
+Binary files ./out/bsxdat/BSX0001-45.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-45.bin differ
+Binary files ./out/bsxdat/BSX0001-46.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-46.bin differ
+Binary files ./out/bsxdat/BSX0001-47.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-47.bin differ
+Binary files ./out/bsxdat/BSX0001-4.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-4.bin differ
+Binary files ./out/bsxdat/BSX0001-5.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-5.bin differ
+Binary files ./out/bsxdat/BSX0001-6.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-6.bin differ
+Binary files ./out/bsxdat/BSX0001-7.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-7.bin differ
+Binary files ./out/bsxdat/BSX0001-8.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-8.bin differ
+Binary files ./out/bsxdat/BSX0001-9.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0001-9.bin differ
+Binary files ./out/bsxdat/BSX0121-0.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0121-0.bin differ
+Binary files ./out/bsxdat/BSX0122-0.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0122-0.bin differ
+Binary files ./out/bsxdat/BSX0124-0.bin and ../../bsnes-sx2_v009/out/bsxdat/BSX0124-0.bin differ
+Binary files ./out/bsxdat/new/BSX0115-0.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0115-0.bin differ
+Binary files ./out/bsxdat/new/BSX0120-0.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0120-0.bin differ
+Binary files ./out/bsxdat/new/BSX0124-0.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0124-0.bin differ
+Binary files ./out/bsxdat/new/BSX0124-0 (Copie de Seru-PC en conflit 2012-04-04).bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0124-0 (Copie de Seru-PC en conflit 2012-04-04).bin differ
+Binary files ./out/bsxdat/new/BSX0126-0.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0126-0.bin differ
+Binary files ./out/bsxdat/new/BSX01F1-0.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX01F1-0.bin differ
+Binary files ./out/bsxdat/new/BSX01F1-1.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX01F1-1.bin differ
+Binary files ./out/bsxdat/new/BSX0201-0.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0201-0.bin differ
+Binary files ./out/bsxdat/new/BSX0201-10.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0201-10.bin differ
+Binary files ./out/bsxdat/new/BSX0201-11.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0201-11.bin differ
+Binary files ./out/bsxdat/new/BSX0201-1.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0201-1.bin differ
+Binary files ./out/bsxdat/new/BSX0201-2.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0201-2.bin differ
+Binary files ./out/bsxdat/new/BSX0201-3.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0201-3.bin differ
+Binary files ./out/bsxdat/new/BSX0201-4.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0201-4.bin differ
+Binary files ./out/bsxdat/new/BSX0201-5.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0201-5.bin differ
+Binary files ./out/bsxdat/new/BSX0201-6.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0201-6.bin differ
+Binary files ./out/bsxdat/new/BSX0201-7.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0201-7.bin differ
+Binary files ./out/bsxdat/new/BSX0201-8.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0201-8.bin differ
+Binary files ./out/bsxdat/new/BSX0201-9.bin and ../../bsnes-sx2_v009/out/bsxdat/new/BSX0201-9.bin differ
+Binary files ./out/bsxdat/new1/BSX0000-0.bin and ../../bsnes-sx2_v009/out/bsxdat/new1/BSX0000-0.bin differ
+Binary files ./out/bsxdat/new1/BSX0120-0.bin and ../../bsnes-sx2_v009/out/bsxdat/new1/BSX0120-0.bin differ
+Binary files ./out/bsxdat/new1/BSX0121-0.bin and ../../bsnes-sx2_v009/out/bsxdat/new1/BSX0121-0.bin differ
+Binary files ./out/bsxdat/new1/BSX0122-0.bin and ../../bsnes-sx2_v009/out/bsxdat/new1/BSX0122-0.bin differ
+Binary files ./out/bsxdat/new1/BSX0124-0.bin and ../../bsnes-sx2_v009/out/bsxdat/new1/BSX0124-0.bin differ
+Binary files ./out/bsxdat/new1/Directory.bin and ../../bsnes-sx2_v009/out/bsxdat/new1/Directory.bin differ
+Binary files ./out/bsxdat/new1/File1.bin and ../../bsnes-sx2_v009/out/bsxdat/new1/File1.bin differ
+Binary files ./out/bsxdat/new1/Folder1.bin and ../../bsnes-sx2_v009/out/bsxdat/new1/Folder1.bin differ
+Binary files ./out/bsxdat/old/BSX0400-0.bin and ../../bsnes-sx2_v009/out/bsxdat/old/BSX0400-0.bin differ
+Binary files ./out/bsxdat/old/BSX0500-0.bin and ../../bsnes-sx2_v009/out/bsxdat/old/BSX0500-0.bin differ
+Binary files ./out/bsxdat/old/BSX0600-0.bin and ../../bsnes-sx2_v009/out/bsxdat/old/BSX0600-0.bin differ
+Binary files ./out/bsxdat/old/BSX0700-0.bin and ../../bsnes-sx2_v009/out/bsxdat/old/BSX0700-0.bin differ
+Binary files ./out/bsxdat/old/BSX0.bin and ../../bsnes-sx2_v009/out/bsxdat/old/BSX0.bin differ
+Binary files ./out/bsxdat/old/BSX1.bin and ../../bsnes-sx2_v009/out/bsxdat/old/BSX1.bin differ
+Binary files ./out/bsxdat/old/BSX2.bin and ../../bsnes-sx2_v009/out/bsxdat/old/BSX2.bin differ
+Binary files ./out/bsxdat/old/BSX3.bin and ../../bsnes-sx2_v009/out/bsxdat/old/BSX3.bin differ
+Binary files ./out/bsxdat/old/BSX4.bin and ../../bsnes-sx2_v009/out/bsxdat/old/BSX4.bin differ
+Binary files ./out/bsxdat/old/BSX5.bin and ../../bsnes-sx2_v009/out/bsxdat/old/BSX5.bin differ
+Binary files ./out/bsxdat/old/BSX6.bin and ../../bsnes-sx2_v009/out/bsxdat/old/BSX6.bin differ
+Binary files ./out/bsxdat/old/BSX7.bin and ../../bsnes-sx2_v009/out/bsxdat/old/BSX7.bin differ
+Binary files ./out/bsxdat/old/BSX8.bin and ../../bsnes-sx2_v009/out/bsxdat/old/BSX8.bin differ
+Binary files ./out/bsxdat/old/Copy of BSX0.bin and ../../bsnes-sx2_v009/out/bsxdat/old/Copy of BSX0.bin differ
+Binary files ./out/bsxdat/old2/BSX0115-0.bin and ../../bsnes-sx2_v009/out/bsxdat/old2/BSX0115-0.bin differ
+Binary files ./out/bsxdat/old2/BSX0120-0.bin and ../../bsnes-sx2_v009/out/bsxdat/old2/BSX0120-0.bin differ
+Binary files ./out/bsxdat/old2/BSX0124-0.bin and ../../bsnes-sx2_v009/out/bsxdat/old2/BSX0124-0.bin differ
+Binary files ./out/bsxdat/old2/BSX0126-0.bin and ../../bsnes-sx2_v009/out/bsxdat/old2/BSX0126-0.bin differ
+Binary files ./out/bsxdat/old2/BSX01F1-0.bin and ../../bsnes-sx2_v009/out/bsxdat/old2/BSX01F1-0.bin differ
+Binary files ./out/bsxdat/old2/BSX0201-0.bin and ../../bsnes-sx2_v009/out/bsxdat/old2/BSX0201-0.bin differ
+Binary files ./out/bsxdat/other/BSX5.bin and ../../bsnes-sx2_v009/out/bsxdat/other/BSX5.bin differ
+Binary files ./out/bsxdat/other/BSX6.bin and ../../bsnes-sx2_v009/out/bsxdat/other/BSX6.bin differ
+Binary files ./out/bsxdat/other/BSX7.bin and ../../bsnes-sx2_v009/out/bsxdat/other/BSX7.bin differ
+Binary files ./out/bsxdat/other/BSX8.bin and ../../bsnes-sx2_v009/out/bsxdat/other/BSX8.bin differ
+Binary files ./out/bsxdat/other/BSX9.bin and ../../bsnes-sx2_v009/out/bsxdat/other/BSX9.bin differ
+Binary files ./out/bsxdat/other2/BSX5.bin and ../../bsnes-sx2_v009/out/bsxdat/other2/BSX5.bin differ
+Binary files ./out/bsxdat/other2/BSX6.bin and ../../bsnes-sx2_v009/out/bsxdat/other2/BSX6.bin differ
+Binary files ./out/bsxdat/other2/BSX7.bin and ../../bsnes-sx2_v009/out/bsxdat/other2/BSX7.bin differ
+Binary files ./out/bsxdat/other2/BSX8.bin and ../../bsnes-sx2_v009/out/bsxdat/other2/BSX8.bin differ
+Binary files ./out/bsxdat/other2/BSX9.bin and ../../bsnes-sx2_v009/out/bsxdat/other2/BSX9.bin differ
+diff -urN ./out/Ongaku Tsukuru - Kanadeeru (J).xml ../../bsnes-sx2_v009/out/Ongaku Tsukuru - Kanadeeru (J).xml
+--- ./out/Ongaku Tsukuru - Kanadeeru (J).xml	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/out/Ongaku Tsukuru - Kanadeeru (J).xml	2011-12-03 13:57:24.000000000 +0900
+@@ -0,0 +1,20 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<cartridge region="NTSC">
++  <rom>
++	<map mode="shadow" address="00-3f:8000-ffff"/>
++    <map mode="linear" address="40-7d:0000-ffff"/>
++	<map mode="shadow" address="80-bf:8000-ffff"/>
++	<map mode="linear" address="c0-fd:0000-ffff"/>
++  </rom>
++
++  <ram size="10000">
++    <map mode="linear" address="20-3f:6000-7fff"/>
++	<map mode="linear" address="a0-bf:6000-7fff"/>
++  </ram>
++
++  <bsx>
++    <slot>
++		<map mode="linear" address="e0-ff:0000-ffff"/>
++	</slot>
++  </bsx>
++</cartridge>
+\ No newline at end of file
+diff -urN ./out/readme.txt ../../bsnes-sx2_v009/out/readme.txt
+--- ./out/readme.txt	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/out/readme.txt	2012-08-05 22:09:41.000000000 +0900
+@@ -0,0 +1,102 @@
++bsnes-sx2 v009 (bsnes-bsx) (32/64-bit Compatibility+Debugger)
++(based on bsnes v082)
++by LuigiBlood/Seru-kun
++
++------
++Facts
++------
++- Super Famicom Box isn't well emulated, mostly because of the non support of Z80, which won't be done in bsnes-sx2.
++- XBAND is partially emulated, but I've yet to update how the registers work and give the data it expects.
++But it's not a priority there so it ain't gonna happen for now.
++- From now on (v007), the Time can be "downloaded" from Satellaview Stream 1 & 2.
++To have the Time data, ask the Hardware Channel 0x0000 and get 22 bytes (1 packet).
++Note that BSX0000-0.bin won't be read because of this change.
++- Cartridge Tilt and Swap are only there for fun.
++- From now on (v008), BSX files have a new format that only contains the Download Data.
++The emulator itself will do the rest.
++
++------
++Changelog
++------
++v009:
++- Debugger removed for faster emulation
++- Proper BS-X Memory Mapping added. (Note: This version isn't tested.)
++
++v008:
++- New format of BSX data files supported.
++- Added Year data to Time Channel.
++- Fixed Day data to Time Channel.
++- Fixed Crash when erasing full Flash data.
++
++v007:
++- Super Famicom Box emulation (which doesn't work) added.
++- Fixed Page Erase Memory Pack command.
++- Added Satellaview Second Stream support. ($218E-$2193)
++- Added Hardcoded Time Stream Channel (0x0000)
++- Time Stream Channel now have Month and Day data.
++
++v006:
++- XBAND is now supported. (Without Online features)
++- Added Cartridge Tilt and Swap features.
++- New name. "sx2" stands for "Seru's bs-X and Xband".
++
++v005:
++- Fixed some Memory Pack Erase commands.
++- Added Memory Pack saving support.
++(It will make a MEMPACK.bs file, and will replace the contents EVERY TIME you save, be careful.)
++- Removed Memory Pack Logging feature that slows down emulation.
++
++v004:
++- Added more Memory Pack commands support
++- Fixed XML BS-X Slot support! (Try RPG Maker 2 and others now!)
++
++v003:
++- Signal Type Filter support (Registers $2188-$2189)
++- BSX files have different filenames.
++
++v002:
++- Better Customizable files that the BS-X BIOS downloads.
++- Better detection of file change.
++- Added a folder for the BSX?.bin files.
++
++v001:
++- Initial release
++
++------
++Thanks to
++------
++Byuu - For making bsnes.
++nocash - For his well made documentation (of BS-X, XBAND...)
++ikari_01 - For his Memory Pack documentation (and adding BS-X support for sd2snes)
++d4s - For his Satellaview Register Testing Doc, mostly.
++p4plus2 - For his BS-X BIOS disassembly.
++Kiddo - If he wasn't here, i wouldn't do all this, and thanks for making the SatellaBlog.
++Matthew Callis - For hosting the BS-X Project website, and for doing superfamicom.org.
++
++(Probably forgot some... I only made this part in the Readme in class ^^')
++
++------
++NEW BSX????-?.bin FILE FORMAT
++------
++Only contains the $218B/$2191 Data.
++Max File Size is 2794 bytes.
++
++
++------
++OLD BSX????-???.bin FILE FORMAT
++------
++Kept it for archiving purposes.
++
++BSX<Channel>-<Number>.bin
++<Channel>: Must be 4 HEXADECIMAL DIGITS.
++<Number>: From 0 to 255 decimal numbers.
++
++Offset - Size (Bytes) - Description
++0x00 - 50 - UNUSED (You can put anything in there.)
++0x32 - 1 - $218A/$2190 Data (Packet Queue)
++0x33 - 1 - $218D/$2193 Data (Status Data) [UNUSED SINCE V007]
++0x34 - 20 - $218B/$2191 Data (Queue Status Data)
++0x48 - 440 - $218C/$2192 Data (MAIN DOWNLOAD)
++
++Note: It "downloads" all of them in a infinite loop. You can add them if you want.
++The limit is BSX????-255.bin.
+\ No newline at end of file
+diff -urN ./out/RPG Tsukuru 2 (J) [!].xml ../../bsnes-sx2_v009/out/RPG Tsukuru 2 (J) [!].xml
+--- ./out/RPG Tsukuru 2 (J) [!].xml	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/out/RPG Tsukuru 2 (J) [!].xml	2010-10-19 17:36:39.000000000 +0900
+@@ -0,0 +1,17 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<cartridge region="NTSC">
++  <rom>
++    <map mode="linear" address="00-6f:8000-ffff"/>
++    <map mode="linear" address="80-ff:8000-ffff"/>
++  </rom>
++
++  <ram size="10000">
++    <map mode="linear" address="70-7d:0000-7fff"/>
++  </ram>
++
++  <bsx>
++    <slot>
++		<map mode="linear" address="c0-ff:8000-ffff"/>
++	</slot>
++  </bsx>
++</cartridge>
+\ No newline at end of file
+diff -urN ./out/Sound Novel Tsukuru (J).xml ../../bsnes-sx2_v009/out/Sound Novel Tsukuru (J).xml
+--- ./out/Sound Novel Tsukuru (J).xml	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/out/Sound Novel Tsukuru (J).xml	2010-10-19 15:46:41.000000000 +0900
+@@ -0,0 +1,17 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<cartridge region="NTSC">
++  <rom>
++    <map mode="linear" address="00-7d:8000-ffff"/>
++    <map mode="linear" offset="200000" address="80-bd:8000-ffff"/>
++  </rom>
++
++  <ram size="10000">
++    <map mode="linear" address="70-7d:0000-7fff"/>
++  </ram>
++
++  <bsx>
++    <slot>
++		<map mode="linear" address="c0-ff:8000-ffff"/>
++	</slot>
++  </bsx>
++</cartridge>
+\ No newline at end of file
+diff -urN ./phoenix/gtk/platform.cpp ../../bsnes-sx2_v009/phoenix/gtk/platform.cpp
+--- ./phoenix/gtk/platform.cpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/gtk/platform.cpp	2011-10-10 19:06:36.000000000 +0900
+@@ -0,0 +1,179 @@
++#include "platform.hpp"
++
++#include "settings.cpp"
++#include "font.cpp"
++#include "timer.cpp"
++#include "message-window.cpp"
++#include "window.cpp"
++
++#include "action/action.cpp"
++#include "action/menu.cpp"
++#include "action/separator.cpp"
++#include "action/item.cpp"
++#include "action/check-item.cpp"
++#include "action/radio-item.cpp"
++
++#include "widget/widget.cpp"
++#include "widget/button.cpp"
++#include "widget/canvas.cpp"
++#include "widget/check-box.cpp"
++#include "widget/combo-box.cpp"
++#include "widget/hex-edit.cpp"
++#include "widget/horizontal-scroll-bar.cpp"
++#include "widget/horizontal-slider.cpp"
++#include "widget/label.cpp"
++#include "widget/line-edit.cpp"
++#include "widget/list-view.cpp"
++#include "widget/progress-bar.cpp"
++#include "widget/radio-box.cpp"
++#include "widget/text-edit.cpp"
++#include "widget/vertical-scroll-bar.cpp"
++#include "widget/vertical-slider.cpp"
++#include "widget/viewport.cpp"
++
++Font pOS::defaultFont;
++
++Geometry pOS::availableGeometry() {
++  Display *display = XOpenDisplay(0);
++  int screen = DefaultScreen(display);
++
++  static Atom atom = X11None;
++  if(atom == X11None) atom = XInternAtom(display, "_NET_WORKAREA", True);
++
++  int format;
++  unsigned char *data = 0;
++  unsigned long items, after;
++  Atom returnAtom;
++
++  int result = XGetWindowProperty(
++    display, RootWindow(display, screen), atom, 0, 4, False, XA_CARDINAL, &returnAtom, &format, &items, &after, &data
++  );
++
++  XCloseDisplay(display);
++
++  if(result == Success && returnAtom == XA_CARDINAL && format == 32 && items == 4) {
++    unsigned long *workarea = (unsigned long*)data;
++    return { (signed)workarea[0], (signed)workarea[1], (unsigned)workarea[2], (unsigned)workarea[3] };
++  }
++
++  return desktopGeometry();
++}
++
++Geometry pOS::desktopGeometry() {
++  return {
++    0, 0,
++    gdk_screen_get_width(gdk_screen_get_default()),
++    gdk_screen_get_height(gdk_screen_get_default())
++  };
++}
++
++static string pOS_fileDialog(bool save, Window &parent, const string &path, const lstring &filter) {
++  string name;
++
++  GtkWidget *dialog = gtk_file_chooser_dialog_new(
++    save == 0 ? "Load File" : "Save File",
++    &parent != &Window::None ? GTK_WINDOW(parent.p.widget) : (GtkWindow*)0,
++    save == 0 ? GTK_FILE_CHOOSER_ACTION_OPEN : GTK_FILE_CHOOSER_ACTION_SAVE,
++    GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
++    GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
++    (const gchar*)0
++  );
++
++  if(path) gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), path);
++
++  for(auto &filterItem : filter) {
++    GtkFileFilter *gtkFilter = gtk_file_filter_new();
++    gtk_file_filter_set_name(gtkFilter, filterItem);
++    lstring part;
++    part.split("(", filterItem);
++    part[1].rtrim<1>(")");
++    lstring list;
++    list.split(",", part[1]);
++    for(auto &pattern : list) gtk_file_filter_add_pattern(gtkFilter, pattern);
++    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), gtkFilter);
++  }
++
++  if(gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
++    char *temp = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
++    name = temp;
++    g_free(temp);
++  }
++
++  gtk_widget_destroy(dialog);
++  return name;
++}
++
++string pOS::fileLoad(Window &parent, const string &path, const lstring &filter) {
++  return pOS_fileDialog(0, parent, path, filter);
++}
++
++string pOS::fileSave(Window &parent, const string &path, const lstring &filter) {
++  return pOS_fileDialog(1, parent, path, filter);
++}
++
++string pOS::folderSelect(Window &parent, const string &path) {
++  string name;
++
++  GtkWidget *dialog = gtk_file_chooser_dialog_new(
++    "Select Folder",
++    &parent != &Window::None ? GTK_WINDOW(parent.p.widget) : (GtkWindow*)0,
++    GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER,
++    GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
++    GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
++    (const gchar*)0
++  );
++
++  if(path) gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), path);
++
++  if(gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
++    char *temp = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
++    name = temp;
++    g_free(temp);
++  }
++
++  gtk_widget_destroy(dialog);
++  if(name == "") return "";
++  if(name.endswith("/") == false) name.append("/");
++  return name;
++}
++
++void pOS::main() {
++  gtk_main();
++}
++
++bool pOS::pendingEvents() {
++  return gtk_events_pending();
++}
++
++void pOS::processEvents() {
++  while(pendingEvents()) gtk_main_iteration_do(false);
++}
++
++void pOS::quit() {
++  settings->save();
++
++  gtk_main_quit();
++}
++
++void pOS::initialize() {
++  settings = new Settings;
++  settings->load();
++
++  int argc = 1;
++  char *argv[2];
++  argv[0] = new char[8];
++  argv[1] = 0;
++  strcpy(argv[0], "phoenix");
++  char **argvp = argv;
++  gtk_init(&argc, &argvp);
++
++  gtk_rc_parse_string(
++    "style \"phoenix-gtk\"\n"
++    "{\n"
++    "  GtkComboBox::appears-as-list = 1\n"
++    "  GtkTreeView::vertical-separator = 0\n"
++    "}\n"
++  //"class \"GtkComboBox\" style \"phoenix-gtk\"\n"
++    "class \"GtkTreeView\" style \"phoenix-gtk\"\n"
++  );
++}
+diff -urN ./phoenix/gtk/platform.hpp ../../bsnes-sx2_v009/phoenix/gtk/platform.hpp
+--- ./phoenix/gtk/platform.hpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/gtk/platform.hpp	2011-10-10 19:06:36.000000000 +0900
+@@ -0,0 +1,468 @@
++struct Settings : public configuration {
++  unsigned frameGeometryX;
++  unsigned frameGeometryY;
++  unsigned frameGeometryWidth;
++  unsigned frameGeometryHeight;
++  unsigned menuGeometryHeight;
++  unsigned statusGeometryHeight;
++
++  void load();
++  void save();
++  Settings();
++};
++
++struct pWindow;
++struct pMenu;
++struct pLayout;
++struct pWidget;
++
++struct pFont {
++  static Geometry geometry(const string &description, const string &text);
++
++  static PangoFontDescription* create(const string &description);
++  static void free(PangoFontDescription *font);
++  static Geometry geometry(PangoFontDescription *font, const string &text);
++  static void setFont(GtkWidget *widget, const string &font);
++  static void setFont(GtkWidget *widget, gpointer font);
++};
++
++struct pObject {
++  Object &object;
++  bool locked;
++
++  pObject(Object &object) : object(object), locked(false) {}
++  virtual ~pObject() {}
++
++  void constructor() {}
++  void destructor() {}
++};
++
++struct pOS : public pObject {
++  static Font defaultFont;
++
++  static Geometry availableGeometry();
++  static Geometry desktopGeometry();
++  static string fileLoad(Window &parent, const string &path, const lstring &filter);
++  static string fileSave(Window &parent, const string &path, const lstring &filter);
++  static string folderSelect(Window &parent, const string &path);
++  static void main();
++  static bool pendingEvents();
++  static void processEvents();
++  static void quit();
++
++  static void initialize();
++};
++
++struct pTimer : public pObject {
++  Timer &timer;
++
++  void setEnabled(bool enabled);
++  void setInterval(unsigned milliseconds);
++
++  pTimer(Timer &timer) : pObject(timer), timer(timer) {}
++  void constructor();
++};
++
++struct pMessageWindow : public pObject {
++  static MessageWindow::Response information(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response question(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response warning(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response critical(Window &parent, const string &text, MessageWindow::Buttons buttons);
++};
++
++struct pWindow : public pObject {
++  Window &window;
++  GtkWidget *widget;
++  GtkWidget *menuContainer;
++  GtkWidget *formContainer;
++  GtkWidget *statusContainer;
++  GtkWidget *menu;
++  GtkWidget *status;
++  GdkEventConfigure lastConfigure;
++
++  void append(Layout &layout);
++  void append(Menu &menu);
++  void append(Widget &widget);
++  Color backgroundColor();
++  bool focused();
++  Geometry frameMargin();
++  Geometry geometry();
++  void remove(Layout &layout);
++  void remove(Menu &menu);
++  void remove(Widget &widget);
++  void setBackgroundColor(const Color &color);
++  void setFocused();
++  void setFullScreen(bool fullScreen);
++  void setGeometry(const Geometry &geometry);
++  void setMenuFont(const string &font);
++  void setMenuVisible(bool visible);
++  void setResizable(bool resizable);
++  void setStatusFont(const string &font);
++  void setStatusText(const string &text);
++  void setStatusVisible(bool visible);
++  void setTitle(const string &text);
++  void setVisible(bool visible);
++  void setWidgetFont(const string &font);
++
++  pWindow(Window &window) : pObject(window), window(window) {}
++  void constructor();
++  unsigned menuHeight();
++  unsigned statusHeight();
++};
++
++struct pAction : public pObject {
++  Action &action;
++  GtkWidget *widget;
++
++  void setEnabled(bool enabled);
++  void setVisible(bool visible);
++
++  pAction(Action &action) : pObject(action), action(action) {}
++  void constructor();
++  virtual void orphan();
++  virtual void setFont(const string &font);
++};
++
++struct pMenu : public pAction {
++  Menu &menu;
++  GtkWidget *gtkMenu;
++
++  void append(Action &action);
++  void remove(Action &action);
++  void setText(const string &text);
++
++  pMenu(Menu &menu) : pAction(menu), menu(menu) {}
++  void constructor();
++  void destructor();
++  void orphan();
++  void setFont(const string &font);
++};
++
++struct pSeparator : public pAction {
++  Separator &separator;
++
++  pSeparator(Separator &separator) : pAction(separator), separator(separator) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pItem : public pAction {
++  Item &item;
++
++  void setText(const string &text);
++
++  pItem(Item &item) : pAction(item), item(item) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pCheckItem : public pAction {
++  CheckItem &checkItem;
++
++  bool checked();
++  void setChecked(bool checked);
++  void setText(const string &text);
++
++  pCheckItem(CheckItem &checkItem) : pAction(checkItem), checkItem(checkItem) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pRadioItem : public pAction {
++  RadioItem &radioItem;
++
++  bool checked();
++  void setChecked();
++  void setGroup(const reference_array<RadioItem&> &group);
++  void setText(const string &text);
++
++  pRadioItem(RadioItem &radioItem) : pAction(radioItem), radioItem(radioItem) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pSizable : public pObject {
++  Sizable &sizable;
++
++  pSizable(Sizable &sizable) : pObject(sizable), sizable(sizable) {}
++};
++
++struct pLayout : public pSizable {
++  Layout &layout;
++
++  pLayout(Layout &layout) : pSizable(layout), layout(layout) {}
++};
++
++struct pWidget : public pSizable {
++  Widget &widget;
++  GtkWidget *gtkWidget;
++
++  bool enabled();
++  virtual Geometry minimumGeometry();
++  void setEnabled(bool enabled);
++  virtual void setFocused();
++  virtual void setFont(const string &font);
++  virtual void setGeometry(const Geometry &geometry);
++  void setVisible(bool visible);
++
++  pWidget(Widget &widget) : pSizable(widget), widget(widget) {}
++  void constructor();
++  void destructor();
++  virtual void orphan();
++};
++
++struct pButton : public pWidget {
++  Button &button;
++
++  Geometry minimumGeometry();
++  void setText(const string &text);
++
++  pButton(Button &button) : pWidget(button), button(button) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pCanvas : public pWidget {
++  Canvas &canvas;
++  cairo_surface_t *surface;
++
++  uint32_t* buffer();
++  void setGeometry(const Geometry &geometry);
++  void update();
++
++  pCanvas(Canvas &canvas) : pWidget(canvas), canvas(canvas) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pCheckBox : public pWidget {
++  CheckBox &checkBox;
++
++  bool checked();
++  Geometry minimumGeometry();
++  void setChecked(bool checked);
++  void setText(const string &text);
++
++  pCheckBox(CheckBox &checkBox) : pWidget(checkBox), checkBox(checkBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pComboBox : public pWidget {
++  ComboBox &comboBox;
++  unsigned itemCounter;
++
++  void append(const string &text);
++  Geometry minimumGeometry();
++  void reset();
++  unsigned selection();
++  void setSelection(unsigned row);
++
++  pComboBox(ComboBox &comboBox) : pWidget(comboBox), comboBox(comboBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pHexEdit : public pWidget {
++  HexEdit &hexEdit;
++  GtkWidget *container;
++  GtkWidget *subWidget;
++  GtkWidget *scrollBar;
++  GtkTextBuffer *textBuffer;
++  GtkTextMark *textCursor;
++
++  void setColumns(unsigned columns);
++  void setLength(unsigned length);
++  void setOffset(unsigned offset);
++  void setRows(unsigned rows);
++  void update();
++
++  pHexEdit(HexEdit &hexEdit) : pWidget(hexEdit), hexEdit(hexEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++  unsigned cursorPosition();
++  bool keyPress(unsigned scancode);
++  void scroll(unsigned position);
++  void setCursorPosition(unsigned position);
++  void setScroll();
++  void updateScroll();
++};
++
++struct pHorizontalScrollBar : public pWidget {
++  HorizontalScrollBar &horizontalScrollBar;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pHorizontalScrollBar(HorizontalScrollBar &horizontalScrollBar) : pWidget(horizontalScrollBar), horizontalScrollBar(horizontalScrollBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pHorizontalSlider : public pWidget {
++  HorizontalSlider &horizontalSlider;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pHorizontalSlider(HorizontalSlider &horizontalSlider) : pWidget(horizontalSlider), horizontalSlider(horizontalSlider) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pLabel : public pWidget {
++  Label &label;
++
++  Geometry minimumGeometry();
++  void setText(const string &text);
++
++  pLabel(Label &label) : pWidget(label), label(label) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pLineEdit : public pWidget {
++  LineEdit &lineEdit;
++
++  Geometry minimumGeometry();
++  void setEditable(bool editable);
++  void setText(const string &text);
++  string text();
++
++  pLineEdit(LineEdit &lineEdit) : pWidget(lineEdit), lineEdit(lineEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pListView : public pWidget {
++  ListView &listView;
++  GtkWidget *subWidget;
++  GtkListStore *store;
++  struct GtkColumn {
++    GtkCellRenderer *renderer;
++    GtkTreeViewColumn *column;
++    GtkWidget *label;
++  };
++  linear_vector<GtkColumn> column;
++
++  void append(const lstring &text);
++  void autoSizeColumns();
++  bool checked(unsigned row);
++  void modify(unsigned row, const lstring &text);
++  void reset();
++  bool selected();
++  unsigned selection();
++  void setCheckable(bool checkable);
++  void setChecked(unsigned row, bool checked);
++  void setHeaderText(const lstring &text);
++  void setHeaderVisible(bool visible);
++  void setSelected(bool selected);
++  void setSelection(unsigned row);
++
++  pListView(ListView &listView) : pWidget(listView), listView(listView) {}
++  void constructor();
++  void destructor();
++  void orphan();
++  void setFocused();
++  void setFont(const string &font);
++};
++
++struct pProgressBar : public pWidget {
++  ProgressBar &progressBar;
++
++  Geometry minimumGeometry();
++  void setPosition(unsigned position);
++
++  pProgressBar(ProgressBar &progressBar) : pWidget(progressBar), progressBar(progressBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pRadioBox : public pWidget {
++  RadioBox &radioBox;
++
++  bool checked();
++  Geometry minimumGeometry();
++  void setChecked();
++  void setGroup(const reference_array<RadioBox&> &group);
++  void setText(const string &text);
++
++  pRadioBox(RadioBox &radioBox) : pWidget(radioBox), radioBox(radioBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pTextEdit : public pWidget {
++  TextEdit &textEdit;
++  GtkWidget *subWidget;
++  GtkTextBuffer *textBuffer;
++
++  void setCursorPosition(unsigned position);
++  void setEditable(bool editable);
++  void setText(const string &text);
++  void setWordWrap(bool wordWrap);
++  string text();
++
++  pTextEdit(TextEdit &textEdit) : pWidget(textEdit), textEdit(textEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pVerticalScrollBar : public pWidget {
++  VerticalScrollBar &verticalScrollBar;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pVerticalScrollBar(VerticalScrollBar &verticalScrollBar) : pWidget(verticalScrollBar), verticalScrollBar(verticalScrollBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pVerticalSlider : public pWidget {
++  VerticalSlider &verticalSlider;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pVerticalSlider(VerticalSlider &verticalSlider) : pWidget(verticalSlider), verticalSlider(verticalSlider) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pViewport : public pWidget {
++  Viewport &viewport;
++
++  uintptr_t handle();
++
++  pViewport(Viewport &viewport) : pWidget(viewport), viewport(viewport) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
+diff -urN ./phoenix/qt/platform.cpp ../../bsnes-sx2_v009/phoenix/qt/platform.cpp
+--- ./phoenix/qt/platform.cpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/qt/platform.cpp	2011-10-10 19:06:36.000000000 +0900
+@@ -0,0 +1,135 @@
++#include "platform.moc.hpp"
++#include "platform.moc"
++
++#include "settings.cpp"
++#include "font.cpp"
++#include "timer.cpp"
++#include "message-window.cpp"
++#include "window.cpp"
++
++#include "action/action.cpp"
++#include "action/menu.cpp"
++#include "action/separator.cpp"
++#include "action/item.cpp"
++#include "action/check-item.cpp"
++#include "action/radio-item.cpp"
++
++#include "widget/widget.cpp"
++#include "widget/button.cpp"
++#include "widget/canvas.cpp"
++#include "widget/check-box.cpp"
++#include "widget/combo-box.cpp"
++#include "widget/hex-edit.cpp"
++#include "widget/horizontal-scroll-bar.cpp"
++#include "widget/horizontal-slider.cpp"
++#include "widget/label.cpp"
++#include "widget/line-edit.cpp"
++#include "widget/list-view.cpp"
++#include "widget/progress-bar.cpp"
++#include "widget/radio-box.cpp"
++#include "widget/text-edit.cpp"
++#include "widget/vertical-scroll-bar.cpp"
++#include "widget/vertical-slider.cpp"
++#include "widget/viewport.cpp"
++
++Geometry pOS::availableGeometry() {
++  QRect rect = QApplication::desktop()->availableGeometry();
++  return { rect.x(), rect.y(), rect.width(), rect.height() };
++}
++
++Geometry pOS::desktopGeometry() {
++  QRect rect = QApplication::desktop()->screenGeometry();
++  return { 0, 0, rect.width(), rect.height() };
++}
++
++string pOS::fileLoad(Window &parent, const string &path, const lstring &filter) {
++  string filterList;
++  for(auto &item : filter) {
++    filterList.append(item);
++    filterList.append(";;");
++  }
++  filterList.rtrim<1>(";;");
++
++  //convert filter list from phoenix to Qt format, example:
++  //"Text, XML files (*.txt,*.xml)" -> "Text, XML files (*.txt *.xml)"
++  signed parenthesis = 0;
++  for(auto &n : filterList) {
++    if(n == '(') parenthesis++;
++    if(n == ')') parenthesis--;
++    if(n == ',' && parenthesis) n = ' ';
++  }
++
++  QString filename = QFileDialog::getOpenFileName(
++    &parent != &Window::None ? parent.p.qtWindow : 0, "Load File",
++    QString::fromUtf8(path), QString::fromUtf8(filterList)
++  );
++  return filename.toUtf8().constData();
++}
++
++string pOS::fileSave(Window &parent, const string &path, const lstring &filter) {
++  string filterList;
++  for(auto &item : filter) {
++    filterList.append(item);
++    filterList.append(";;");
++  }
++  filterList.rtrim<1>(";;");
++
++  //convert filter list from phoenix to Qt format, example:
++  //"Text, XML files (*.txt,*.xml)" -> "Text, XML files (*.txt *.xml)"
++  signed parenthesis = 0;
++  for(auto &n : filterList) {
++    if(n == '(') parenthesis++;
++    if(n == ')') parenthesis--;
++    if(n == ',' && parenthesis) n = ' ';
++  }
++
++  QString filename = QFileDialog::getSaveFileName(
++    &parent != &Window::None ? parent.p.qtWindow : 0, "Save File",
++    QString::fromUtf8(path), QString::fromUtf8(filterList)
++  );
++  return filename.toUtf8().constData();
++}
++
++string pOS::folderSelect(Window &parent, const string &path) {
++  QString directory = QFileDialog::getExistingDirectory(
++    &parent != &Window::None ? parent.p.qtWindow : 0, "Select Directory",
++    QString::fromUtf8(path), QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
++  );
++  string name = directory.toUtf8().constData();
++  if(name != "" && name.endswith("/") == false) name.append("/");
++  return name;
++}
++
++void pOS::main() {
++  QApplication::exec();
++}
++
++bool pOS::pendingEvents() {
++  return QApplication::hasPendingEvents();
++}
++
++void pOS::processEvents() {
++  while(pendingEvents()) QApplication::processEvents();
++}
++
++void pOS::quit() {
++  settings->save();
++
++  QApplication::quit();
++  //note: QApplication cannot be deleted; or libQtGui will crash
++  qtApplication = 0;
++}
++
++void pOS::initialize() {
++  settings = new Settings;
++  settings->load();
++
++  static int argc = 1;
++  static char *argv[2];
++  argv[0] = new char[8];
++  argv[1] = 0;
++  strcpy(argv[0], "phoenix");
++  char **argvp = argv;
++
++  qtApplication = new QApplication(argc, argvp);
++}
+diff -urN ./phoenix/qt/platform.moc ../../bsnes-sx2_v009/phoenix/qt/platform.moc
+--- ./phoenix/qt/platform.moc	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/qt/platform.moc	2011-10-10 19:06:36.000000000 +0900
+@@ -0,0 +1,1105 @@
++/****************************************************************************
++** Meta object code from reading C++ file 'platform.moc.hpp'
++**
++** Created: Tue Sep 27 01:00:52 2011
++**      by: The Qt Meta Object Compiler version 62 (Qt 4.7.0)
++**
++** WARNING! All changes made in this file will be lost!
++*****************************************************************************/
++
++#if !defined(Q_MOC_OUTPUT_REVISION)
++#error "The header file 'platform.moc.hpp' doesn't include <QObject>."
++#elif Q_MOC_OUTPUT_REVISION != 62
++#error "This file was generated using the moc from 4.7.0. It"
++#error "cannot be used with the include files from this version of Qt."
++#error "(The moc has changed too much.)"
++#endif
++
++QT_BEGIN_MOC_NAMESPACE
++static const uint qt_meta_data_pTimer[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++       8,    7,    7,    7, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pTimer[] = {
++    "pTimer\0\0onTimeout()\0"
++};
++
++const QMetaObject pTimer::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pTimer,
++      qt_meta_data_pTimer, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pTimer::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pTimer::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pTimer::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pTimer))
++        return static_cast<void*>(const_cast< pTimer*>(this));
++    if (!strcmp(_clname, "pObject"))
++        return static_cast< pObject*>(const_cast< pTimer*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pTimer::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onTimeout(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pWindow[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       0,    0, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pWindow[] = {
++    "pWindow\0"
++};
++
++const QMetaObject pWindow::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pWindow,
++      qt_meta_data_pWindow, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pWindow::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pWindow::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pWindow::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pWindow))
++        return static_cast<void*>(const_cast< pWindow*>(this));
++    if (!strcmp(_clname, "pObject"))
++        return static_cast< pObject*>(const_cast< pWindow*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pWindow::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    return _id;
++}
++static const uint qt_meta_data_pItem[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++       7,    6,    6,    6, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pItem[] = {
++    "pItem\0\0onTick()\0"
++};
++
++const QMetaObject pItem::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pItem,
++      qt_meta_data_pItem, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pItem::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pItem::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pItem::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pItem))
++        return static_cast<void*>(const_cast< pItem*>(this));
++    if (!strcmp(_clname, "pAction"))
++        return static_cast< pAction*>(const_cast< pItem*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pItem::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onTick(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pCheckItem[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      12,   11,   11,   11, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pCheckItem[] = {
++    "pCheckItem\0\0onTick()\0"
++};
++
++const QMetaObject pCheckItem::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pCheckItem,
++      qt_meta_data_pCheckItem, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pCheckItem::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pCheckItem::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pCheckItem::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pCheckItem))
++        return static_cast<void*>(const_cast< pCheckItem*>(this));
++    if (!strcmp(_clname, "pAction"))
++        return static_cast< pAction*>(const_cast< pCheckItem*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pCheckItem::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onTick(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pRadioItem[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      12,   11,   11,   11, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pRadioItem[] = {
++    "pRadioItem\0\0onTick()\0"
++};
++
++const QMetaObject pRadioItem::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pRadioItem,
++      qt_meta_data_pRadioItem, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pRadioItem::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pRadioItem::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pRadioItem::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pRadioItem))
++        return static_cast<void*>(const_cast< pRadioItem*>(this));
++    if (!strcmp(_clname, "pAction"))
++        return static_cast< pAction*>(const_cast< pRadioItem*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pRadioItem::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onTick(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pButton[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++       9,    8,    8,    8, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pButton[] = {
++    "pButton\0\0onTick()\0"
++};
++
++const QMetaObject pButton::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pButton,
++      qt_meta_data_pButton, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pButton::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pButton::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pButton::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pButton))
++        return static_cast<void*>(const_cast< pButton*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pButton*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pButton::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onTick(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pCanvas[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       0,    0, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pCanvas[] = {
++    "pCanvas\0"
++};
++
++const QMetaObject pCanvas::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pCanvas,
++      qt_meta_data_pCanvas, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pCanvas::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pCanvas::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pCanvas::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pCanvas))
++        return static_cast<void*>(const_cast< pCanvas*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pCanvas*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pCanvas::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    return _id;
++}
++static const uint qt_meta_data_pCheckBox[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      11,   10,   10,   10, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pCheckBox[] = {
++    "pCheckBox\0\0onTick()\0"
++};
++
++const QMetaObject pCheckBox::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pCheckBox,
++      qt_meta_data_pCheckBox, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pCheckBox::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pCheckBox::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pCheckBox::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pCheckBox))
++        return static_cast<void*>(const_cast< pCheckBox*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pCheckBox*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pCheckBox::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onTick(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pComboBox[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      11,   10,   10,   10, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pComboBox[] = {
++    "pComboBox\0\0onChange()\0"
++};
++
++const QMetaObject pComboBox::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pComboBox,
++      qt_meta_data_pComboBox, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pComboBox::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pComboBox::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pComboBox::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pComboBox))
++        return static_cast<void*>(const_cast< pComboBox*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pComboBox*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pComboBox::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onChange(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pHexEdit[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      10,    9,    9,    9, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pHexEdit[] = {
++    "pHexEdit\0\0onScroll()\0"
++};
++
++const QMetaObject pHexEdit::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pHexEdit,
++      qt_meta_data_pHexEdit, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pHexEdit::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pHexEdit::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pHexEdit::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pHexEdit))
++        return static_cast<void*>(const_cast< pHexEdit*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pHexEdit*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pHexEdit::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onScroll(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pHorizontalScrollBar[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      22,   21,   21,   21, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pHorizontalScrollBar[] = {
++    "pHorizontalScrollBar\0\0onChange()\0"
++};
++
++const QMetaObject pHorizontalScrollBar::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pHorizontalScrollBar,
++      qt_meta_data_pHorizontalScrollBar, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pHorizontalScrollBar::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pHorizontalScrollBar::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pHorizontalScrollBar::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pHorizontalScrollBar))
++        return static_cast<void*>(const_cast< pHorizontalScrollBar*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pHorizontalScrollBar*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pHorizontalScrollBar::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onChange(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pHorizontalSlider[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      19,   18,   18,   18, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pHorizontalSlider[] = {
++    "pHorizontalSlider\0\0onChange()\0"
++};
++
++const QMetaObject pHorizontalSlider::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pHorizontalSlider,
++      qt_meta_data_pHorizontalSlider, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pHorizontalSlider::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pHorizontalSlider::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pHorizontalSlider::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pHorizontalSlider))
++        return static_cast<void*>(const_cast< pHorizontalSlider*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pHorizontalSlider*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pHorizontalSlider::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onChange(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pLineEdit[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       2,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      11,   10,   10,   10, 0x0a,
++      24,   10,   10,   10, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pLineEdit[] = {
++    "pLineEdit\0\0onActivate()\0onChange()\0"
++};
++
++const QMetaObject pLineEdit::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pLineEdit,
++      qt_meta_data_pLineEdit, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pLineEdit::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pLineEdit::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pLineEdit::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pLineEdit))
++        return static_cast<void*>(const_cast< pLineEdit*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pLineEdit*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pLineEdit::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onActivate(); break;
++        case 1: onChange(); break;
++        default: ;
++        }
++        _id -= 2;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pListView[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       3,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      11,   10,   10,   10, 0x0a,
++      29,   24,   10,   10, 0x0a,
++      56,   24,   10,   10, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pListView[] = {
++    "pListView\0\0onActivate()\0item\0"
++    "onChange(QTreeWidgetItem*)\0"
++    "onTick(QTreeWidgetItem*)\0"
++};
++
++const QMetaObject pListView::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pListView,
++      qt_meta_data_pListView, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pListView::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pListView::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pListView::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pListView))
++        return static_cast<void*>(const_cast< pListView*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pListView*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pListView::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onActivate(); break;
++        case 1: onChange((*reinterpret_cast< QTreeWidgetItem*(*)>(_a[1]))); break;
++        case 2: onTick((*reinterpret_cast< QTreeWidgetItem*(*)>(_a[1]))); break;
++        default: ;
++        }
++        _id -= 3;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pRadioBox[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      11,   10,   10,   10, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pRadioBox[] = {
++    "pRadioBox\0\0onTick()\0"
++};
++
++const QMetaObject pRadioBox::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pRadioBox,
++      qt_meta_data_pRadioBox, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pRadioBox::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pRadioBox::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pRadioBox::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pRadioBox))
++        return static_cast<void*>(const_cast< pRadioBox*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pRadioBox*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pRadioBox::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onTick(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pTextEdit[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      11,   10,   10,   10, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pTextEdit[] = {
++    "pTextEdit\0\0onChange()\0"
++};
++
++const QMetaObject pTextEdit::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pTextEdit,
++      qt_meta_data_pTextEdit, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pTextEdit::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pTextEdit::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pTextEdit::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pTextEdit))
++        return static_cast<void*>(const_cast< pTextEdit*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pTextEdit*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pTextEdit::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onChange(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pVerticalScrollBar[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      20,   19,   19,   19, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pVerticalScrollBar[] = {
++    "pVerticalScrollBar\0\0onChange()\0"
++};
++
++const QMetaObject pVerticalScrollBar::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pVerticalScrollBar,
++      qt_meta_data_pVerticalScrollBar, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pVerticalScrollBar::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pVerticalScrollBar::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pVerticalScrollBar::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pVerticalScrollBar))
++        return static_cast<void*>(const_cast< pVerticalScrollBar*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pVerticalScrollBar*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pVerticalScrollBar::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onChange(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pVerticalSlider[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      17,   16,   16,   16, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pVerticalSlider[] = {
++    "pVerticalSlider\0\0onChange()\0"
++};
++
++const QMetaObject pVerticalSlider::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pVerticalSlider,
++      qt_meta_data_pVerticalSlider, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pVerticalSlider::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pVerticalSlider::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pVerticalSlider::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pVerticalSlider))
++        return static_cast<void*>(const_cast< pVerticalSlider*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pVerticalSlider*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pVerticalSlider::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onChange(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++QT_END_MOC_NAMESPACE
+diff -urN ./phoenix/qt/platform.moc.hpp ../../bsnes-sx2_v009/phoenix/qt/platform.moc.hpp
+--- ./phoenix/qt/platform.moc.hpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/qt/platform.moc.hpp	2011-10-10 19:06:36.000000000 +0900
+@@ -0,0 +1,587 @@
++static QApplication *qtApplication = 0;
++
++struct Settings : public configuration {
++  unsigned frameGeometryX;
++  unsigned frameGeometryY;
++  unsigned frameGeometryWidth;
++  unsigned frameGeometryHeight;
++  unsigned menuGeometryHeight;
++  unsigned statusGeometryHeight;
++
++  void load();
++  void save();
++  Settings();
++};
++
++struct pWindow;
++struct pMenu;
++struct pLayout;
++struct pWidget;
++
++struct pFont {
++  static Geometry geometry(const string &description, const string &text);
++
++  static QFont create(const string &description);
++  static Geometry geometry(const QFont &qtFont, const string &text);
++};
++
++struct pObject {
++  Object &object;
++  bool locked;
++
++  pObject(Object &object) : object(object), locked(false) {}
++  virtual ~pObject() {}
++  void constructor() {}
++  void destructor() {}
++};
++
++struct pOS : public pObject {
++  static Geometry availableGeometry();
++  static Geometry desktopGeometry();
++  static string fileLoad(Window &parent, const string &path, const lstring &filter);
++  static string fileSave(Window &parent, const string &path, const lstring &filter);
++  static string folderSelect(Window &parent, const string &path);
++  static void main();
++  static bool pendingEvents();
++  static void processEvents();
++  static void quit();
++
++  static void initialize();
++};
++
++struct pTimer : public QObject, public pObject {
++  Q_OBJECT
++
++public:
++  Timer &timer;
++  QTimer *qtTimer;
++
++  void setEnabled(bool enabled);
++  void setInterval(unsigned milliseconds);
++
++  pTimer(Timer &timer) : pObject(timer), timer(timer) {}
++  void constructor();
++  void destructor();
++
++public slots:
++  void onTimeout();
++};
++
++struct pMessageWindow : public pObject {
++  static MessageWindow::Response information(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response question(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response warning(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response critical(Window &parent, const string &text, MessageWindow::Buttons buttons);
++};
++
++struct pWindow : public QObject, public pObject {
++  Q_OBJECT
++
++public:
++  Window &window;
++  struct QtWindow : public QWidget {
++    pWindow &self;
++    void closeEvent(QCloseEvent*);
++    void moveEvent(QMoveEvent*);
++    void resizeEvent(QResizeEvent*);
++    QSize sizeHint() const;
++    QtWindow(pWindow &self) : self(self) {}
++  } *qtWindow;
++  QVBoxLayout *qtLayout;
++  QMenuBar *qtMenu;
++  QStatusBar *qtStatus;
++  QWidget *qtContainer;
++
++  void append(Layout &layout);
++  void append(Menu &menu);
++  void append(Widget &widget);
++  Color backgroundColor();
++  Geometry frameMargin();
++  bool focused();
++  Geometry geometry();
++  void remove(Layout &layout);
++  void remove(Menu &menu);
++  void remove(Widget &widget);
++  void setBackgroundColor(const Color &color);
++  void setFocused();
++  void setFullScreen(bool fullScreen);
++  void setGeometry(const Geometry &geometry);
++  void setMenuFont(const string &font);
++  void setMenuVisible(bool visible);
++  void setResizable(bool resizable);
++  void setStatusFont(const string &font);
++  void setStatusText(const string &text);
++  void setStatusVisible(bool visible);
++  void setTitle(const string &text);
++  void setVisible(bool visible);
++  void setWidgetFont(const string &font);
++
++  pWindow(Window &window) : pObject(window), window(window) {}
++  void constructor();
++  void destructor();
++  void updateFrameGeometry();
++};
++
++struct pAction : public pObject {
++  Action &action;
++
++  void setEnabled(bool enabled);
++  void setFont(const string &font);
++  void setVisible(bool visible);
++
++  pAction(Action &action) : pObject(action), action(action) {}
++  void constructor();
++  void destructor();
++};
++
++struct pMenu : public pAction {
++  Menu &menu;
++  QMenu *qtMenu;
++
++  void append(Action &action);
++  void remove(Action &action);
++  void setFont(const string &font);
++  void setText(const string &text);
++
++  pMenu(Menu &menu) : pAction(menu), menu(menu) {}
++  void constructor();
++  void destructor();
++};
++
++struct pSeparator : public pAction {
++  Separator &separator;
++  QAction *qtAction;
++
++  pSeparator(Separator &separator) : pAction(separator), separator(separator) {}
++  void constructor();
++  void destructor();
++};
++
++struct pItem : public QObject, public pAction {
++  Q_OBJECT
++
++public:
++  Item &item;
++  QAction *qtAction;
++
++  void setText(const string &text);
++
++  pItem(Item &item) : pAction(item), item(item) {}
++  void constructor();
++  void destructor();
++
++public slots:
++  void onTick();
++};
++
++struct pCheckItem : public QObject, public pAction {
++  Q_OBJECT
++
++public:
++  CheckItem &checkItem;
++  QAction *qtAction;
++
++  bool checked();
++  void setChecked(bool checked);
++  void setText(const string &text);
++
++  pCheckItem(CheckItem &checkItem) : pAction(checkItem), checkItem(checkItem) {}
++  void constructor();
++  void destructor();
++
++public slots:
++  void onTick();
++};
++
++struct pRadioItem : public QObject, public pAction {
++  Q_OBJECT
++
++public:
++  RadioItem &radioItem;
++  QAction *qtAction;
++  QActionGroup *qtGroup;
++
++  bool checked();
++  void setChecked();
++  void setGroup(const reference_array<RadioItem&> &group);
++  void setText(const string &text);
++
++  pRadioItem(RadioItem &radioItem) : pAction(radioItem), radioItem(radioItem) {}
++  void constructor();
++  void destructor();
++
++public slots:
++  void onTick();
++};
++
++struct pSizable : public pObject {
++  Sizable &sizable;
++
++  pSizable(Sizable &sizable) : pObject(sizable), sizable(sizable) {}
++
++  void constructor() {}
++  void destructor() {}
++};
++
++struct pLayout : public pSizable {
++  Layout &layout;
++
++  pLayout(Layout &layout) : pSizable(layout), layout(layout) {}
++
++  void constructor() {}
++  void destructor() {}
++};
++
++struct pWidget : public pSizable {
++  Widget &widget;
++  QWidget *qtWidget;
++
++  virtual Geometry minimumGeometry();
++  void setEnabled(bool enabled);
++  void setFocused();
++  void setFont(const string &font);
++  virtual void setGeometry(const Geometry &geometry);
++  void setVisible(bool visible);
++
++  pWidget(Widget &widget) : pSizable(widget), widget(widget) {}
++  void constructor();
++  void synchronizeState();
++  void destructor();
++  virtual void orphan();
++};
++
++struct pButton : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  Button &button;
++  QPushButton *qtButton;
++
++  Geometry minimumGeometry();
++  void setText(const string &text);
++
++  pButton(Button &button) : pWidget(button), button(button) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onTick();
++};
++
++struct pCanvas : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  Canvas &canvas;
++  QImage *qtImage;
++  struct QtCanvas : public QWidget {
++    pCanvas &self;
++    void paintEvent(QPaintEvent*);
++    QtCanvas(pCanvas &self);
++  } *qtCanvas;
++
++  uint32_t* buffer();
++  void setGeometry(const Geometry &geometry);
++  void update();
++
++  pCanvas(Canvas &canvas) : pWidget(canvas), canvas(canvas) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++};
++
++struct pCheckBox : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  CheckBox &checkBox;
++  QCheckBox *qtCheckBox;
++
++  bool checked();
++  Geometry minimumGeometry();
++  void setChecked(bool checked);
++  void setText(const string &text);
++
++  pCheckBox(CheckBox &checkBox) : pWidget(checkBox), checkBox(checkBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onTick();
++};
++
++struct pComboBox : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  ComboBox &comboBox;
++  QComboBox *qtComboBox;
++
++  void append(const string &text);
++  Geometry minimumGeometry();
++  void reset();
++  unsigned selection();
++  void setSelection(unsigned row);
++
++  pComboBox(ComboBox &comboBox) : pWidget(comboBox), comboBox(comboBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onChange();
++};
++
++struct pHexEdit : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  HexEdit &hexEdit;
++  struct QtHexEdit : public QTextEdit {
++    pHexEdit &self;
++    void keyPressEvent(QKeyEvent*);
++    void keyPressEventAcknowledge(QKeyEvent*);
++    QtHexEdit(pHexEdit &self) : self(self) {}
++  } *qtHexEdit;
++  QHBoxLayout *qtLayout;
++  QScrollBar *qtScroll;
++
++  void setColumns(unsigned columns);
++  void setLength(unsigned length);
++  void setOffset(unsigned offset);
++  void setRows(unsigned rows);
++  void update();
++
++  pHexEdit(HexEdit &hexEdit) : pWidget(hexEdit), hexEdit(hexEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++  void keyPressEvent(QKeyEvent*);
++
++public slots:
++  void onScroll();
++};
++
++struct pHorizontalScrollBar : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  HorizontalScrollBar &horizontalScrollBar;
++  QScrollBar *qtScrollBar;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pHorizontalScrollBar(HorizontalScrollBar &horizontalScrollBar) : pWidget(horizontalScrollBar), horizontalScrollBar(horizontalScrollBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onChange();
++};
++
++struct pHorizontalSlider : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  HorizontalSlider &horizontalSlider;
++  QSlider *qtSlider;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pHorizontalSlider(HorizontalSlider &horizontalSlider) : pWidget(horizontalSlider), horizontalSlider(horizontalSlider) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onChange();
++};
++
++struct pLabel : public pWidget {
++  Label &label;
++  QLabel *qtLabel;
++
++  Geometry minimumGeometry();
++  void setText(const string &text);
++
++  pLabel(Label &label) : pWidget(label), label(label) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pLineEdit : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  LineEdit &lineEdit;
++  QLineEdit *qtLineEdit;
++
++  Geometry minimumGeometry();
++  void setEditable(bool editable);
++  void setText(const string &text);
++  string text();
++
++  pLineEdit(LineEdit &lineEdit) : pWidget(lineEdit), lineEdit(lineEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onActivate();
++  void onChange();
++};
++
++struct pListView : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  ListView &listView;
++  QTreeWidget *qtListView;
++
++  void append(const lstring &text);
++  void autoSizeColumns();
++  bool checked(unsigned row);
++  void modify(unsigned row, const lstring &text);
++  void reset();
++  bool selected();
++  unsigned selection();
++  void setCheckable(bool checkable);
++  void setChecked(unsigned row, bool checked);
++  void setHeaderText(const lstring &text);
++  void setHeaderVisible(bool visible);
++  void setSelected(bool selected);
++  void setSelection(unsigned row);
++
++  pListView(ListView &listView) : pWidget(listView), listView(listView) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onActivate();
++  void onChange(QTreeWidgetItem *item);
++  void onTick(QTreeWidgetItem *item);
++};
++
++struct pProgressBar : public pWidget {
++  ProgressBar &progressBar;
++  QProgressBar *qtProgressBar;
++
++  Geometry minimumGeometry();
++  void setPosition(unsigned position);
++
++  pProgressBar(ProgressBar &progressBar) : pWidget(progressBar), progressBar(progressBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pRadioBox : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  RadioBox &radioBox;
++  QRadioButton *qtRadioBox;
++  QButtonGroup *qtGroup;
++
++  bool checked();
++  Geometry minimumGeometry();
++  void setChecked();
++  void setGroup(const reference_array<RadioBox&> &group);
++  void setText(const string &text);
++
++  pRadioBox(RadioBox &radioBox) : pWidget(radioBox), radioBox(radioBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onTick();
++};
++
++struct pTextEdit : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  TextEdit &textEdit;
++  QTextEdit *qtTextEdit;
++
++  void setCursorPosition(unsigned position);
++  void setEditable(bool editable);
++  void setText(const string &text);
++  void setWordWrap(bool wordWrap);
++  string text();
++
++  pTextEdit(TextEdit &textEdit) : pWidget(textEdit), textEdit(textEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onChange();
++};
++
++struct pVerticalScrollBar : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  VerticalScrollBar &verticalScrollBar;
++  QScrollBar *qtScrollBar;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pVerticalScrollBar(VerticalScrollBar &verticalScrollBar) : pWidget(verticalScrollBar), verticalScrollBar(verticalScrollBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onChange();
++};
++
++struct pVerticalSlider : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  VerticalSlider &verticalSlider;
++  QSlider *qtSlider;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pVerticalSlider(VerticalSlider &verticalSlider) : pWidget(verticalSlider), verticalSlider(verticalSlider) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onChange();
++};
++
++struct pViewport : public pWidget {
++  Viewport &viewport;
++
++  uintptr_t handle();
++
++  pViewport(Viewport &viewport) : pWidget(viewport), viewport(viewport) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
+diff -urN ./phoenix/reference/platform.cpp ../../bsnes-sx2_v009/phoenix/reference/platform.cpp
+--- ./phoenix/reference/platform.cpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/reference/platform.cpp	2011-10-10 19:06:36.000000000 +0900
+@@ -0,0 +1,67 @@
++#include "platform.hpp"
++
++#include "font.cpp"
++#include "timer.cpp"
++#include "message-window.cpp"
++#include "window.cpp"
++
++#include "action/action.cpp"
++#include "action/menu.cpp"
++#include "action/separator.cpp"
++#include "action/item.cpp"
++#include "action/check-item.cpp"
++#include "action/radio-item.cpp"
++
++#include "widget/widget.cpp"
++#include "widget/button.cpp"
++#include "widget/canvas.cpp"
++#include "widget/check-box.cpp"
++#include "widget/combo-box.cpp"
++#include "widget/hex-edit.cpp"
++#include "widget/horizontal-scroll-bar.cpp"
++#include "widget/horizontal-slider.cpp"
++#include "widget/label.cpp"
++#include "widget/line-edit.cpp"
++#include "widget/list-view.cpp"
++#include "widget/progress-bar.cpp"
++#include "widget/radio-box.cpp"
++#include "widget/text-edit.cpp"
++#include "widget/vertical-scroll-bar.cpp"
++#include "widget/vertical-slider.cpp"
++#include "widget/viewport.cpp"
++
++Geometry pOS::availableGeometry() {
++  return { 0, 0, 0, 0 };
++}
++
++Geometry pOS::desktopGeometry() {
++  return { 0, 0, 0, 0 };
++}
++
++string pOS::fileLoad(Window &parent, const string &path, const lstring &filter) {
++  return "";
++}
++
++string pOS::fileSave(Window &parent, const string &path, const lstring &filter) {
++  return "";
++}
++
++string pOS::folderSelect(Window &parent, const string &path) {
++  return "";
++}
++
++void pOS::main() {
++}
++
++bool pOS::pendingEvents() {
++  return false;
++}
++
++void pOS::processEvents() {
++}
++
++void pOS::quit() {
++}
++
++void pOS::initialize() {
++}
+diff -urN ./phoenix/reference/platform.hpp ../../bsnes-sx2_v009/phoenix/reference/platform.hpp
+--- ./phoenix/reference/platform.hpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/reference/platform.hpp	2011-10-10 19:06:38.000000000 +0900
+@@ -0,0 +1,357 @@
++struct pFont;
++struct pWindow;
++struct pMenu;
++struct pLayout;
++struct pWidget;
++
++struct pFont {
++  static Geometry geometry(const string &description, const string &text);
++};
++
++struct pObject {
++  Object &object;
++  bool locked;
++
++  pObject(Object &object) : object(object), locked(locked) {}
++  virtual ~pObject() {}
++
++  void constructor() {}
++  void destructor() {}
++};
++
++struct pOS : public pObject {
++  static Geometry availableGeometry();
++  static Geometry desktopGeometry();
++  static string fileLoad(Window &parent, const string &path, const lstring &filter);
++  static string fileSave(Window &parent, const string &path, const lstring &filter);
++  static string folderSelect(Window &parent, const string &path);
++  static void main();
++  static bool pendingEvents();
++  static void processEvents();
++  static void quit();
++
++  static void initialize();
++};
++
++struct pTimer : public pObject {
++  Timer &timer;
++
++  void setEnabled(bool enabled);
++  void setInterval(unsigned milliseconds);
++
++  pTimer(Timer &timer) : pObject(timer), timer(timer) {}
++  void constructor();
++};
++
++struct pMessageWindow : public pObject {
++  static MessageWindow::Response information(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response question(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response warning(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response critical(Window &parent, const string &text, MessageWindow::Buttons buttons);
++};
++
++struct pWindow : public pObject {
++  Window &window;
++
++  void append(Layout &layout);
++  void append(Menu &menu);
++  void append(Widget &widget);
++  Color backgroundColor();
++  bool focused();
++  Geometry frameMargin();
++  Geometry geometry();
++  void remove(Layout &layout);
++  void remove(Menu &menu);
++  void remove(Widget &widget);
++  void setBackgroundColor(const Color &color);
++  void setFocused();
++  void setFullScreen(bool fullScreen);
++  void setGeometry(const Geometry &geometry);
++  void setMenuFont(const string &font);
++  void setMenuVisible(bool visible);
++  void setResizable(bool resizable);
++  void setStatusFont(const string &font);
++  void setStatusText(const string &text);
++  void setStatusVisible(bool visible);
++  void setTitle(const string &text);
++  void setVisible(bool visible);
++  void setWidgetFont(const string &font);
++
++  pWindow(Window &window) : pObject(window), window(window) {}
++  void constructor();
++};
++
++struct pAction : public pObject {
++  Action &action;
++
++  void setEnabled(bool enabled);
++  void setVisible(bool visible);
++
++  pAction(Action &action) : pObject(action), action(action) {}
++  void constructor();
++};
++
++struct pMenu : public pAction {
++  Menu &menu;
++
++  void append(Action &action);
++  void remove(Action &action);
++  void setText(const string &text);
++
++  pMenu(Menu &menu) : pAction(menu), menu(menu) {}
++  void constructor();
++  void destructor();
++};
++
++struct pSeparator : public pAction {
++  Separator &separator;
++
++  pSeparator(Separator &separator) : pAction(separator), separator(separator) {}
++  void constructor();
++  void destructor();
++};
++
++struct pItem : public pAction {
++  Item &item;
++
++  void setText(const string &text);
++
++  pItem(Item &item) : pAction(item), item(item) {}
++  void constructor();
++  void destructor();
++};
++
++struct pCheckItem : public pAction {
++  CheckItem &checkItem;
++
++  bool checked();
++  void setChecked(bool checked);
++  void setText(const string &text);
++
++  pCheckItem(CheckItem &checkItem) : pAction(checkItem), checkItem(checkItem) {}
++  void constructor();
++  void destructor();
++};
++
++struct pRadioItem : public pAction {
++  RadioItem &radioItem;
++
++  bool checked();
++  void setChecked();
++  void setGroup(const reference_array<RadioItem&> &group);
++  void setText(const string &text);
++
++  pRadioItem(RadioItem &radioItem) : pAction(radioItem), radioItem(radioItem) {}
++  void constructor();
++  void destructor();
++};
++
++struct pSizable : public pObject {
++  Sizable &sizable;
++
++  pSizable(Sizable &sizable) : pObject(sizable), sizable(sizable) {}
++};
++
++struct pLayout : public pSizable {
++  Layout &layout;
++
++  pLayout(Layout &layout) : pSizable(layout), layout(layout) {}
++};
++
++struct pWidget : public pSizable {
++  Widget &widget;
++
++  bool enabled();
++  Geometry minimumGeometry();
++  void setEnabled(bool enabled);
++  void setFocused();
++  void setFont(const string &font);
++  void setGeometry(const Geometry &geometry);
++  void setVisible(bool visible);
++
++  pWidget(Widget &widget) : pSizable(widget), widget(widget) {}
++  void constructor();
++};
++
++struct pButton : public pWidget {
++  Button &button;
++
++  void setText(const string &text);
++
++  pButton(Button &button) : pWidget(button), button(button) {}
++  void constructor();
++};
++
++struct pCanvas : public pWidget {
++  Canvas &canvas;
++
++  uint32_t* buffer();
++  void update();
++
++  pCanvas(Canvas &canvas) : pWidget(canvas), canvas(canvas) {}
++  void constructor();
++};
++
++struct pCheckBox : public pWidget {
++  CheckBox &checkBox;
++
++  bool checked();
++  void setChecked(bool checked);
++  void setText(const string &text);
++
++  pCheckBox(CheckBox &checkBox) : pWidget(checkBox), checkBox(checkBox) {}
++  void constructor();
++};
++
++struct pComboBox : public pWidget {
++  ComboBox &comboBox;
++
++  void append(const string &text);
++  void reset();
++  unsigned selection();
++  void setSelection(unsigned row);
++
++  pComboBox(ComboBox &comboBox) : pWidget(comboBox), comboBox(comboBox) {}
++  void constructor();
++};
++
++struct pHexEdit : public pWidget {
++  HexEdit &hexEdit;
++
++  void setColumns(unsigned columns);
++  void setLength(unsigned length);
++  void setOffset(unsigned offset);
++  void setRows(unsigned rows);
++  void update();
++
++  pHexEdit(HexEdit &hexEdit) : pWidget(hexEdit), hexEdit(hexEdit) {}
++  void constructor();
++};
++
++struct pHorizontalScrollBar : public pWidget {
++  HorizontalScrollBar &horizontalScrollBar;
++
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pHorizontalScrollBar(HorizontalScrollBar &horizontalScrollBar) : pWidget(horizontalScrollBar), horizontalScrollBar(horizontalScrollBar) {}
++  void constructor();
++};
++
++struct pHorizontalSlider : public pWidget {
++  HorizontalSlider &horizontalSlider;
++
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pHorizontalSlider(HorizontalSlider &horizontalSlider) : pWidget(horizontalSlider), horizontalSlider(horizontalSlider) {}
++  void constructor();
++};
++
++struct pLabel : public pWidget {
++  Label &label;
++
++  void setText(const string &text);
++
++  pLabel(Label &label) : pWidget(label), label(label) {}
++  void constructor();
++};
++
++struct pLineEdit : public pWidget {
++  LineEdit &lineEdit;
++
++  void setEditable(bool editable);
++  void setText(const string &text);
++  string text();
++
++  pLineEdit(LineEdit &lineEdit) : pWidget(lineEdit), lineEdit(lineEdit) {}
++  void constructor();
++};
++
++struct pListView : public pWidget {
++  ListView &listView;
++
++  void append(const lstring &text);
++  void autoSizeColumns();
++  bool checked(unsigned row);
++  void modify(unsigned row, const lstring &text);
++  void reset();
++  bool selected();
++  unsigned selection();
++  void setCheckable(bool checkable);
++  void setChecked(unsigned row, bool checked);
++  void setHeaderText(const lstring &text);
++  void setHeaderVisible(bool visible);
++  void setSelected(bool selected);
++  void setSelection(unsigned row);
++
++  pListView(ListView &listView) : pWidget(listView), listView(listView) {}
++  void constructor();
++};
++
++struct pProgressBar : public pWidget {
++  ProgressBar &progressBar;
++
++  void setPosition(unsigned position);
++
++  pProgressBar(ProgressBar &progressBar) : pWidget(progressBar), progressBar(progressBar) {}
++  void constructor();
++};
++
++struct pRadioBox : public pWidget {
++  RadioBox &radioBox;
++
++  bool checked();
++  void setChecked();
++  void setGroup(const reference_array<RadioBox&> &group);
++  void setText(const string &text);
++
++  pRadioBox(RadioBox &radioBox) : pWidget(radioBox), radioBox(radioBox) {}
++  void constructor();
++};
++
++struct pTextEdit : public pWidget {
++  TextEdit &textEdit;
++
++  void setCursorPosition(unsigned position);
++  void setEditable(bool editable);
++  void setText(const string &text);
++  void setWordWrap(bool wordWrap);
++  string text();
++
++  pTextEdit(TextEdit &textEdit) : pWidget(textEdit), textEdit(textEdit) {}
++  void constructor();
++};
++
++struct pVerticalScrollBar : public pWidget {
++  VerticalScrollBar &verticalScrollBar;
++
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pVerticalScrollBar(VerticalScrollBar &verticalScrollBar) : pWidget(verticalScrollBar), verticalScrollBar(verticalScrollBar) {}
++  void constructor();
++};
++
++struct pVerticalSlider : public pWidget {
++  VerticalSlider &verticalSlider;
++
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pVerticalSlider(VerticalSlider &verticalSlider) : pWidget(verticalSlider), verticalSlider(verticalSlider) {}
++  void constructor();
++};
++
++struct pViewport : public pWidget {
++  Viewport &viewport;
++
++  uintptr_t handle();
++
++  pViewport(Viewport &viewport) : pWidget(viewport), viewport(viewport) {}
++  void constructor();
++};
+diff -urN ./phoenix/windows/platform.cpp ../../bsnes-sx2_v009/phoenix/windows/platform.cpp
+--- ./phoenix/windows/platform.cpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/windows/platform.cpp	2011-10-10 19:06:38.000000000 +0900
+@@ -0,0 +1,489 @@
++#include "platform.hpp"
++
++#include "object.cpp"
++#include "font.cpp"
++#include "timer.cpp"
++#include "message-window.cpp"
++#include "window.cpp"
++
++#include "action/action.cpp"
++#include "action/menu.cpp"
++#include "action/separator.cpp"
++#include "action/item.cpp"
++#include "action/check-item.cpp"
++#include "action/radio-item.cpp"
++
++#include "widget/widget.cpp"
++#include "widget/button.cpp"
++#include "widget/canvas.cpp"
++#include "widget/check-box.cpp"
++#include "widget/combo-box.cpp"
++#include "widget/hex-edit.cpp"
++#include "widget/horizontal-scroll-bar.cpp"
++#include "widget/horizontal-slider.cpp"
++#include "widget/label.cpp"
++#include "widget/line-edit.cpp"
++#include "widget/list-view.cpp"
++#include "widget/progress-bar.cpp"
++#include "widget/radio-box.cpp"
++#include "widget/text-edit.cpp"
++#include "widget/vertical-scroll-bar.cpp"
++#include "widget/vertical-slider.cpp"
++#include "widget/viewport.cpp"
++
++static void OS_keyboardProc(HWND, UINT, WPARAM, LPARAM);
++static void OS_processDialogMessage(MSG&);
++static LRESULT CALLBACK OS_windowProc(HWND, UINT, WPARAM, LPARAM);
++
++Geometry pOS::availableGeometry() {
++  RECT rc;
++  SystemParametersInfo(SPI_GETWORKAREA, 0, &rc, 0);
++  return { rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top };
++}
++
++Geometry pOS::desktopGeometry() {
++  return { 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN) };
++}
++
++static string pOS_fileDialog(bool save, Window &parent, const string &path, const lstring &filter) {
++  string dir = path;
++  dir.replace("/", "\\");
++
++  string filterList;
++  for(auto &filterItem : filter) {
++    lstring part;
++    part.split("(", filterItem);
++    if(part.size() != 2) { print("--", filterItem, "\n"); continue; }
++    part[1].rtrim<1>(")");
++    part[1].replace(" ", "");
++    part[1].transform(",", ";");
++    filterList.append(string(filterItem, "\t", part[1], "\t"));
++  }
++
++  utf16_t wfilter(filterList);
++  utf16_t wdir(dir);
++  wchar_t wfilename[PATH_MAX + 1] = L"";
++
++  wchar_t *p = wfilter;
++  while(*p != L'\0') {
++    if(*p == L'\t') *p = L'\0';
++    p++;
++  }
++
++  OPENFILENAME ofn;
++  memset(&ofn, 0, sizeof(OPENFILENAME));
++  ofn.lStructSize = sizeof(OPENFILENAME);
++  ofn.hwndOwner = &parent != &Window::None ? parent.p.hwnd : 0;
++  ofn.lpstrFilter = wfilter;
++  ofn.lpstrInitialDir = wdir;
++  ofn.lpstrFile = wfilename;
++  ofn.nMaxFile = PATH_MAX;
++  ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
++  ofn.lpstrDefExt = L"";
++
++  bool result = (save == false ? GetOpenFileName(&ofn) : GetSaveFileName(&ofn));
++  if(result == false) return "";
++  string name = (const char*)utf8_t(wfilename);
++  name.transform("\\", "/");
++  return name;
++}
++
++string pOS::fileLoad(Window &parent, const string &path, const lstring &filter) {
++  return pOS_fileDialog(false, parent, path, filter);
++}
++
++string pOS::fileSave(Window &parent, const string &path, const lstring &filter) {
++  return pOS_fileDialog(true, parent, path, filter);
++}
++
++string pOS::folderSelect(Window &parent, const string &path) {
++  wchar_t wfilename[PATH_MAX + 1] = L"";
++  BROWSEINFO bi;
++  bi.hwndOwner = &parent != &Window::None ? parent.p.hwnd : 0;
++  bi.pidlRoot = NULL;
++  bi.pszDisplayName = wfilename;
++  bi.lpszTitle = L"";
++  bi.ulFlags = BIF_NEWDIALOGSTYLE | BIF_RETURNONLYFSDIRS;
++  bi.lpfn = NULL;
++  bi.lParam = 0;
++  bi.iImage = 0;
++  bool result = false;
++  LPITEMIDLIST pidl = SHBrowseForFolder(&bi);
++  if(pidl) {
++    if(SHGetPathFromIDList(pidl, wfilename)) {
++      result = true;
++      IMalloc *imalloc = 0;
++      if(SUCCEEDED(SHGetMalloc(&imalloc))) {
++        imalloc->Free(pidl);
++        imalloc->Release();
++      }
++    }
++  }
++  if(result == false) return "";
++  string name = (const char*)utf8_t(wfilename);
++  if(name == "") return "";
++  name.transform("\\", "/");
++  if(name.endswith("/") == false) name.append("/");
++  return name;
++}
++
++void pOS::main() {
++  MSG msg;
++  while(GetMessage(&msg, 0, 0, 0)) {
++    OS_processDialogMessage(msg);
++  }
++}
++
++bool pOS::pendingEvents() {
++  MSG msg;
++  return PeekMessage(&msg, 0, 0, 0, PM_NOREMOVE);
++}
++
++void pOS::processEvents() {
++  while(pendingEvents()) {
++    MSG msg;
++    if(PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
++      OS_processDialogMessage(msg);
++    }
++  }
++}
++
++void OS_processDialogMessage(MSG &msg) {
++  if(msg.message == WM_KEYDOWN || msg.message == WM_KEYUP) {
++    OS_keyboardProc(msg.hwnd, msg.message, msg.wParam, msg.lParam);
++  }
++
++  wchar_t className[256];
++  GetClassName(msg.hwnd, className, 255);
++
++  //if this HWND accepts tabs to move between controls ...
++  if(!wcscmp(className, L"BUTTON")       //Button, CheckBox, RadioBox
++  || !wcscmp(className, L"COMBOBOX")     //ComboBox
++  || !wcscmp(className, L"EDIT")         //HexEdit, LineEdit, TextEdit
++  || !wcscmp(className, L"SCROLLBAR")    //HorizontalScrollBar, VerticalScrollBar
++  || !wcscmp(className, TRACKBAR_CLASS)  //HorizontalSlider, VerticalSlider
++  || !wcscmp(className, WC_LISTVIEW)     //ListView
++  ) {
++    //... return if the message is a dialog command
++    if(IsDialogMessage(msg.hwnd, &msg)) return;
++  }
++
++  TranslateMessage(&msg);
++  DispatchMessage(&msg);
++}
++
++void pOS::quit() {
++  PostQuitMessage(0);
++}
++
++void pOS::initialize() {
++  CoInitialize(0);
++  InitCommonControls();
++
++  WNDCLASS wc;
++  wc.cbClsExtra = 0;
++  wc.cbWndExtra = 0;
++  wc.hbrBackground = GetSysColorBrush(COLOR_3DFACE);
++  wc.hCursor = LoadCursor(0, IDC_ARROW);
++  wc.hIcon = LoadIcon(GetModuleHandle(0), MAKEINTRESOURCE(2));
++  wc.hInstance = GetModuleHandle(0);
++  wc.lpfnWndProc = OS_windowProc;
++  wc.lpszClassName = L"phoenix_window";
++  wc.lpszMenuName = 0;
++  wc.style = CS_HREDRAW | CS_VREDRAW;
++  RegisterClass(&wc);
++
++  wc.cbClsExtra = 0;
++  wc.cbWndExtra = 0;
++  wc.hbrBackground = CreateSolidBrush(RGB(0, 0, 0));
++  wc.hCursor = LoadCursor(0, IDC_ARROW);
++  wc.hIcon = LoadIcon(0, IDI_APPLICATION);
++  wc.hInstance = GetModuleHandle(0);
++  wc.lpfnWndProc = Canvas_windowProc;
++  wc.lpszClassName = L"phoenix_canvas";
++  wc.lpszMenuName = 0;
++  wc.style = CS_HREDRAW | CS_VREDRAW;
++  RegisterClass(&wc);
++
++  wc.cbClsExtra = 0;
++  wc.cbWndExtra = 0;
++  wc.hbrBackground = GetSysColorBrush(COLOR_3DFACE);
++  wc.hCursor = LoadCursor(0, IDC_ARROW);
++  wc.hIcon = LoadIcon(0, IDI_APPLICATION);
++  wc.hInstance = GetModuleHandle(0);
++  wc.lpfnWndProc = Label_windowProc;
++  wc.lpszClassName = L"phoenix_label";
++  wc.lpszMenuName = 0;
++  wc.style = CS_HREDRAW | CS_VREDRAW;
++  RegisterClass(&wc);
++
++  wc.cbClsExtra = 0;
++  wc.cbWndExtra = 0;
++  wc.hbrBackground = CreateSolidBrush(RGB(0, 0, 0));
++  wc.hCursor = LoadCursor(0, IDC_ARROW);
++  wc.hIcon = LoadIcon(0, IDI_APPLICATION);
++  wc.hInstance = GetModuleHandle(0);
++  wc.lpfnWndProc = Viewport_windowProc;
++  wc.lpszClassName = L"phoenix_viewport";
++  wc.lpszMenuName = 0;
++  wc.style = CS_HREDRAW | CS_VREDRAW;
++  RegisterClass(&wc);
++}
++
++static void OS_keyboardProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
++  if(msg == WM_KEYDOWN) {
++    GUITHREADINFO info;
++    memset(&info, 0, sizeof(GUITHREADINFO));
++    info.cbSize = sizeof(GUITHREADINFO);
++    GetGUIThreadInfo(GetCurrentThreadId(), &info);
++    Object *object = (Object*)GetWindowLongPtr(info.hwndFocus, GWLP_USERDATA);
++    if(object == 0) return;
++    if(dynamic_cast<ListView*>(object)) {
++      ListView &listView = (ListView&)*object;
++      if(wparam == VK_RETURN) {
++        if(listView.onActivate) listView.onActivate();
++      }
++    } else if(dynamic_cast<LineEdit*>(object)) {
++      LineEdit &lineEdit = (LineEdit&)*object;
++      if(wparam == VK_RETURN) {
++        if(lineEdit.onActivate) lineEdit.onActivate();
++      }
++    }
++  }
++}
++
++static LRESULT CALLBACK OS_windowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
++  Object *object = (Object*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
++  if(!object || !dynamic_cast<Window*>(object)) return DefWindowProc(hwnd, msg, wparam, lparam);
++  Window &window = (Window&)*object;
++
++  switch(msg) {
++    case WM_CLOSE: {
++      window.state.ignore = false;
++      if(window.onClose) window.onClose();
++      if(window.state.ignore == false) window.setVisible(false);
++      return TRUE;
++    }
++
++    case WM_MOVE: {
++      if(window.p.locked) break;
++
++      Geometry geometry = window.geometry();
++      window.state.geometry.x = geometry.x;
++      window.state.geometry.y = geometry.y;
++
++      if(window.onMove) window.onMove();
++      break;
++    }
++
++    case WM_SIZE: {
++      if(window.p.locked) break;
++      SetWindowPos(window.p.hstatus, NULL, 0, 0, 0, 0, SWP_NOZORDER | SWP_FRAMECHANGED);
++
++      Geometry geometry = window.geometry();
++      window.state.geometry.width = geometry.width;
++      window.state.geometry.height = geometry.height;
++
++      for(auto &layout : window.state.layout) {
++        Geometry geom = window.geometry();
++        geom.x = geom.y = 0;
++        layout.setGeometry(geom);
++      }
++
++      if(window.onSize) window.onSize();
++      break;
++    }
++
++    case WM_GETMINMAXINFO: {
++      MINMAXINFO *mmi = (MINMAXINFO*)lparam;
++    //mmi->ptMinTrackSize.x = 256 + window.p.frameMargin().width;
++    //mmi->ptMinTrackSize.y = 256 + window.p.frameMargin().height;
++    //return TRUE;
++    }
++
++    case WM_ERASEBKGND: {
++      if(window.p.brush == 0) break;
++      RECT rc;
++      GetClientRect(window.p.hwnd, &rc);
++      PAINTSTRUCT ps;
++      BeginPaint(window.p.hwnd, &ps);
++      FillRect(ps.hdc, &rc, window.p.brush);
++      EndPaint(window.p.hwnd, &ps);
++      return TRUE;
++    }
++
++    case WM_CTLCOLORBTN:
++    case WM_CTLCOLORSTATIC: {
++      Object *object = (Object*)GetWindowLongPtr((HWND)lparam, GWLP_USERDATA);
++      if(object && window.p.brush) {
++        HDC hdc = (HDC)wparam;
++        SetBkColor((HDC)wparam, window.p.brushColor);
++        return (INT_PTR)window.p.brush;
++      }
++    }
++
++    case WM_COMMAND: {
++      unsigned id = LOWORD(wparam);
++      HWND control = GetDlgItem(window.p.hwnd, id);
++      if(control == 0) {
++        pObject *object = (pObject*)pObject::find(id);
++        if(!object) break;
++        if(dynamic_cast<pItem*>(object)) {
++          Item &item = ((pItem*)object)->item;
++          if(item.onTick) item.onTick();
++        } else if(dynamic_cast<pCheckItem*>(object)) {
++          CheckItem &checkItem = ((pCheckItem*)object)->checkItem;
++          checkItem.setChecked(!checkItem.state.checked);
++          if(checkItem.onTick) checkItem.onTick();
++        } else if(dynamic_cast<pRadioItem*>(object)) {
++          RadioItem &radioItem = ((pRadioItem*)object)->radioItem;
++          if(radioItem.state.checked == false) {
++            radioItem.setChecked();
++            if(radioItem.onTick) radioItem.onTick();
++          }
++        }
++      } else {
++        Object *object = (Object*)GetWindowLongPtr(control, GWLP_USERDATA);
++        if(!object) break;
++        if(dynamic_cast<Button*>(object)) {
++          Button &button = (Button&)*object;
++          if(button.onTick) button.onTick();
++        } else if(dynamic_cast<CheckBox*>(object)) {
++          CheckBox &checkBox = (CheckBox&)*object;
++          checkBox.setChecked(!checkBox.state.checked);
++          if(checkBox.onTick) checkBox.onTick();
++        } else if(dynamic_cast<ComboBox*>(object)) {
++          ComboBox &comboBox = (ComboBox&)*object;
++          if(HIWORD(wparam) == CBN_SELCHANGE) {
++            if(comboBox.state.selection != comboBox.selection()) {
++              comboBox.state.selection = comboBox.selection();
++              if(comboBox.onChange) comboBox.onChange();
++            }
++          }
++        } else if(dynamic_cast<LineEdit*>(object)) {
++          LineEdit &lineEdit = (LineEdit&)*object;
++          if(HIWORD(wparam) == EN_CHANGE) {
++            if(lineEdit.p.locked == false && lineEdit.onChange) lineEdit.onChange();
++          }
++        } else if(dynamic_cast<RadioBox*>(object)) {
++          RadioBox &radioBox = (RadioBox&)*object;
++          if(radioBox.state.checked == false) {
++            radioBox.setChecked();
++            if(radioBox.onTick) radioBox.onTick();
++          }
++        } else if(dynamic_cast<TextEdit*>(object)) {
++          TextEdit &textEdit = (TextEdit&)*object;
++          if(HIWORD(wparam) == EN_CHANGE) {
++            if(textEdit.p.locked == false && textEdit.onChange) textEdit.onChange();
++          }
++        }
++      }
++    }
++
++    case WM_NOTIFY: {
++      unsigned id = LOWORD(wparam);
++      HWND control = GetDlgItem(window.p.hwnd, id);
++      if(control == 0) break;
++      Object *object = (Object*)GetWindowLongPtr(control, GWLP_USERDATA);
++      if(object == 0) break;
++      if(dynamic_cast<ListView*>(object)) {
++        ListView &listView = (ListView&)*object;
++        LPNMHDR nmhdr = (LPNMHDR)lparam;
++        LPNMLISTVIEW nmlistview = (LPNMLISTVIEW)lparam;
++
++        if(nmhdr->code == LVN_ITEMCHANGED && (nmlistview->uChanged & LVIF_STATE)) {
++          unsigned imagemask = ((nmlistview->uNewState & LVIS_STATEIMAGEMASK) >> 12) - 1;
++          if(imagemask == 0 || imagemask == 1) {
++            if(listView.p.locked == false && listView.onTick) listView.onTick(nmlistview->iItem);
++          } else if((nmlistview->uOldState & LVIS_FOCUSED) && !(nmlistview->uNewState & LVIS_FOCUSED)) {
++            listView.p.lostFocus = true;
++          } else {
++            if(!(nmlistview->uOldState & LVIS_SELECTED) && (nmlistview->uNewState & LVIS_SELECTED)) {
++              listView.state.selected = true;
++              listView.state.selection = listView.selection();
++              if(listView.p.locked == false && listView.onChange) listView.onChange();
++            } else if(listView.p.lostFocus == false && listView.selected() == false) {
++              listView.state.selected = true;
++              listView.state.selection = listView.selection();
++              if(listView.p.locked == false && listView.onChange) listView.onChange();
++            }
++            listView.p.lostFocus = false;
++          }
++        } else if(nmhdr->code == LVN_ITEMACTIVATE) {
++          if(listView.onActivate) listView.onActivate();
++        }
++      }
++    }
++
++    case WM_HSCROLL:
++    case WM_VSCROLL: {
++      Object *object = 0;
++      if(lparam) {
++        object = (Object*)GetWindowLongPtr((HWND)lparam, GWLP_USERDATA);
++      } else {
++        unsigned id = LOWORD(wparam);
++        HWND control = GetDlgItem(window.p.hwnd, id);
++        if(control == 0) break;
++        object = (Object*)GetWindowLongPtr(control, GWLP_USERDATA);
++      }
++      if(object == 0) break;
++
++      if(dynamic_cast<HorizontalScrollBar*>(object)
++      || dynamic_cast<VerticalScrollBar*>(object)) {
++        SCROLLINFO info;
++        memset(&info, 0, sizeof(SCROLLINFO));
++        info.cbSize = sizeof(SCROLLINFO);
++        info.fMask = SIF_ALL;
++        GetScrollInfo((HWND)lparam, SB_CTL, &info);
++
++        switch(LOWORD(wparam)) {
++        case SB_LEFT: info.nPos = info.nMin; break;
++        case SB_RIGHT: info.nPos = info.nMax; break;
++        case SB_LINELEFT: info.nPos--; break;
++        case SB_LINERIGHT: info.nPos++; break;
++        case SB_PAGELEFT: info.nPos -= info.nMax >> 3; break;
++        case SB_PAGERIGHT: info.nPos += info.nMax >> 3; break;
++        case SB_THUMBTRACK: info.nPos = info.nTrackPos; break;
++        }
++
++        info.fMask = SIF_POS;
++        SetScrollInfo((HWND)lparam, SB_CTL, &info, TRUE);
++
++        //Windows may clamp position to scrollbar range
++        GetScrollInfo((HWND)lparam, SB_CTL, &info);
++
++        if(dynamic_cast<HorizontalScrollBar*>(object)) {
++          HorizontalScrollBar &horizontalScrollBar = (HorizontalScrollBar&)*object;
++          if(horizontalScrollBar.state.position != info.nPos) {
++            horizontalScrollBar.state.position = info.nPos;
++            if(horizontalScrollBar.onChange) horizontalScrollBar.onChange();
++          }
++        } else {
++          VerticalScrollBar &verticalScrollBar = (VerticalScrollBar&)*object;
++          if(verticalScrollBar.state.position != info.nPos) {
++            verticalScrollBar.state.position = info.nPos;
++            if(verticalScrollBar.onChange) verticalScrollBar.onChange();
++          }
++        }
++
++        return TRUE;
++      }
++
++      if(dynamic_cast<HorizontalSlider*>(object)) {
++        HorizontalSlider &horizontalSlider = (HorizontalSlider&)*object;
++        if(horizontalSlider.state.position != horizontalSlider.position()) {
++          horizontalSlider.state.position = horizontalSlider.position();
++          if(horizontalSlider.onChange) horizontalSlider.onChange();
++        }
++      } else if(dynamic_cast<VerticalSlider*>(object)) {
++        VerticalSlider &verticalSlider = (VerticalSlider&)*object;
++        if(verticalSlider.state.position != verticalSlider.position()) {
++          verticalSlider.state.position = verticalSlider.position();
++          if(verticalSlider.onChange) verticalSlider.onChange();
++        }
++      }
++    }
++  }
++
++  return DefWindowProc(hwnd, msg, wparam, lparam);
++}
+diff -urN ./phoenix/windows/platform.hpp ../../bsnes-sx2_v009/phoenix/windows/platform.hpp
+--- ./phoenix/windows/platform.hpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/windows/platform.hpp	2011-10-10 19:06:38.000000000 +0900
+@@ -0,0 +1,434 @@
++struct pFont;
++struct pWindow;
++struct pMenu;
++struct pLayout;
++struct pWidget;
++
++struct pFont {
++  static Geometry geometry(const string &description, const string &text);
++
++  static HFONT create(const string &description);
++  static void free(HFONT hfont);
++  static Geometry geometry(HFONT hfont, const string &text);
++};
++
++struct pObject {
++  Object &object;
++  uintptr_t id;
++  bool locked;
++  static array<pObject*> objects;
++
++  pObject(Object &object);
++  static pObject* find(unsigned id);
++  virtual ~pObject() {}
++
++  void constructor() {}
++  void destructor() {}
++};
++
++struct pOS : public pObject {
++  static Geometry availableGeometry();
++  static Geometry desktopGeometry();
++  static string fileLoad(Window &parent, const string &path, const lstring &filter);
++  static string fileSave(Window &parent, const string &path, const lstring &filter);
++  static string folderSelect(Window &parent, const string &path);
++  static void main();
++  static bool pendingEvents();
++  static void processEvents();
++  static void quit();
++
++  static void initialize();
++};
++
++struct pTimer : public pObject {
++  Timer &timer;
++  UINT_PTR htimer;
++
++  void setEnabled(bool enabled);
++  void setInterval(unsigned milliseconds);
++
++  pTimer(Timer &timer) : pObject(timer), timer(timer) {}
++  void constructor();
++};
++
++struct pMessageWindow : public pObject {
++  static MessageWindow::Response information(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response question(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response warning(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response critical(Window &parent, const string &text, MessageWindow::Buttons buttons);
++};
++
++struct pWindow : public pObject {
++  Window &window;
++  HWND hwnd;
++  HMENU hmenu;
++  HWND hstatus;
++  HFONT hstatusfont;
++  HBRUSH brush;
++  COLORREF brushColor;
++
++  void append(Layout &layout);
++  void append(Menu &menu);
++  void append(Widget &widget);
++  Color backgroundColor();
++  bool focused();
++  Geometry frameMargin();
++  Geometry geometry();
++  void remove(Layout &layout);
++  void remove(Menu &menu);
++  void remove(Widget &widget);
++  void setBackgroundColor(const Color &color);
++  void setFocused();
++  void setFullScreen(bool fullScreen);
++  void setGeometry(const Geometry &geometry);
++  void setMenuFont(const string &font);
++  void setMenuVisible(bool visible);
++  void setResizable(bool resizable);
++  void setStatusFont(const string &font);
++  void setStatusText(const string &text);
++  void setStatusVisible(bool visible);
++  void setTitle(const string &text);
++  void setVisible(bool visible);
++  void setWidgetFont(const string &font);
++
++  pWindow(Window &window) : pObject(window), window(window) {}
++  void constructor();
++  void destructor();
++  void updateMenu();
++};
++
++struct pAction : public pObject {
++  Action &action;
++  Menu *parentMenu;
++  Window *parentWindow;
++
++  void setEnabled(bool enabled);
++  void setVisible(bool visible);
++
++  pAction(Action &action) : pObject(action), action(action) {}
++  void constructor();
++};
++
++struct pMenu : public pAction {
++  Menu &menu;
++  HMENU hmenu;
++
++  void append(Action &action);
++  void remove(Action &action);
++  void setText(const string &text);
++
++  pMenu(Menu &menu) : pAction(menu), menu(menu) {}
++  void constructor();
++  void destructor();
++  void update(Window &parentWindow, Menu *parentMenu = 0);
++};
++
++struct pSeparator : public pAction {
++  Separator &separator;
++
++  pSeparator(Separator &separator) : pAction(separator), separator(separator) {}
++  void constructor();
++  void destructor();
++};
++
++struct pItem : public pAction {
++  Item &item;
++
++  void setText(const string &text);
++
++  pItem(Item &item) : pAction(item), item(item) {}
++  void constructor();
++  void destructor();
++};
++
++struct pCheckItem : public pAction {
++  CheckItem &checkItem;
++
++  bool checked();
++  void setChecked(bool checked);
++  void setText(const string &text);
++
++  pCheckItem(CheckItem &checkItem) : pAction(checkItem), checkItem(checkItem) {}
++  void constructor();
++  void destructor();
++};
++
++struct pRadioItem : public pAction {
++  RadioItem &radioItem;
++
++  bool checked();
++  void setChecked();
++  void setGroup(const reference_array<RadioItem&> &group);
++  void setText(const string &text);
++
++  pRadioItem(RadioItem &radioItem) : pAction(radioItem), radioItem(radioItem) {}
++  void constructor();
++  void destructor();
++};
++
++struct pSizable : public pObject {
++  Sizable &sizable;
++
++  pSizable(Sizable &sizable) : pObject(sizable), sizable(sizable) {}
++};
++
++struct pLayout : public pSizable {
++  Layout &layout;
++
++  pLayout(Layout &layout) : pSizable(layout), layout(layout) {}
++};
++
++struct pWidget : public pSizable {
++  Widget &widget;
++  Window *parentWindow;
++  HWND hwnd;
++  HFONT hfont;
++
++  bool enabled();
++  virtual Geometry minimumGeometry();
++  void setEnabled(bool enabled);
++  void setFocused();
++  void setFont(const string &font);
++  virtual void setGeometry(const Geometry &geometry);
++  void setVisible(bool visible);
++
++  pWidget(Widget &widget) : pSizable(widget), widget(widget) { parentWindow = &Window::None; }
++  void constructor();
++  void destructor();
++  virtual void orphan();
++  void setDefaultFont();
++  void synchronize();
++};
++
++struct pButton : public pWidget {
++  Button &button;
++
++  Geometry minimumGeometry();
++  void setText(const string &text);
++
++  pButton(Button &button) : pWidget(button), button(button) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pCanvas : public pWidget {
++  Canvas &canvas;
++  uint32_t *bufferRGB;
++
++  uint32_t* buffer();
++  void setGeometry(const Geometry &geometry);
++  void update();
++
++  pCanvas(Canvas &canvas) : pWidget(canvas), canvas(canvas) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pCheckBox : public pWidget {
++  CheckBox &checkBox;
++
++  bool checked();
++  Geometry minimumGeometry();
++  void setChecked(bool checked);
++  void setText(const string &text);
++
++  pCheckBox(CheckBox &checkBox) : pWidget(checkBox), checkBox(checkBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pComboBox : public pWidget {
++  ComboBox &comboBox;
++
++  void append(const string &text);
++  Geometry minimumGeometry();
++  void reset();
++  unsigned selection();
++  void setSelection(unsigned row);
++
++  pComboBox(ComboBox &comboBox) : pWidget(comboBox), comboBox(comboBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++  void setGeometry(const Geometry &geometry);
++};
++
++struct pHexEdit : public pWidget {
++  HexEdit &hexEdit;
++  LRESULT CALLBACK (*windowProc)(HWND, UINT, LPARAM, WPARAM);
++
++  void setColumns(unsigned columns);
++  void setLength(unsigned length);
++  void setOffset(unsigned offset);
++  void setRows(unsigned rows);
++  void update();
++
++  pHexEdit(HexEdit &hexEdit) : pWidget(hexEdit), hexEdit(hexEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++  bool keyPress(unsigned key);
++};
++
++struct pHorizontalScrollBar : public pWidget {
++  HorizontalScrollBar &horizontalScrollBar;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pHorizontalScrollBar(HorizontalScrollBar &horizontalScrollBar) : pWidget(horizontalScrollBar), horizontalScrollBar(horizontalScrollBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pHorizontalSlider : public pWidget {
++  HorizontalSlider &horizontalSlider;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pHorizontalSlider(HorizontalSlider &horizontalSlider) : pWidget(horizontalSlider), horizontalSlider(horizontalSlider) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pLabel : public pWidget {
++  Label &label;
++
++  Geometry minimumGeometry();
++  void setText(const string &text);
++
++  pLabel(Label &label) : pWidget(label), label(label) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pLineEdit : public pWidget {
++  LineEdit &lineEdit;
++
++  Geometry minimumGeometry();
++  void setEditable(bool editable);
++  void setText(const string &text);
++  string text();
++
++  pLineEdit(LineEdit &lineEdit) : pWidget(lineEdit), lineEdit(lineEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pListView : public pWidget {
++  ListView &listView;
++  bool lostFocus;
++
++  void append(const lstring &text);
++  void autoSizeColumns();
++  bool checked(unsigned row);
++  void modify(unsigned row, const lstring &text);
++  void reset();
++  bool selected();
++  unsigned selection();
++  void setCheckable(bool checkable);
++  void setChecked(unsigned row, bool checked);
++  void setHeaderText(const lstring &text);
++  void setHeaderVisible(bool visible);
++  void setSelected(bool selected);
++  void setSelection(unsigned row);
++
++  pListView(ListView &listView) : pWidget(listView), listView(listView) {}
++  void constructor();
++  void destructor();
++  void orphan();
++  void setGeometry(const Geometry &geometry);
++};
++
++struct pProgressBar : public pWidget {
++  ProgressBar &progressBar;
++
++  Geometry minimumGeometry();
++  void setPosition(unsigned position);
++
++  pProgressBar(ProgressBar &progressBar) : pWidget(progressBar), progressBar(progressBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pRadioBox : public pWidget {
++  RadioBox &radioBox;
++
++  bool checked();
++  Geometry minimumGeometry();
++  void setChecked();
++  void setGroup(const reference_array<RadioBox&> &group);
++  void setText(const string &text);
++
++  pRadioBox(RadioBox &radioBox) : pWidget(radioBox), radioBox(radioBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pTextEdit : public pWidget {
++  TextEdit &textEdit;
++
++  void setCursorPosition(unsigned position);
++  void setEditable(bool editable);
++  void setText(const string &text);
++  void setWordWrap(bool wordWrap);
++  string text();
++
++  pTextEdit(TextEdit &textEdit) : pWidget(textEdit), textEdit(textEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pVerticalScrollBar : public pWidget {
++  VerticalScrollBar &verticalScrollBar;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pVerticalScrollBar(VerticalScrollBar &verticalScrollBar) : pWidget(verticalScrollBar), verticalScrollBar(verticalScrollBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pVerticalSlider : public pWidget {
++  VerticalSlider &verticalSlider;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pVerticalSlider(VerticalSlider &verticalSlider) : pWidget(verticalSlider), verticalSlider(verticalSlider) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pViewport : public pWidget {
++  Viewport &viewport;
++
++  uintptr_t handle();
++
++  pViewport(Viewport &viewport) : pWidget(viewport), viewport(viewport) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
+diff -urN ./snes/cartridge/cartridge.cpp ../../bsnes-sx2_v009/snes/cartridge/cartridge.cpp
+--- ./snes/cartridge/cartridge.cpp	2011-07-03 22:28:19.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/cartridge/cartridge.cpp	2012-01-19 15:05:30.000000000 +0900
+@@ -30,6 +30,7 @@
+   has_st0018     = false;
+   has_msu1       = false;
+   has_link       = false;
++  has_xband_slot = false;
+ 
+   nvram.reset();
+ 
+@@ -80,4 +81,16 @@
+   unload();
+ }
+ 
++void Cartridge::Tilt() {
++  rom.write_protect(false);
++  uint8 data = 0;
++  unsigned data2 = 0;
++  for(unsigned addr = 0; addr <= rom.size(); addr++) {
++	data2 = SNES::random();
++	data = (uint8)data2;	
++	if(data != 0xdb) { rom.write(addr, data); }
++  }
++  rom.write_protect(true);
++}
++
+ }
+diff -urN ./snes/cartridge/cartridge.hpp ../../bsnes-sx2_v009/snes/cartridge/cartridge.hpp
+--- ./snes/cartridge/cartridge.hpp	2011-06-26 14:06:35.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/cartridge/cartridge.hpp	2012-01-22 20:38:25.000000000 +0900
+@@ -6,6 +6,8 @@
+     Bsx,
+     SufamiTurbo,
+     SuperGameBoy,
++	XBand,
++	SFBox,
+   };
+ 
+   enum class Region : unsigned {
+@@ -20,6 +22,7 @@
+     SufamiTurboA,
+     SufamiTurboB,
+     GameBoy,
++	XBand,
+   };
+ 
+   MappedRAM rom;
+@@ -47,6 +50,7 @@
+   readonly<bool> has_st0018;
+   readonly<bool> has_msu1;
+   readonly<bool> has_link;
++  readonly<bool> has_xband_slot;
+ 
+   struct NonVolatileRAM {
+     const string id;
+@@ -89,6 +93,8 @@
+   void serialize(serializer&);
+   Cartridge();
+   ~Cartridge();
++  
++  void Tilt();
+ 
+ private:
+   void parse_xml(const lstring&);
+@@ -96,6 +102,7 @@
+   void parse_xml_bsx(const char*);
+   void parse_xml_sufami_turbo(const char*, bool);
+   void parse_xml_gameboy(const char*);
++  void parse_xml_xband(const char*);
+ 
+   void xml_parse_rom(xml_element&);
+   void xml_parse_ram(xml_element&);
+@@ -115,6 +122,7 @@
+   void xml_parse_setarisc(xml_element&);
+   void xml_parse_msu1(xml_element&);
+   void xml_parse_link(xml_element&);
++  void xml_parse_xband(xml_element&);
+ 
+   unsigned xml_parse_hex(const string&);
+   unsigned xml_parse_unsigned(const string&);
+diff -urN ./snes/cartridge/xml.cpp ../../bsnes-sx2_v009/snes/cartridge/xml.cpp
+--- ./snes/cartridge/xml.cpp	2011-07-03 23:07:58.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/cartridge/xml.cpp	2012-01-11 09:25:54.000000000 +0900
+@@ -13,6 +13,8 @@
+     parse_xml_sufami_turbo(list[2], 1);
+   } else if(mode == Mode::SuperGameBoy) {
+     parse_xml_gameboy(list[1]);
++  } else if(mode == Mode::XBand) {
++	parse_xml_xband(list[1]);
+   }
+ }
+ 
+@@ -50,6 +52,7 @@
+         if(node.name == "setarisc") xml_parse_setarisc(node);
+         if(node.name == "msu1") xml_parse_msu1(node);
+         if(node.name == "link") xml_parse_link(node);
++		if(node.name == "xband") xml_parse_xband(node);
+       }
+     }
+   }
+@@ -65,6 +68,9 @@
+ void Cartridge::parse_xml_gameboy(const char *data) {
+ }
+ 
++void Cartridge::parse_xml_xband(const char *data) {
++}
++
+ void Cartridge::xml_parse_rom(xml_element &root) {
+   foreach(leaf, root.element) {
+     if(leaf.name == "map") {
+@@ -439,7 +445,7 @@
+     if(node.name == "slot") {
+       foreach(leaf, node.element) {
+         if(leaf.name == "map") {
+-          Mapping m(bsxflash.memory);
++          Mapping m(bsxflash);
+           foreach(attr, leaf.attribute) {
+             if(attr.name == "address") xml_parse_address(m, attr.content);
+             if(attr.name == "mode") xml_parse_mode(m, attr.content);
+@@ -702,6 +708,34 @@
+     }
+   }
+ }
++
++void Cartridge::xml_parse_xband(xml_element &root) {
++  if(mode != Mode::XBand) return;
++
++  foreach(node, root.element) {
++    if(node.name == "mcu") {
++      foreach(leaf, node.element) {
++        if(leaf.name == "map") {
++          Mapping m({ &XBAND::mcu_read, &xband }, { &XBAND::mcu_write, &xband });
++          foreach(attr, leaf.attribute) {
++            if(attr.name == "address") xml_parse_address(m, attr.content);
++          }
++          mapping.append(m);
++        }
++      }
++    } else if(node.name == "mmio") {
++      foreach(leaf, node.element) {
++        if(leaf.name == "map") {
++          Mapping m({ &XBAND::mmio_read, &xband }, { &XBAND::mmio_write, &xband });
++          foreach(attr, leaf.attribute) {
++            if(attr.name == "address") xml_parse_address(m, attr.content);
++          }
++          mapping.append(m);
++        }
++      }
++    }
++  }
++}
+ 
+ unsigned Cartridge::xml_parse_hex(const string &s) {
+   return hex(s);
+diff -urN ./snes/chip/bsx/cartridge/cartridge.cpp ../../bsnes-sx2_v009/snes/chip/bsx/cartridge/cartridge.cpp
+--- ./snes/chip/bsx/cartridge/cartridge.cpp	2011-03-14 04:41:44.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/bsx/cartridge/cartridge.cpp	2012-08-05 22:06:52.000000000 +0900
+@@ -24,8 +24,14 @@
+ 
+ void BSXCartridge::reset() {
+   for(unsigned i = 0; i < 16; i++) r[i] = 0x00;
++  r[0x02] = 0x80;
++  r[0x03] = 0x80;
++  r[0x05] = 0x80;
++  r[0x06] = 0x80;
+   r[0x07] = 0x80;
+   r[0x08] = 0x80;
++  r[0x09] = 0x80;
++  r[0x0b] = 0x80;
+   mmio_commit();
+ }
+ 
+@@ -46,6 +52,7 @@
+ 
+ //mcu_access() allows mcu_read() and mcu_write() to share decoding logic
+ uint8 BSXCartridge::mcu_access(bool write, unsigned addr, uint8 data) {
++  //BIOS ROM Access
+   if(within<0x00, 0x1f, 0x8000, 0xffff>(addr)) {
+     if(r07 == 1) {
+       addr = ((addr & 0x1f0000) >> 1) | (addr & 0x7fff);
+@@ -60,34 +67,155 @@
+     }
+   }
+ 
+-  if(within<0x20, 0x3f, 0x6000, 0x7fff>(addr)) {
+-    return memory_access(write, psram, addr, data);
++  //PSRAM Access
++  //LoROM
++  if(r02==0) {
++  
++	if(within<0x70, 0x7d, 0x0000, 0x7fff>(addr)) {
++		if(r03==1) return memory_access(write, psram, addr & 0x07ffff, data);
++	}
++	
++	if(within<0xf0, 0xff, 0x0000, 0x7fff>(addr)) {
++		if(r04==1) return memory_access(write, psram, addr & 0x07ffff, data);
++	}
++	
++	
++	if(within<0x00, 0x0f, 0x8000, 0xffff>(addr)) {
++		if(r03==1 && r05==0 && r06==0) return memory_access(write, psram, ((addr & 0x7f0000) >> 1) | (addr & 0x7fff), data);
++	}
++	
++	if(within<0x80, 0x8f, 0x8000, 0xffff>(addr)) {
++		if(r04==1 && r05==0 && r06==0) return memory_access(write, psram, ((addr & 0x7f0000) >> 1) | (addr & 0x7fff), data);
++	}
++	
++	if(within<0x20, 0x2f, 0x8000, 0xffff>(addr)) {
++		if(r03==1 && r05==1 && r06==0) return memory_access(write, psram, ((addr & 0x7f0000) >> 1) | (addr & 0x7fff), data);
++	}
++	
++	if(within<0xa0, 0xaf, 0x8000, 0xffff>(addr)) {
++		if(r04==1 && r05==1 && r06==0) return memory_access(write, psram, ((addr & 0x7f0000) >> 1) | (addr & 0x7fff), data);
++	}
++	
++	if(within<0x40, 0x4f, 0x0000, 0xffff>(addr)) {
++		if(r03==1 && r05==0 && r06==1) return memory_access(write, psram, ((addr & 0x7f0000) >> 1) | (addr & 0x7fff), data);
++	}
++	
++	if(within<0xc0, 0xcf, 0x0000, 0xffff>(addr)) {
++		if(r04==1 && r05==0 && r06==1) return memory_access(write, psram, ((addr & 0x7f0000) >> 1) | (addr & 0x7fff), data);
++	}
++	
++	if(within<0x60, 0x6f, 0x0000, 0xffff>(addr)) {
++		if(r03==1 && r05==1 && r06==1) return memory_access(write, psram, ((addr & 0x7f0000) >> 1) | (addr & 0x7fff), data);
++	}
++	
++	if(within<0xe0, 0xef, 0x0000, 0xffff>(addr)) {
++		if(r04==1 && r05==1 && r06==1) return memory_access(write, psram, ((addr & 0x7f0000) >> 1) | (addr & 0x7fff), data);
++	}
++  
++  } else {
++  //HiROM
++	if(within<0x20, 0x3f, 0x6000, 0x7fff>(addr)) {
++		if(r03==1) return memory_access(write, psram, (addr&0x1fff)|0x6000, data);
++	}
++	
++	if(within<0xa0, 0xbf, 0x6000, 0x7fff>(addr)) {
++		if(r04==1) return memory_access(write, psram, (addr&0x1fff)|0x6000, data);
++	}
++	
++
++	if(within<0x40, 0x47, 0x0000, 0xffff>(addr)) {
++		if(r03==1 && r05==0 && r06==0) return memory_access(write, psram, addr & 0x0fffff, data);
++	}
++
++	if(within<0x50, 0x57, 0x0000, 0xffff>(addr)) {
++		if(r03==1 && r05==1 && r06==0) return memory_access(write, psram, addr & 0x0fffff, data);
++	}
++
++	if(within<0x60, 0x67, 0x0000, 0xffff>(addr)) {
++		if(r03==1 && r05==0 && r06==1) return memory_access(write, psram, addr & 0x0fffff, data);
++	}
++	
++	if(within<0x70, 0x77, 0x0000, 0xffff>(addr)) {
++		if(r03==1 && r05==1 && r06==1) return memory_access(write, psram, addr & 0x0fffff, data);
++	}
++	
++	
++	if(within<0xc0, 0xc7, 0x0000, 0xffff>(addr)) {
++		if(r04==1 && r05==0 && r06==0) return memory_access(write, psram, addr & 0x0fffff, data);
++	}
++
++	if(within<0xd0, 0xd7, 0x0000, 0xffff>(addr)) {
++		if(r04==1 && r05==1 && r06==0) return memory_access(write, psram, addr & 0x0fffff, data);
++	}
++
++	if(within<0xe0, 0xe7, 0x0000, 0xffff>(addr)) {
++		if(r04==1 && r05==0 && r06==1) return memory_access(write, psram, addr & 0x0fffff, data);
++	}
++	
++	if(within<0xf0, 0xf7, 0x0000, 0xffff>(addr)) {
++		if(r04==1 && r05==1 && r06==1) return memory_access(write, psram, addr & 0x0fffff, data);
++	}
++
++  }
++  
++  //Memory Pack Hole
++  if(r02==0) {
++	if(within<0x00, 0x1f, 0x8000, 0xffff>(addr)) {
++		if(r09==1 && r0b==0) return cpu.regs.mdr;
++	}
++	
++	if(within<0x40, 0x5f, 0x0000, 0xffff>(addr)) {
++		if(r09==1 && r0b==1) return cpu.regs.mdr;
++	}
++	
++	if(within<0x80, 0x9f, 0x8000, 0xffff>(addr)) {
++		if(r0a==1 && r0b==0) return cpu.regs.mdr;
++	}
++	
++	if(within<0xc0, 0xdf, 0x0000, 0xffff>(addr)) {
++		if(r0a==1 && r0b==1) return cpu.regs.mdr;
++	}
++
++  } else {
++	if(within<0x00, 0x0f, 0x8000, 0xffff>(addr)
++	|| within<0x40, 0x4f, 0x0000, 0xffff>(addr)
++	) {
++		if(r09==1 && r0b==0) return cpu.regs.mdr;
++	}
++	
++	if(within<0x20, 0x2f, 0x8000, 0xffff>(addr)
++	|| within<0x60, 0x6f, 0x0000, 0xffff>(addr)
++	) {
++		if(r09==1 && r0b==1) return cpu.regs.mdr;
++	}
++	
++	if(within<0x80, 0x8f, 0x8000, 0xffff>(addr)
++	|| within<0xc0, 0xcf, 0x0000, 0xffff>(addr)
++	) {
++		if(r0a==1 && r0b==0) return cpu.regs.mdr;
++	}
++	
++	if(within<0xa0, 0xaf, 0x8000, 0xffff>(addr)
++	|| within<0xe0, 0xef, 0x0000, 0xffff>(addr)
++	) {
++		if(r0a==1 && r0b==1) return cpu.regs.mdr;
++	}
++	  
+   }
+-
+-  if(within<0x40, 0x4f, 0x0000, 0xffff>(addr)) {
+-    if(r05 == 0) return memory_access(write, psram, addr & 0x0fffff, data);
+-  }
+-
+-  if(within<0x50, 0x5f, 0x0000, 0xffff>(addr)) {
+-    if(r06 == 0) return memory_access(write, psram, addr & 0x0fffff, data);
+-  }
+-
+-  if(within<0x60, 0x6f, 0x0000, 0xffff>(addr)) {
+-    if(r03 == 1) return memory_access(write, psram, addr & 0x0fffff, data);
+-  }
+-
+-  if(within<0x70, 0x77, 0x0000, 0xffff>(addr)) {
+-    return memory_access(write, psram, addr & 0x07ffff, data);
+-  }
+-
++  
++  //Memory Pack Access  
+   if(within<0x00, 0x3f, 0x8000, 0xffff>(addr)
+-  || within<0x40, 0x7f, 0x0000, 0xffff>(addr)
+   || within<0x80, 0xbf, 0x8000, 0xffff>(addr)
+-  || within<0xc0, 0xff, 0x0000, 0xffff>(addr)
+   ) {
+     if(r02 == 0) addr = ((addr & 0x7f0000) >> 1) | (addr & 0x7fff);
+-    Memory &memory = (r01 == 0 ? (Memory&)bsxflash : (Memory&)psram);
+-    return memory_access(write, memory, addr & 0x7fffff, data);
++	return memory_access(write && r0c, bsxflash, addr & 0x7fffff, data);
++  }
++  
++  if(within<0x40, 0x7d, 0x0000, 0xffff>(addr)
++  || within<0xc0, 0xff, 0x0000, 0xffff>(addr)
++  ) {
++	if(r02 == 0) addr = ((addr & 0x7f0000) >> 1) | (addr & 0x7fff);
++	return memory_access(write && r0c, bsxflash, addr & 0x7fffff, data);
+   }
+ 
+   return cpu.regs.mdr;
+diff -urN ./snes/chip/bsx/cartridge/cartridge.hpp ../../bsnes-sx2_v009/snes/chip/bsx/cartridge/cartridge.hpp
+--- ./snes/chip/bsx/cartridge/cartridge.hpp	2011-01-25 21:58:15.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/bsx/cartridge/cartridge.hpp	2012-03-19 12:27:10.000000000 +0900
+@@ -27,6 +27,7 @@
+   bool r04, r05, r06, r07;
+   bool r08, r09, r0a, r0b;
+   bool r0c, r0d, r0e, r0f;
++  
+ };
+ 
+ extern BSXCartridge bsxcartridge;
+diff -urN ./snes/chip/bsx/flash/flash.cpp ../../bsnes-sx2_v009/snes/chip/bsx/flash/flash.cpp
+--- ./snes/chip/bsx/flash/flash.cpp	2011-01-25 21:57:00.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/bsx/flash/flash.cpp	2012-04-07 19:44:02.000000000 +0900
+@@ -2,6 +2,23 @@
+ 
+ BSXFlash bsxflash;
+ 
++void BSXFlash::save() {
++	if(memory.size() >= 1) {
++		file MEMPAK;
++		//uint8 filenumber;
++		char filenm [25];
++		bool writeisdone = false;
++		sprintf(filenm, ".\\MEMPACK.bs");
++		if (MEMPAK.open(filenm, file::mode::write)) {
++			int x;
++			for (x=0; x <= memory.size()-1; x++) {
++				MEMPAK.write(memory.read(x));
++			}
++			MEMPAK.close();
++		}
++	}
++}
++
+ void BSXFlash::init() {
+ }
+ 
+@@ -27,6 +44,7 @@
+   regs.flash_enable = false;
+   regs.read_enable  = false;
+   regs.write_enable = false;
++  regs.command_done = false;
+   memory.write_protect(!regs.write_enable);
+ }
+ 
+@@ -35,29 +53,44 @@
+ }
+ 
+ uint8 BSXFlash::read(unsigned addr) {
+-  if(addr == 0x0002) {
+-    if(regs.flash_enable) return 0x80;
++  unsigned addr2 = addr&0xffff;
++  
++  if(addr2 == 0x5555 && regs.flash_enable) { return 0x80; }
++  
++  if(regs.flash_stat_bsr && addr2 == 0x0002)
++  {
++	//printf("Read BSR\n");
++	return 0xc0;
+   }
+-
+-  if(addr == 0x5555) {
+-    if(regs.flash_enable) return 0x80;
++  if(regs.flash_stat_gsr && addr2 == 0x0004)
++  {
++	//printf("Read GSR\n");
++	return 0x82;
++  }
++  
++  if(regs.flash_stat_csr)
++  {
++	//printf("Read CSR (%x)\n", addr);
++	regs.flash_stat_csr = false;
++	return 0x80;
+   }
+ 
+-  if(regs.read_enable && addr >= 0xff00 && addr <= 0xff13) {
++  if(regs.read_enable && addr2 >= 0xff00 && addr2 <= 0xff13) {
+     //read flash cartridge vendor information
++	//printf("Read Vendor Info (%x)\n", addr);
+     switch(addr - 0xff00) {
+       case 0x00: return 0x4d;
+-      case 0x01: return 0x00;
++      case 0x01: return 0x50;
+       case 0x02: return 0x50;
+       case 0x03: return 0x00;
+       case 0x04: return 0x00;
+       case 0x05: return 0x00;
+-      case 0x06: return 0x2a;  //0x2a = 8mbit, 0x2b = 16mbit (not known to exist, though BIOS recognizes ID)
++      case 0x06: return 0x1a;  //0x2a = 8mbit, 0x2b = 16mbit (not known to exist, though BIOS recognizes ID)
+       case 0x07: return 0x00;
+       default:   return 0x00;
+     }
+   }
+-
++  //printf("Read Flash Memory: %x : %x\n", addr, memory.read(addr));
+   return memory.read(addr);
+ }
+ 
+@@ -71,28 +104,133 @@
+   //read-only flashcarts.
+   //below is an unfortunately necessary workaround to this problem.
+   //if(cartridge.mapper() == Cartridge::BSCHiROM) return;
+-
+   if((addr & 0xff0000) == 0) {
+     regs.write_old = regs.write_new;
+     regs.write_new = data;
+ 
+     if(regs.write_enable && regs.write_old == regs.write_new) {
++	  regs.write_enable = false;
+       return memory.write(addr, data);
+     }
+   } else {
+     if(regs.write_enable) {
++	  regs.write_enable = false;
+       return memory.write(addr, data);
+     }
+   }
++  
++  if(regs.write_enable) {
++	  //printf("Write Flash Memory: %x : %x\n", addr, data);
++	  regs.write_enable = false;
++      return memory.write(addr, data);
++  }
+ 
+-  if(addr == 0x0000) {
++  //if(addr == 0x0000 || addr == 0x8000) {
++  if(true) {
+     regs.command <<= 8;
+     regs.command  |= data;
+ 
+-    if((regs.command & 0xffff) == 0x38d0) {
+-      regs.flash_enable = true;
+-      regs.read_enable  = true;
++    switch(regs.command & 0xff)
++	{
++		case 0x00:
++			regs.flash_enable = false;
++			regs.read_enable  = false;
++			regs.write_enable = false;
++			regs.flash_stat_csr = false;
++			regs.flash_stat_gsr = false;
++			regs.flash_stat_bsr = false;
++			regs.command_done = true;
++			break;
++		case 0x38:
++			regs.flash_enable = true;
++			regs.read_enable  = true;
++			regs.flash_stat_csr = false;
++			regs.flash_stat_gsr = false;
++			regs.flash_stat_bsr = false;
++			//regs.command_done = true;
++			break;
++		case 0x10:
++			regs.write_enable = true;
++			regs.flash_stat_csr = true;
++			regs.flash_stat_gsr = false;
++			regs.flash_stat_bsr = false;
++			regs.command_done = true;
++			break;
++		case 0x40:
++			regs.write_enable = true;
++			regs.flash_stat_csr = true;
++			regs.flash_stat_gsr = false;
++			regs.flash_stat_bsr = false;
++			regs.command_done = true;
++			break;
++		case 0x50:
++			regs.flash_stat_csr = false;
++			regs.flash_stat_gsr = false;
++			regs.flash_stat_bsr = false;
++			regs.command_done = true;
++		case 0x70:
++			regs.flash_stat_csr = true;
++			regs.write_enable = false;
++			regs.flash_stat_gsr = false;
++			regs.flash_stat_bsr = false;
++			regs.command_done = true;
++			break;
++		case 0x71:
++			regs.flash_stat_gsr = true;
++			regs.flash_stat_bsr = true;
++			regs.flash_stat_csr = false;
++			regs.flash_enable = true;
++			regs.command_done = true;
++		case 0x72:
++			regs.command_done = true;
++			break;
++		case 0x75:
++			regs.read_enable  = true;
++			regs.flash_stat_csr = false;
++			regs.command_done = true;
++			break;
++		case 0xd0:
++			regs.command_done = true;
++			break;
++		case 0xff:
++			regs.flash_enable = false;
++			regs.read_enable  = false;
++			regs.write_enable = false;
++			regs.flash_stat_csr = false;
++			regs.flash_stat_gsr = false;
++			regs.flash_stat_bsr = false;
++			regs.command_done = true;
++			break;
+     }
++	if(regs.command_done)
++	{
++		//printf("Flash Command: %x\n", regs.command);
++		memory.write_protect(!regs.write_enable);
++		//Page Erase
++		if (regs.command == 0x20d0) {
++			memory.write_protect(false);
++			int erase_addr = addr & 0xff0000;
++			//printf("Page Erase (Page %x)\n", erase_addr);
++			uint32 x;
++			for (x=0; x < 0xffff; x++) {
++				memory.write(erase_addr+x, 0xff);
++			}
++			memory.write_protect(true);
++		}
++	
++		//Chip Erase
++		if (regs.command == 0xa7d0) {
++			memory.write_protect(false);
++			unsigned x;
++			//printf("Chip Erase\n");
++			for (x=0; x < bsxflash.size(); x++) {
++				memory.write(x, 0xff);
++			}
++			memory.write_protect(true);
++		}
++		regs.command = 0;
++		regs.command_done = false;
++	}
+   }
+ 
+   if(addr == 0x2aaa) {
+@@ -106,6 +244,7 @@
+ 
+     if((regs.command & 0xffffff) == 0xaa5570) {
+       regs.write_enable = false;
++	  regs.flash_enable = true;
+     }
+ 
+     if((regs.command & 0xffffff) == 0xaa55a0) {
+@@ -118,7 +257,10 @@
+     if((regs.command & 0xffffff) == 0xaa55f0) {
+       regs.flash_enable = false;
+       regs.read_enable  = false;
+-      regs.write_enable = false;
++      regs.write_enable = true;
++	  regs.flash_stat_csr = false;
++	  regs.flash_stat_gsr = false;
++	  regs.flash_stat_bsr = false;
+     }
+ 
+     memory.write_protect(!regs.write_enable);
+diff -urN ./snes/chip/bsx/flash/flash.hpp ../../bsnes-sx2_v009/snes/chip/bsx/flash/flash.hpp
+--- ./snes/chip/bsx/flash/flash.hpp	2011-01-25 21:56:47.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/bsx/flash/flash.hpp	2011-12-03 21:55:02.000000000 +0900
+@@ -1,7 +1,10 @@
++#include <nall/file.hpp>
++
+ class BSXFlash : public Memory {
+ public:
+   MappedRAM memory;
+ 
++  void save();
+   void init();
+   void load();
+   void unload();
+@@ -15,12 +18,19 @@
+ private:
+   struct {
+     unsigned command;
++	unsigned command2;
+     uint8 write_old;
+     uint8 write_new;
+ 
+     bool flash_enable;
+     bool read_enable;
+     bool write_enable;
++	
++	bool command_done; //Giving Flash Command is done.
++	
++	bool flash_stat_csr;
++	bool flash_stat_gsr;
++	bool flash_stat_bsr;
+   } regs;
+ };
+ 
+diff -urN ./snes/chip/bsx/satellaview/satellaview.cpp ../../bsnes-sx2_v009/snes/chip/bsx/satellaview/satellaview.cpp
+--- ./snes/chip/bsx/satellaview/satellaview.cpp	2011-01-25 21:58:52.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/bsx/satellaview/satellaview.cpp	2012-04-07 18:56:33.000000000 +0900
+@@ -7,7 +7,7 @@
+ 
+ void BSXSatellaview::load() {
+   bus.map(Bus::MapMode::Direct, 0x00, 0x3f, 0x2188, 0x219f, { &BSXSatellaview::mmio_read, &bsxsatellaview }, { &BSXSatellaview::mmio_write, &bsxsatellaview });
+-  bus.map(Bus::MapMode::Direct, 0x80, 0xbf, 0x2188, 0x219f, { &BSXSatellaview::mmio_read, &bsxsatellaview }, { &BSXSatellaview::mmio_write, &bsxsatellaview });
++  bus.map(Bus::MapMode::Direct, 0x80, 0xbf, 0x2188, 0x219f, { &BSXSatellaview::mmio_read, &bsxsatellaview }, { &BSXSatellaview::mmio_write, &bsxsatellaview });  
+ }
+ 
+ void BSXSatellaview::unload() {
+@@ -18,64 +18,241 @@
+ }
+ 
+ void BSXSatellaview::reset() {
++  BSXF.close();
++  regs.BSXF_NUM = 0;
+   memset(&regs, 0x00, sizeof regs);
+ }
+ 
++void BSXSatellaview::BSXfileopen(uint8 filenumber) {
++	BSXF.close();
++	uint16 Signal_Nb=regs.r2188^(regs.r2189*256);
++	char filenm [25];
++	sprintf(filenm, ".\\bsxdat\\BSX%04.4hX-%d.bin", Signal_Nb, filenumber);
++	BSXF.open(filenm, file::mode::read);
++	if(BSXF.size()!= -1) {
++	  //printf("%02.2hX, %02.2hX, %04.4hX: %s\n",regs.r2189, regs.r2188, Signal_Nb, filenm);
++	  regs.BSX_access=true;
++	  regs.BSXF_Signal++;
++	  float QueueSize = BSXF.size() / 22.;
++	  regs.BSXF_Queue = (uint8)(ceil(QueueSize));
++	  regs.BSXF_1ST = true;
++	  }
++	else {
++	  regs.BSX_access=false;
++	  regs.BSXF_Signal=0;
++	  }
++}
++
++void BSXSatellaview::BSX2fileopen(uint8 filenumber) {
++	BSXF2.close();
++	uint16 Signal_Nb=regs.r218e^(regs.r218f*256);
++	char filenm [25];
++	sprintf(filenm, ".\\bsxdat\\BSX%04.4hX-%d.bin", Signal_Nb, filenumber);
++	BSXF2.open(filenm, file::mode::read);
++	if(BSXF2.size()!= -1) {
++	  //printf("%02.2hX, %02.2hX, %04.4hX: %s\n",regs.r218f, regs.r218e, Signal_Nb, filenm);
++	  regs.BSX2_access=true;
++	  regs.BSXF2_Signal++;
++	  float QueueSize = BSXF2.size() / 22.;
++	  regs.BSXF2_Queue = (uint8)(ceil(QueueSize));
++	  regs.BSXF2_1ST = true;
++	  }
++	else {
++	  regs.BSX2_access=false;
++	  regs.BSXF2_Signal=0;
++	  }
++}
++
++uint8 BSXSatellaview::GetTime(bool reset_count) {
++		if(reset_count == true) {
++			regs.time_counter = 0;
++			return 0xff;
++		}
++		unsigned counter = regs.time_counter;
++		regs.time_counter++;
++		if(regs.time_counter >= 22) regs.time_counter = 0;
++		if(counter == 0) {
++			time_t rawtime;
++			time(&rawtime);
++			tm *t = localtime(&rawtime);
++
++			regs.time_hour   = t->tm_hour;
++			regs.time_minute = t->tm_min;
++			regs.time_second = t->tm_sec;
++			regs.time_weekday = (t->tm_wday)++;
++			regs.time_day = (t->tm_mday)++;
++			regs.time_month = t->tm_mon;
++			uint16 time_year = (t->tm_year) + 1900;
++			regs.time_yearL = time_year & 0xFF;
++			regs.time_yearH = time_year >> 8;
++		}
++
++		switch(counter) {
++			case  0: return 0x00;  //???
++			case  1: return 0x00;  //???
++			case  2: return 0x00;  //???
++			case  3: return 0x00;  //???
++			case  4: return 0x03;  //???
++			case  5: return 0x01;
++			case  6: return 0x01;
++			case  7: return 0x00;
++			case  8: return 0x00;
++			case  9: return 0x00;
++			case 10: return regs.time_second;
++			case 11: return regs.time_minute;
++			case 12: return regs.time_hour;
++			case 13: return regs.time_weekday;
++			case 14: return regs.time_day;
++			case 15: return regs.time_month;
++			case 16: return regs.time_yearL;  //???
++			case 17: return regs.time_yearH;  //???
++		}
++		return 0;
++}
++
++
+ uint8 BSXSatellaview::mmio_read(unsigned addr) {
+-  addr &= 0xffff;
++  addr &= 0xffff;  
+ 
+   switch(addr) {
+     case 0x2188: return regs.r2188;
+     case 0x2189: return regs.r2189;
+-    case 0x218a: return regs.r218a;
+-    case 0x218c: return regs.r218c;
++    case 0x218a: {
++		if(regs.r2188 == 0 && regs.r2189 == 0) {
++			return 0x01;
++		}
++		if (regs.BSXF_Queue <= 0) {
++			regs.BSXF_NUM++;
++			BSXfileopen(regs.BSXF_NUM-1);
++		}
++		if(!regs.BSX_access && (regs.BSXF_NUM-1) > 0) {
++			regs.BSXF_NUM=1;
++			BSXfileopen(regs.BSXF_NUM-1);
++		}
++		if(regs.BSX_access) {
++			regs.r218b_chk=true;
++			regs.r218c_chk=true;
++			return regs.BSXF_Queue;
++		}
++		else return 0;
++		//return regs.r218a;
++	}
++	
++	case 0x218b: {
++		if(regs.r218b_port) {
++			if(regs.r2188 == 0 && regs.r2189 == 0) {
++				regs.r218b = 0x90;
++				return 0x90;
++			}
++			if(regs.BSX_access) {
++				regs.r218b_chk=false;
++				uint8 lol = 0;
++				if (regs.BSXF_1ST) {
++					lol = 0x10;
++					regs.BSXF_1ST = false;
++				}
++				regs.BSXF_Queue--;
++				if (regs.BSXF_Queue==0) { lol |= 0x80; }
++				regs.r218d |= lol;
++				return lol;
++			}
++		}
++		else return 0x00;
++	}
++    case 0x218c: {
++		if(regs.r218c_port) {
++			if(regs.r2188 == 0 && regs.r2189 == 0) {
++				return GetTime(false);
++			}
++			if(regs.BSX_access) {
++			/*	if(!regs.r218c_chk && BSXF.offset() <= 0x48) regs.r218b_chk=true;
++				if(regs.r218c_chk) {
++					//BSXF.seek(0x48);
++					regs.r218c_chk=false;
++					return BSXF.read();
++				} */
++				return BSXF.read();
++			}
++		}
++		else return 0x00;
++	}
++	case 0x218d: {
++		uint8 lol = regs.r218d;
++		regs.r218d = 0;
++		return lol;
++	}
+     case 0x218e: return regs.r218e;
+     case 0x218f: return regs.r218f;
+-    case 0x2190: return regs.r2190;
++    case 0x2190: {
++		if(regs.r218e == 0 && regs.r218f == 0) {
++			return 0x01;
++		}
++		if (regs.BSXF2_Queue <= 0) {
++			regs.BSXF2_NUM++;
++			BSX2fileopen(regs.BSXF2_NUM-1);
++		}
++		if(!regs.BSX2_access && (regs.BSXF2_NUM-1) > 0) {
++			regs.BSXF2_NUM=1;
++			BSX2fileopen(regs.BSXF2_NUM-1);
++		}
++		if(regs.BSX2_access) {
++			regs.r2191_chk=true;
++			regs.r2192_chk=true;
++			return regs.BSXF2_Queue;
++		}
++		else return 0;
++	}
++	
++	case 0x2191: {
++	  if(regs.r2191_port) {
++			if(regs.r218e == 0 && regs.r218f == 0) {
++				regs.r2193 = 0x90;
++				return 0x90;
++			}
++			if(regs.BSX2_access) {
++				uint8 lol = 0;
++				if (regs.BSXF2_1ST) {
++					lol = 0x10;
++					regs.BSXF2_1ST = false;
++				}
++				regs.BSXF2_Queue--;
++				if (regs.BSXF2_Queue==0) { lol |= 0x80; }
++				regs.r2193 |= lol;
++				return lol;
++			}
++	  }
++	  else return 0;
++	}
+ 
+     case 0x2192: {
+-      unsigned counter = regs.r2192_counter++;
+-      if(regs.r2192_counter >= 18) regs.r2192_counter = 0;
++	  if(regs.r2192_port) {
++		if(regs.r218e == 0 && regs.r218f == 0) {
++			return GetTime(false);
++		}
++		if(regs.BSX2_access) {
++		/*
++			if(!regs.r2192_chk && BSXF2.offset() <= 0x48) regs.r2191_chk=true;
++			if(regs.r2192_chk) {
++				//BSXF2.seek(0x48);
++				regs.r2192_chk=false;
++				return BSXF2.read();
++			} */
++			return BSXF2.read();
++		}
++		else return 0x00;
++	} break;
+ 
+-      if(counter == 0) {
+-        time_t rawtime;
+-        time(&rawtime);
+-        tm *t = localtime(&rawtime);
+-
+-        regs.r2192_hour   = t->tm_hour;
+-        regs.r2192_minute = t->tm_min;
+-        regs.r2192_second = t->tm_sec;
+-      }
+-
+-      switch(counter) {
+-        case  0: return 0x00;  //???
+-        case  1: return 0x00;  //???
+-        case  2: return 0x00;  //???
+-        case  3: return 0x00;  //???
+-        case  4: return 0x00;  //???
+-        case  5: return 0x01;
+-        case  6: return 0x01;
+-        case  7: return 0x00;
+-        case  8: return 0x00;
+-        case  9: return 0x00;
+-        case 10: return regs.r2192_second;
+-        case 11: return regs.r2192_minute;
+-        case 12: return regs.r2192_hour;
+-        case 13: return 0x00;  //???
+-        case 14: return 0x00;  //???
+-        case 15: return 0x00;  //???
+-        case 16: return 0x00;  //???
+-        case 17: return 0x00;  //???
+-      }
+-    } break;
+-
+-    case 0x2193: return regs.r2193 & ~0x0c;
+-    case 0x2194: return regs.r2194;
++    case 0x2193: {
++		uint8 lol = regs.r2193;
++		regs.r2193 = 0;
++		return lol;
++	}
++    case 0x2194: return 0xff; //regs.r2194;
+     case 0x2196: return regs.r2196;
+     case 0x2197: return regs.r2197;
+     case 0x2199: return regs.r2199;
+   }
+-
++ }
+   return cpu.regs.mdr;
+ }
+ 
+@@ -84,11 +261,23 @@
+ 
+   switch(addr) {
+     case 0x2188: {
+-      regs.r2188 = data;
++	  //printf("Write 2188: %02.2hX\n", regs.r2188);
++	  if (regs.r2188 != data) {
++		regs.BSXF_Signal = 0;
++		regs.BSXF_NUM = 0;
++	  }
++	  else regs.BSXF_Signal++;
++	  regs.r2188 = data;
+     } break;
+ 
+     case 0x2189: {
+-      regs.r2189 = data;
++	  //printf("Write 2189: %02.2hX\n", regs.r2189);
++	  if (regs.r2189 != data) {
++		regs.BSXF_Signal = 0;
++		regs.BSXF_NUM = 0;
++	  }
++	  else regs.BSXF_Signal++;
++	  regs.r2189 = data;
+     } break;
+ 
+     case 0x218a: {
+@@ -96,30 +285,55 @@
+     } break;
+ 
+     case 0x218b: {
+-      regs.r218b = data;
++	  if (data && 1 == 1) {
++		regs.r218b_port=true;
++		regs.r218b_chk=true;
++	  }
++	  else regs.r218b_port=false;
++      //regs.r218b = data;
+     } break;
+ 
+     case 0x218c: {
+-      regs.r218c = data;
++	  if (regs.r2188 == 0 && regs.r2189 == 0) { GetTime(true); }
++	  if (data && 1 == 1) {
++		regs.r218c_port=true;
++		regs.r218c_chk=true;
++	  }
++	  else regs.r218c_port=false;
++      //regs.r218c = data;
+     } break;
+ 
+     case 0x218e: {
+-      regs.r218e = data;
++      //printf("Write 218E: %02.2hX\n", regs.r2188);
++	  if (regs.r218e != data) {
++		regs.BSXF2_Signal = 0;
++		regs.BSXF2_NUM = 0;
++	  }
++	  else regs.BSXF2_Signal++;
++	  regs.r218e = data;
+     } break;
+ 
+     case 0x218f: {
+-      regs.r218e >>= 1;
+-      regs.r218e = regs.r218f - regs.r218e;
+-      regs.r218f >>= 1;
++      //printf("Write 218F: %02.2hX\n", regs.r2189);
++	  if (regs.r218f != data) {
++		regs.BSXF2_Signal = 0;
++		regs.BSXF2_NUM = 0;
++	  }
++	  else regs.BSXF2_Signal++;
++	  regs.r218f = data;
+     } break;
+ 
+     case 0x2191: {
+-      regs.r2191 = data;
+-      regs.r2192_counter = 0;
++      if (data && 1 == 1) regs.r2191_port=true;
++	  else regs.r2191_port=false;
++	  //regs.r2191 = data;
++      regs.time_counter = 0;
+     } break;
+ 
+     case 0x2192: {
+-      regs.r2190 = 0x80;
++	  if (regs.r218e == 0 && regs.r218f == 0) { GetTime(true); }
++	  if (data && 1 == 1) regs.r2192_port=true;
++	  else regs.r2192_port=false;
+     } break;
+ 
+     case 0x2193: {
+diff -urN ./snes/chip/bsx/satellaview/satellaview.hpp ../../bsnes-sx2_v009/snes/chip/bsx/satellaview/satellaview.hpp
+--- ./snes/chip/bsx/satellaview/satellaview.hpp	2011-01-25 21:58:39.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/bsx/satellaview/satellaview.hpp	2012-04-07 13:32:03.000000000 +0900
+@@ -1,3 +1,5 @@
++#include <nall/file.hpp>
++
+ class BSXSatellaview {
+ public:
+   void init();
+@@ -6,6 +8,14 @@
+   void power();
+   void reset();
+ 
++  file BSXF;
++  file BSXF2;
++
++  void BSXfileopen(uint8 filenumber);
++  void BSX2fileopen(uint8 filenumber);
++  
++  uint8 GetTime(bool reset_count);
++  
+   uint8 mmio_read(unsigned addr);
+   void mmio_write(unsigned addr, uint8 data);
+ 
+@@ -18,8 +28,33 @@
+     uint8 r2198, r2199, r219a, r219b;
+     uint8 r219c, r219d, r219e, r219f;
+ 
+-    uint8 r2192_counter;
+-    uint8 r2192_hour, r2192_minute, r2192_second;
++    uint8 time_counter;
++    uint8 time_hour, time_minute, time_second;
++	uint8 time_weekday, time_day, time_month;
++	uint8 time_yearL, time_yearH;
++	
++	bool r218b_port, r218c_port;
++	bool r2191_port, r2192_port;
++	
++	bool BSX_access;
++	uint8 BSXF_NUM;
++	uint8 BSXF_Signal;
++	
++	uint8 BSXF_Queue;
++	bool BSXF_1ST;
++	
++	bool BSX2_access;
++	uint8 BSXF2_NUM;
++	uint8 BSXF2_Signal;
++	
++	uint8 BSXF2_Queue;
++	bool BSXF2_1ST;
++	
++	bool r218b_chk;
++	bool r218c_chk;
++	
++	bool r2191_chk;
++	bool r2192_chk;
+   } regs;
+ };
+ 
+diff -urN ./snes/chip/chip.hpp ../../bsnes-sx2_v009/snes/chip/chip.hpp
+--- ./snes/chip/chip.hpp	2011-06-26 11:54:51.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/chip.hpp	2012-01-22 20:24:33.000000000 +0900
+@@ -18,6 +18,8 @@
+ #include <snes/chip/sufamiturbo/sufamiturbo.hpp>
+ #include <snes/chip/msu1/msu1.hpp>
+ #include <snes/chip/link/link.hpp>
++#include <snes/chip/xband/xband.hpp>
++#include <snes/chip/sfbox/sfbox.hpp>
+ 
+ void Coprocessor::step(unsigned clocks) {
+   clock += clocks * (uint64)cpu.frequency;
+diff -urN ./snes/chip/sfbox/sfbox.cpp ../../bsnes-sx2_v009/snes/chip/sfbox/sfbox.cpp
+--- ./snes/chip/sfbox/sfbox.cpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/sfbox/sfbox.cpp	2012-01-23 00:41:36.000000000 +0900
+@@ -0,0 +1,91 @@
++#include <snes/snes.hpp>
++
++//#ifdef SFBOX_CPP
++
++namespace SNES {
++
++SFBox sfbox;
++
++void SFBox::init() {
++}
++
++void SFBox::load() {
++  //Force MMIO Map
++  bus.map(Bus::MapMode::Direct, 0x00, 0x3f, 0x4201, 0x4201, { &SFBox::mmio_read, &sfbox }, { &SFBox::mmio_write, &sfbox });
++  bus.map(Bus::MapMode::Direct, 0x00, 0x3f, 0x4213, 0x4213, { &SFBox::mmio_read, &sfbox }, { &SFBox::mmio_write, &sfbox });
++  bus.map(Bus::MapMode::Direct, 0x80, 0xbf, 0x4201, 0x4201, { &SFBox::mmio_read, &sfbox }, { &SFBox::mmio_write, &sfbox });
++  bus.map(Bus::MapMode::Direct, 0x80, 0xbf, 0x4213, 0x4213, { &SFBox::mmio_read, &sfbox }, { &SFBox::mmio_write, &sfbox });
++  
++}
++
++void SFBox::unload() {
++}
++
++void SFBox::power() {
++  reset();
++}
++
++void SFBox::reset() {
++  reg_write = 0;
++  e6_count = 0;
++  e6_data = 0x03020850; //01815d  50
++}
++
++uint8 SFBox::memory_access(bool write, Memory &memory, unsigned addr, uint8 data) {
++  if(write == 0) return memory_read(memory, addr);
++  memory_write(memory, addr, data);
++}
++
++uint8 SFBox::memory_read(Memory &memory, unsigned addr) {
++  addr = bus.mirror(addr, memory.size());
++  return memory.read(addr);
++}
++
++void SFBox::memory_write(Memory &memory, unsigned addr, uint8 data) {
++  addr = bus.mirror(addr, memory.size());
++  return memory.write(addr, data);
++}
++
++//mcu_access() allows mcu_read() and mcu_write() to share decoding logic
++uint8 SFBox::mcu_access(bool write, unsigned addr, uint8 data) {
++  return cpu.regs.mdr;
++}
++
++uint8 SFBox::mcu_read(unsigned addr) {
++  return mcu_access(0, addr);
++}
++
++void SFBox::mcu_write(unsigned addr, uint8 data) {
++  //mcu_access(1, addr, data);
++}
++
++uint8 SFBox::mmio_read(unsigned addr) {
++  switch(reg_write) {
++	case 0x20:
++		return 0x00;
++	case 0x22:
++		return 0x00;
++	case 0xe6:
++		return (0x20 | (SFBox::e6out() << 1));
++	case 0xee:
++		return 0xcf;
++	case 0xfe:
++		return 0xcf;
++	case 0xff:
++		return 0x20;
++	default:
++		return 0x20;
++  }
++}
++
++void SFBox::mmio_write(unsigned addr, uint8 data) {
++  reg_write = data;
++  if(data == 0xe6) e6_count++;
++}
++
++bool SFBox::e6out() {
++	return (e6_data >> (e6_count - 1)) & 1;
++}
++
++}
++//#endif
+diff -urN ./snes/chip/sfbox/sfbox.hpp ../../bsnes-sx2_v009/snes/chip/sfbox/sfbox.hpp
+--- ./snes/chip/sfbox/sfbox.hpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/sfbox/sfbox.hpp	2012-01-24 00:13:03.000000000 +0900
+@@ -0,0 +1,30 @@
++class SFBox {
++public:
++  MappedRAM sram;
++
++  void init();
++  void load();
++  void unload();
++  void power();
++  void reset();
++
++  uint8 memory_access(bool write, Memory &memory, unsigned addr, uint8 data);
++  uint8 memory_read(Memory &memory, unsigned addr);
++  void memory_write(Memory &memory, unsigned addr, uint8 data);
++
++  uint8 mcu_access(bool write, unsigned addr, uint8 data = 0x00);
++  uint8 mcu_read(unsigned addr);
++  void mcu_write(unsigned addr, uint8 data);
++
++  uint8 mmio_read(unsigned addr);
++  void mmio_write(unsigned addr, uint8 data);
++  
++  bool e6out();
++
++private:
++  uint8 reg_write;
++  uint8 e6_count;
++  unsigned int e6_data;
++};
++
++extern SFBox sfbox;
+diff -urN ./snes/chip/xband/xband.cpp ../../bsnes-sx2_v009/snes/chip/xband/xband.cpp
+--- ./snes/chip/xband/xband.cpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/xband/xband.cpp	2012-01-14 18:55:21.000000000 +0900
+@@ -0,0 +1,220 @@
++#include <snes/snes.hpp>
++
++//#ifdef XBAND_CPP
++
++namespace SNES {
++
++XBAND xband;
++
++void XBAND::init() {
++}
++
++void XBAND::load() {
++  sram.map(allocate<uint8>(0x10000, 0xff), 0x10000);
++  sram.write_protect(false);
++  cartridge.nvram.append({ ".xbs", sram.data(), sram.size() });
++  //Force Memory Map
++  bus.map(Bus::MapMode::Direct, 0x00, 0x3f, 0x8000, 0xffff, { &XBAND::mcu_read, &xband }, { &XBAND::mcu_write, &xband });
++  bus.map(Bus::MapMode::Direct, 0x40, 0x7d, 0x0000, 0xffff, { &XBAND::mcu_read, &xband }, { &XBAND::mcu_write, &xband });
++  bus.map(Bus::MapMode::Direct, 0x80, 0xbf, 0x8000, 0xffff, { &XBAND::mcu_read, &xband }, { &XBAND::mcu_write, &xband });
++  bus.map(Bus::MapMode::Direct, 0xc0, 0xdf, 0x0000, 0xffff, { &XBAND::mcu_read, &xband }, { &XBAND::mcu_write, &xband });
++  //Force MMIO Map
++  bus.map(Bus::MapMode::Direct, 0xe0, 0xff, 0x0000, 0xffff, { &XBAND::mmio_read, &xband }, { &XBAND::mmio_write, &xband });
++  
++}
++
++void XBAND::unload() {
++}
++
++void XBAND::power() {
++  reset();
++}
++
++void XBAND::reset() {
++  mapset = 0x00;
++  read_96 = false;
++}
++
++uint8 XBAND::memory_access(bool write, Memory &memory, unsigned addr, uint8 data) {
++  if(write == 0) return memory_read(memory, addr);
++  memory_write(memory, addr, data);
++}
++
++uint8 XBAND::memory_read(Memory &memory, unsigned addr) {
++  addr = bus.mirror(addr, memory.size());
++  return memory.read(addr);
++}
++
++void XBAND::memory_write(Memory &memory, unsigned addr, uint8 data) {
++  addr = bus.mirror(addr, memory.size());
++  return memory.write(addr, data);
++}
++
++//mcu_access() allows mcu_read() and mcu_write() to share decoding logic
++uint8 XBAND::mcu_access(bool write, unsigned addr, uint8 data) {
++ if(mapset == 0x00) {
++  if(within<0x00, 0x1f, 0x8000, 0xffff>(addr)) {
++    addr = (addr & 0x3f0000 >> 1) | (addr & 0xffff);
++    return memory_access(write, cartridge.rom, addr, data);
++  }
++  if(within<0x80, 0x9f, 0x8000, 0xffff>(addr)) {
++    addr = ((addr & 0x3f0000 >> 1) | (addr & 0xffff));
++    return memory_access(write, cartridge.rom, addr, data);
++  }
++  
++  if(within<0x40, 0x7d, 0x0000, 0xffff>(addr)) {
++	addr = ((addr & 0x3f0000 >> 1) | (addr & 0xffff));
++	return memory_access(write, cartridge.rom, addr, data);
++  }
++  if(within<0xc0, 0xdf, 0x0000, 0xffff>(addr)) {
++	addr = ((addr & 0x3f0000 >> 1) | (addr & 0xffff));
++	return memory_access(write, cartridge.rom, addr, data);
++  }
++  
++  /*
++  if(within<0xe0, 0xfa, 0x0000, 0xffff>(addr)
++  || within<0xfb, 0xfb, 0x0000, 0xbfff>(addr)
++  || within<0xfc, 0xff, 0x0000, 0xffff>(addr)
++  || within<0x60, 0x7d, 0x0000, 0xffff>(addr)) {
++    return memory_access(write, sram, (addr & 0xffff), data);
++  }
++  
++  if(within<0xfb, 0xfb, 0xc000, 0xc9ff>(addr)
++  || within<0xfb, 0xfb, 0xfa00, 0xfbff>(addr)) {
++	switch(addr & 0x1ff) {
++		case 0x0f8:
++			break;
++		case 0x0fa:
++			break;
++		case 0x108:   //CARD! bit 0: XBAND Card check
++			return 0x01;
++		case 0x110:
++			break;
++		case 0x112:
++			break;
++		case 0x130:
++			break;
++		case 0x138:
++			break;
++		case 0x140:
++			break;
++		case 0x168:
++			break;
++		case 0x188:   //???
++			return 0x00;
++		case 0x192:
++			return 0xff;
++		case 0x196:   //d53898: DIAL-UP!
++			return 0x80;
++		case 0x1b0:   // ??
++			return 0xff;
++		case 0x1b2:   //For running XBAND
++			return 0x46;
++		case 0x1ba:
++			break;
++		case 0x1bc:
++			return 0x08;
++		case 0x1be:
++			break;
++	}
++		return 0xff;
++  }
++  
++  if(within<0xfb, 0xfb, 0xfc00, 0xffff>(addr)) {
++	return 0xff;
++  }
++  */
++  return cpu.regs.mdr;
++ }
++}
++
++uint8 XBAND::mcu_read(unsigned addr) {
++  return mcu_access(0, addr);
++}
++
++void XBAND::mcu_write(unsigned addr, uint8 data) {
++  mcu_access(1, addr, data);
++}
++
++uint8 XBAND::mmio_read(unsigned addr) {  
++  if(within<0xe0, 0xfa, 0x0000, 0xffff>(addr)
++  || within<0xfb, 0xfb, 0x0000, 0xbfff>(addr)
++  || within<0xfc, 0xff, 0x0000, 0xffff>(addr)
++  || within<0x60, 0x7d, 0x0000, 0xffff>(addr)) {
++    return memory_read(sram, (addr & 0xffff));
++  }
++  
++  if(within<0xfb, 0xfb, 0xc000, 0xc9ff>(addr)
++  || within<0xfb, 0xfb, 0xfa00, 0xfbff>(addr)) {
++	switch(addr & 0x1ff) {
++		case 0x0f8:
++			break;
++		case 0x0fa:
++			break;
++		case 0x108:   //CARD! bit 0: XBAND Card check
++			return 0x01;
++		case 0x110:
++			break;
++		case 0x112:
++			break;
++		case 0x130:
++			break;
++		case 0x138:
++			break;
++		case 0x140:
++			break;
++		case 0x168:
++			break;
++		case 0x188:   //???
++			return 0x00;
++		case 0x192:
++			return 0xff;
++		case 0x196:   //d53898: DIAL-UP!
++			return 0x80;
++		case 0x1b0:   // ??
++			return 0xff;
++		case 0x1b2:   //For running XBAND
++			return 0x46;
++		case 0x1ba:
++			break;
++		case 0x1bc:
++			return 0x08;
++		case 0x1be:
++			break;
++	}
++		return 0x00;
++  }
++  
++  /*
++  switch(addr) {
++    case 0xfbc108:   //CARD! bit 0: XBAND Card check
++		return 0x01;
++	case 0xfbc188:   //???
++		return 0x00;
++	case 0xfbc192:
++		break;
++	case 0xfbc196:   //d53898: DIAL-UP!
++		return 0x80;
++	case 0xfbc1b0:   // ??
++		break;
++	case 0xfbc1b2:   //For running XBAND
++		return 0x46;
++	case 0xfbc1ba:
++		break;
++	case 0xfbc1bc:
++		return 0x08;
++	case 0xfbc1be:
++		break;
++  }
++  */
++  return 0xff;
++}
++
++void XBAND::mmio_write(unsigned addr, uint8 data) {
++  if(within<0xe0, 0xfa, 0x0000, 0xffff>(addr)) {
++    return memory_write(sram, (addr & 0x1fffff), data);
++  }
++}
++
++}
++//#endif
+diff -urN ./snes/chip/xband/xband.hpp ../../bsnes-sx2_v009/snes/chip/xband/xband.hpp
+--- ./snes/chip/xband/xband.hpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/xband/xband.hpp	2012-01-13 09:28:07.000000000 +0900
+@@ -0,0 +1,28 @@
++class XBAND {
++public:
++  MappedRAM sram;
++
++  void init();
++  void load();
++  void unload();
++  void power();
++  void reset();
++
++  uint8 memory_access(bool write, Memory &memory, unsigned addr, uint8 data);
++  uint8 memory_read(Memory &memory, unsigned addr);
++  void memory_write(Memory &memory, unsigned addr, uint8 data);
++
++  uint8 mcu_access(bool write, unsigned addr, uint8 data = 0x00);
++  uint8 mcu_read(unsigned addr);
++  void mcu_write(unsigned addr, uint8 data);
++
++  uint8 mmio_read(unsigned addr);
++  void mmio_write(unsigned addr, uint8 data);
++
++private:
++  uint8 mapset;
++  
++  bool read_96;
++};
++
++extern XBAND xband;
+diff -urN ./snes/cpu/core/disassembler/disassembler.cpp ../../bsnes-sx2_v009/snes/cpu/core/disassembler/disassembler.cpp
+--- ./snes/cpu/core/disassembler/disassembler.cpp	2010-08-19 13:18:17.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/cpu/core/disassembler/disassembler.cpp	2012-01-24 19:28:14.000000000 +0900
+@@ -1,7 +1,7 @@
+ #ifdef CPUCORE_CPP
+ 
+ uint8 CPUcore::dreadb(uint32 addr) {
+-  if((addr & 0x40ffff) >= 0x2000 && (addr & 0x40ffff) <= 0x5fff) {
++  if((addr & 0x40ffff) >= 0x2000 && (addr & 0x40ffff) <= 0x4fff) {
+     //$[00-3f|80-bf]:[2000-5fff]
+     //do not read MMIO registers within debugger
+     return 0x00;
+diff -urN ./snes/Makefile ../../bsnes-sx2_v009/snes/Makefile
+--- ./snes/Makefile	2011-06-26 11:54:42.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/Makefile	2012-01-22 20:34:55.000000000 +0900
+@@ -5,7 +5,7 @@
+ snes_objects += snes-nss snes-icd2 snes-superfx snes-sa1 snes-necdsp snes-hitachidsp
+ snes_objects += snes-bsx snes-srtc snes-sdd1 snes-spc7110
+ snes_objects += snes-obc1 snes-st0018 snes-sufamiturbo
+-snes_objects += snes-msu1 snes-link
++snes_objects += snes-msu1 snes-link snes-xband snes-sfbox
+ objects += $(snes_objects)
+ 
+ ifeq ($(profile),accuracy)
+@@ -55,3 +55,5 @@
+ obj/snes-sufamiturbo.o: $(snes)/chip/sufamiturbo/sufamiturbo.cpp $(snes)/chip/sufamiturbo/*
+ obj/snes-msu1.o       : $(snes)/chip/msu1/msu1.cpp $(snes)/chip/msu1/*
+ obj/snes-link.o       : $(snes)/chip/link/link.cpp $(snes)/chip/link/*
++obj/snes-xband.o      : $(snes)/chip/xband/xband.cpp $(snes)/chip/xband/*
++obj/snes-sfbox.o      : $(snes)/chip/sfbox/sfbox.cpp $(snes)/chip/sfbox/*
+diff -urN ./snes/snes.hpp ../../bsnes-sx2_v009/snes/snes.hpp
+--- ./snes/snes.hpp	2011-08-20 22:30:16.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/snes.hpp	2012-08-05 15:02:56.000000000 +0900
+@@ -1,7 +1,9 @@
+ namespace SNES {
+   namespace Info {
+     static const char Name[] = "bsnes";
++	static const char NameLB[] = "bsnes-sx2";
+     static const char Version[] = "082";
++	static const char VersionLB[] = "009";
+     static const unsigned SerializerVersion = 21;
+   }
+ }
+diff -urN ./snes/system/system.cpp ../../bsnes-sx2_v009/snes/system/system.cpp
+--- ./snes/system/system.cpp	2011-06-26 11:56:32.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/system/system.cpp	2012-01-22 20:39:09.000000000 +0900
+@@ -83,6 +83,8 @@
+   st0018.init();
+   msu1.init();
+   link.init();
++  xband.init();
++  sfbox.init();
+ 
+   video.init();
+   audio.init();
+@@ -107,6 +109,8 @@
+   if(cartridge.mode() == Cartridge::Mode::Bsx) bsxcartridge.load();
+   if(cartridge.mode() == Cartridge::Mode::SufamiTurbo) sufamiturbo.load();
+   if(cartridge.mode() == Cartridge::Mode::SuperGameBoy) icd2.load();
++  if(cartridge.mode() == Cartridge::Mode::XBand) xband.load();
++  if(cartridge.mode() == Cartridge::Mode::SFBox) sfbox.load();
+ 
+   if(cartridge.has_bsx_slot()) bsxflash.load();
+   if(cartridge.has_nss_dip()) nss.load();
+@@ -131,6 +135,8 @@
+   if(cartridge.mode() == Cartridge::Mode::Bsx) bsxcartridge.unload();
+   if(cartridge.mode() == Cartridge::Mode::SufamiTurbo) sufamiturbo.unload();
+   if(cartridge.mode() == Cartridge::Mode::SuperGameBoy) icd2.unload();
++  if(cartridge.mode() == Cartridge::Mode::XBand) xband.unload();
++  if(cartridge.mode() == Cartridge::Mode::SFBox) sfbox.unload();
+ 
+   if(cartridge.has_bsx_slot()) bsxflash.unload();
+   if(cartridge.has_nss_dip()) nss.unload();
+@@ -167,6 +173,8 @@
+   if(expansion() == ExpansionPortDevice::BSX) bsxsatellaview.power();
+   if(cartridge.mode() == Cartridge::Mode::Bsx) bsxcartridge.power();
+   if(cartridge.mode() == Cartridge::Mode::SuperGameBoy) icd2.power();
++  if(cartridge.mode() == Cartridge::Mode::XBand) xband.power();
++  if(cartridge.mode() == Cartridge::Mode::SFBox) sfbox.power();
+ 
+   if(cartridge.has_bsx_slot()) bsxflash.power();
+   if(cartridge.has_nss_dip()) nss.power();
+@@ -205,6 +213,8 @@
+ 
+   if(cartridge.mode() == Cartridge::Mode::Bsx) bsxcartridge.reset();
+   if(cartridge.mode() == Cartridge::Mode::SuperGameBoy) icd2.reset();
++  if(cartridge.mode() == Cartridge::Mode::XBand) xband.reset();
++  if(cartridge.mode() == Cartridge::Mode::SFBox) sfbox.reset();
+ 
+   if(cartridge.has_bsx_slot()) bsxflash.reset();
+   if(cartridge.has_nss_dip()) nss.reset();
+diff -urN ./ui/cartridge/cartridge.cpp ../../bsnes-sx2_v009/ui/cartridge/cartridge.cpp
+--- ./ui/cartridge/cartridge.cpp	2011-08-19 18:05:14.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/cartridge/cartridge.cpp	2012-01-22 20:42:07.000000000 +0900
+@@ -11,6 +11,15 @@
+   return true;
+ }
+ 
++bool Cartridge::loadTilt(const char *basename) {
++  if(loadCartridge(SNES::cartridge.rom, baseXML, basename) == false) return false;
++  baseName = nall::basename(basename);
++  SNES::cartridge.load(SNES::Cartridge::Mode::Normal, { baseXML });
++  foreach(memory, SNES::cartridge.nvram) loadMemory(memory);
++  utility.showMessage("Replaced!");
++  return true;
++}
++
+ bool Cartridge::loadBsxSlotted(const char *basename, const char *slotname) {
+   unload();
+   if(loadCartridge(SNES::cartridge.rom, baseXML, basename) == false) return false;
+@@ -81,6 +90,28 @@
+   utility.cartridgeLoaded();
+   return true;
+ }
++
++bool Cartridge::loadXBand(const char *basename, const char *slotname) {
++  unload();
++  if(loadCartridge(SNES::cartridge.rom, baseXML, basename) == false) return false;
++  //loadCartridge(SNES::XBAND, xBandXML, slotname);
++  baseName = nall::basename(basename);
++  //xBandName = nall::basename(slotname);
++  SNES::cartridge.load(SNES::Cartridge::Mode::XBand, { baseXML, xBandXML });
++  foreach(memory, SNES::cartridge.nvram) loadMemory(memory);
++  utility.cartridgeLoaded();
++  return true;
++}
++
++bool Cartridge::loadSFBox(const char *basename) {
++  unload();
++  if(loadCartridge(SNES::cartridge.rom, baseXML, basename) == false) return false;
++  baseName = nall::basename(basename);
++  SNES::cartridge.load(SNES::Cartridge::Mode::SFBox, { baseXML });
++  foreach(memory, SNES::cartridge.nvram) loadMemory(memory);
++  utility.cartridgeLoaded();
++  return true;
++}
+ 
+ void Cartridge::unload() {
+   patch.applied = false;
+diff -urN ./ui/cartridge/cartridge.hpp ../../bsnes-sx2_v009/ui/cartridge/cartridge.hpp
+--- ./ui/cartridge/cartridge.hpp	2011-08-19 17:55:48.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/cartridge/cartridge.hpp	2012-01-22 20:43:19.000000000 +0900
+@@ -1,13 +1,16 @@
+ struct Cartridge {
+   bool loadNormal(const char *basename);
++  bool loadTilt(const char *basename);
+   bool loadBsxSlotted(const char *basename, const char *slotname);
+   bool loadBsx(const char *basename, const char *slotname);
+   bool loadSufamiTurbo(const char *basename, const char *slotAname, const char *slotBname);
+   bool loadSuperGameBoy(const char *basename, const char *slotname);
++  bool loadXBand(const char *basename, const char *slotname);
++  bool loadSFBox(const char *basename);
+   void unload();
+ 
+-  string baseName, bsxName, sufamiTurboAName, sufamiTurboBName, gameBoyName;
+-  string baseXML, bsxXML, sufamiTurboAXML, sufamiTurboBXML, gameBoyXML;
++  string baseName, bsxName, sufamiTurboAName, sufamiTurboBName, gameBoyName, xBandName;
++  string baseXML, bsxXML, sufamiTurboAXML, sufamiTurboBXML, gameBoyXML, xBandXML;
+ 
+   struct Patch {
+     bool applied;
+diff -urN ./ui/general/about-window.cpp ../../bsnes-sx2_v009/ui/general/about-window.cpp
+--- ./ui/general/about-window.cpp	2011-08-06 06:57:14.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/about-window.cpp	2011-12-04 12:17:48.000000000 +0900
+@@ -10,7 +10,7 @@
+ 
+   information.setText({
+     "bsnes v", SNES::Info::Version, " ~ Profile: ", SNES::Info::Profile,
+-    " ~ Author: byuu ~ Website: http://byuu.org/"
++    " ~ Authors: byuu ~ Website: http://byuu.org/\n", SNES::Info::NameLB, " v", SNES::Info::VersionLB, " ~ LuigiBlood ~ Website: http://bsxproj.superfamicom.org/"
+   });
+ 
+   layout.setMargin(5);
+diff -urN ./ui/general/file-browser.cpp ../../bsnes-sx2_v009/ui/general/file-browser.cpp
+--- ./ui/general/file-browser.cpp	2011-08-08 17:26:26.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/file-browser.cpp	2012-01-09 09:26:49.000000000 +0900
+@@ -76,6 +76,13 @@
+       filters.append(".sgb");
+       break;
+     }
++	
++	case Mode::XBand: {
++	  setTitle("Load XBAND Game Cartridge");
++	  filters.append(".sfc");
++	  break;
++	}
++	
+   }
+ 
+   setFolder(activePath);
+diff -urN ./ui/general/file-browser.hpp ../../bsnes-sx2_v009/ui/general/file-browser.hpp
+--- ./ui/general/file-browser.hpp	2011-03-25 03:03:57.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/file-browser.hpp	2012-01-09 09:25:22.000000000 +0900
+@@ -6,7 +6,7 @@
+   Button upButton;
+   ListView contentsBox;
+ 
+-  enum class Mode : unsigned { Cartridge, Satellaview, SufamiTurbo, GameBoy } mode;
++  enum class Mode : unsigned { Cartridge, Satellaview, SufamiTurbo, GameBoy, XBand } mode;
+   void fileOpen(Mode mode, function<void (string)> callback);
+   void create();
+ 
+diff -urN ./ui/general/main-window.cpp ../../bsnes-sx2_v009/ui/general/main-window.cpp
+--- ./ui/general/main-window.cpp	2011-08-12 07:14:22.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/main-window.cpp	2012-01-22 20:42:30.000000000 +0900
+@@ -1,7 +1,7 @@
+ MainWindow mainWindow;
+ 
+ void MainWindow::create() {
+-  setTitle({ SNES::Info::Name, " v", SNES::Info::Version });
++  setTitle({ SNES::Info::NameLB, " v", SNES::Info::VersionLB, " (v", SNES::Info::Version, ")" });
+   setResizable(false);
+   setGeometry({ 0, 0, 595, 448 });
+   application.addWindow(this, "MainWindow", "128,128");
+@@ -28,6 +28,15 @@
+ 
+   systemLoadCartridgeSuperGameBoy.setText("Load Super Game Boy Cartridge ...");
+   systemLoadCartridgeSpecial.append(systemLoadCartridgeSuperGameBoy);
++  
++  systemLoadCartridgeXBand.setText("Load XBAND Cartridge ...");
++  systemLoadCartridgeSpecial.append(systemLoadCartridgeXBand);
++  
++  systemLoadCartridgeSFB.setText("Load Super Famicom Box ...");
++  systemLoadCartridgeSpecial.append(systemLoadCartridgeSFB);
++  
++  systemSaveMemoryPack.setText("Save Memory Pack");
++  system.append(systemSaveMemoryPack);
+ 
+   system.append(systemSeparator1);
+ 
+@@ -38,6 +47,14 @@
+   system.append(systemReset);
+ 
+   system.append(systemSeparator2);
++  
++  systemTilt.setText("Tilt");
++  system.append(systemTilt);
++  
++  systemReplace.setText("Swap");
++  system.append(systemReplace);
++  
++  system.append(systemSeparator3);
+ 
+   systemPort1.setText("Controller Port 1");
+   system.append(systemPort1);
+@@ -265,6 +282,15 @@
+   systemLoadCartridgeBsx.onTick = [] { singleSlotLoader.loadCartridgeBsx(); };
+   systemLoadCartridgeSufamiTurbo.onTick = [] { doubleSlotLoader.loadCartridgeSufamiTurbo(); };
+   systemLoadCartridgeSuperGameBoy.onTick = [] { singleSlotLoader.loadCartridgeSuperGameBoy(); };
++  systemLoadCartridgeXBand.onTick = [] { singleSlotLoader.loadCartridgeXBand(); };
++  
++  systemLoadCartridgeSFB.onTick = [] {
++	fileBrowser.fileOpen(FileBrowser::Mode::Cartridge, [](string filename) {
++      cartridge.loadSFBox(filename);
++    });
++  };
++  
++  systemSaveMemoryPack.onTick = [] { SNES::bsxflash.save(); };
+ 
+   systemPower.onTick = [] {
+     SNES::system.power();
+@@ -275,6 +301,17 @@
+     SNES::system.reset();
+     utility.showMessage("System was reset");
+   };
++  
++  systemTilt.onTick = [] {
++	SNES::cartridge.Tilt();
++	utility.showMessage("Tilt!");
++  };
++  
++  systemReplace.onTick = [] {
++    fileBrowser.fileOpen(FileBrowser::Mode::Cartridge, [](string filename) {
++      cartridge.loadTilt(filename);
++    });
++  };
+ 
+   systemPort1None.onTick       = [] { config.controller.port1 = 0; utility.setControllers(); };
+   systemPort1Gamepad.onTick    = [] { config.controller.port1 = 1; utility.setControllers(); };
+diff -urN ./ui/general/main-window.hpp ../../bsnes-sx2_v009/ui/general/main-window.hpp
+--- ./ui/general/main-window.hpp	2011-08-12 06:43:39.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/main-window.hpp	2012-01-22 20:23:11.000000000 +0900
+@@ -6,10 +6,16 @@
+   Item systemLoadCartridgeBsx;
+   Item systemLoadCartridgeSufamiTurbo;
+   Item systemLoadCartridgeSuperGameBoy;
++  Item systemLoadCartridgeXBand;
++  Item systemLoadCartridgeSFB;
++  Item systemSaveMemoryPack;
+   Separator systemSeparator1;
+   Item systemPower;
+   Item systemReset;
+   Separator systemSeparator2;
++  Item systemTilt;
++  Item systemReplace;
++  Separator systemSeparator3;
+   Menu systemPort1;
+   RadioItem systemPort1None;
+   RadioItem systemPort1Gamepad;
+diff -urN ./ui/general/slot-loader.cpp ../../bsnes-sx2_v009/ui/general/slot-loader.cpp
+--- ./ui/general/slot-loader.cpp	2011-08-08 17:26:43.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/slot-loader.cpp	2012-01-11 09:30:20.000000000 +0900
+@@ -35,7 +35,7 @@
+ 
+   slotBrowse.onTick = []() {
+     FileBrowser::Mode fileMode = (singleSlotLoader.mode == Mode::SuperGameBoy
+-    ? FileBrowser::Mode::GameBoy : FileBrowser::Mode::Satellaview);
++    ? FileBrowser::Mode::GameBoy : (singleSlotLoader.mode == Mode::Bsx || singleSlotLoader.mode == Mode::BsxSlotted) ? FileBrowser::Mode::Satellaview : FileBrowser::Mode::XBand);
+     fileBrowser.fileOpen(fileMode, [](string filename) {
+       singleSlotLoader.slotPath.setText(filename);
+     });
+@@ -71,6 +71,15 @@
+   okButton.setFocused();
+ }
+ 
++void SingleSlotLoader::loadCartridgeXBand() {
++  mode = Mode::XBand;
++  setTitle("Load XBAND cartridge");
++  basePath.setText("");
++  slotPath.setText("");
++  setVisible();
++  okButton.setFocused();
++}
++
+ void SingleSlotLoader::load() {
+   setVisible(false);
+ 
+@@ -89,6 +98,9 @@
+       cartridge.loadSuperGameBoy(basePath.text(), slotPath.text());
+       break;
+     }
++	case Mode::XBand: {
++	  cartridge.loadXBand(basePath.text(), slotPath.text());
++	}
+   }
+ }
+ 
+diff -urN ./ui/general/slot-loader.hpp ../../bsnes-sx2_v009/ui/general/slot-loader.hpp
+--- ./ui/general/slot-loader.hpp	2011-02-15 12:38:20.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/slot-loader.hpp	2012-01-09 09:28:03.000000000 +0900
+@@ -16,8 +16,9 @@
+   void loadCartridgeBsxSlotted();
+   void loadCartridgeBsx();
+   void loadCartridgeSuperGameBoy();
++  void loadCartridgeXBand();
+ 
+-  enum class Mode : unsigned { BsxSlotted, Bsx, SuperGameBoy } mode;
++  enum class Mode : unsigned { BsxSlotted, Bsx, SuperGameBoy, XBand } mode;
+   void load();
+ };
+ 
+diff -urN ./ui/utility/utility.cpp ../../bsnes-sx2_v009/ui/utility/utility.cpp
+--- ./ui/utility/utility.cpp	2011-08-19 17:52:06.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/utility/utility.cpp	2011-12-04 12:16:21.000000000 +0900
+@@ -3,9 +3,9 @@
+ 
+ void Utility::setTitle(const string &text) {
+   if(*text) {
+-    mainWindow.setTitle({ text, " - ", SNES::Info::Name, " v", SNES::Info::Version });
++    mainWindow.setTitle({ text, " - ", SNES::Info::NameLB, " v", SNES::Info::VersionLB, " (v", SNES::Info::Version, ")" });
+   } else {
+-    mainWindow.setTitle({ SNES::Info::Name, " v", SNES::Info::Version });
++    mainWindow.setTitle({ SNES::Info::NameLB, " v", SNES::Info::VersionLB, " (v", SNES::Info::Version, ")"});
+   }
+ }
+ 

@@ -1,5 +1,5 @@
 diff --git a/higan/emulator/interface.hpp b/higan/emulator/interface.hpp
-index c6cd0ce..c148f54 100644
+index c6cd0ce..c148f54 100755
 --- a/higan/emulator/interface.hpp
 +++ b/higan/emulator/interface.hpp
 @@ -88,6 +88,7 @@ struct Interface {
@@ -11,7 +11,7 @@ index c6cd0ce..c148f54 100644
    //system interface
    virtual void connect(unsigned port, unsigned device) {}
 diff --git a/higan/sfc/interface/interface.cpp b/higan/sfc/interface/interface.cpp
-index 61b5198..04d40ef 100644
+index 61b5198..04d40ef 100755
 --- a/higan/sfc/interface/interface.cpp
 +++ b/higan/sfc/interface/interface.cpp
 @@ -265,6 +265,10 @@ void Interface::connect(unsigned port, unsigned device) {
@@ -26,7 +26,7 @@ index 61b5198..04d40ef 100644
    system.power();
  }
 diff --git a/higan/sfc/interface/interface.hpp b/higan/sfc/interface/interface.hpp
-index 3d84500..fd3453d 100644
+index 3d84500..fd3453d 100755
 --- a/higan/sfc/interface/interface.hpp
 +++ b/higan/sfc/interface/interface.hpp
 @@ -93,6 +93,7 @@ struct Interface : Emulator::Interface {
@@ -38,7 +38,7 @@ index 3d84500..fd3453d 100644
    void connect(unsigned port, unsigned device);
    void power();
 diff --git a/higan/sfc/system/system.cpp b/higan/sfc/system/system.cpp
-index feb48f0..e8d45df 100644
+index feb48f0..e8d45df 100755
 --- a/higan/sfc/system/system.cpp
 +++ b/higan/sfc/system/system.cpp
 @@ -165,6 +165,10 @@ void System::unload() {
@@ -53,7 +53,7 @@ index feb48f0..e8d45df 100644
    random.seed((unsigned)time(0));
  
 diff --git a/higan/sfc/system/system.hpp b/higan/sfc/system/system.hpp
-index 3bb08ae..39453d5 100644
+index 3bb08ae..39453d5 100755
 --- a/higan/sfc/system/system.hpp
 +++ b/higan/sfc/system/system.hpp
 @@ -11,6 +11,7 @@ struct System : property<System> {
@@ -65,7 +65,7 @@ index 3bb08ae..39453d5 100644
    void reset();
  
 diff --git a/higan/target-ethos/general/presentation.cpp b/higan/target-ethos/general/presentation.cpp
-index 5c5adab..baa98ec 100644
+index 5c5adab..baa98ec 100755
 --- a/higan/target-ethos/general/presentation.cpp
 +++ b/higan/target-ethos/general/presentation.cpp
 @@ -163,6 +163,7 @@ void Presentation::bootstrap() {
@@ -90,7 +90,7 @@ index 5c5adab..baa98ec 100644
      emulatorList.append(iEmulator);
    }
 diff --git a/higan/target-ethos/general/presentation.hpp b/higan/target-ethos/general/presentation.hpp
-index 1a44aa3..29e737d 100644
+index 1a44aa3..29e737d 100755
 --- a/higan/target-ethos/general/presentation.hpp
 +++ b/higan/target-ethos/general/presentation.hpp
 @@ -9,6 +9,7 @@ struct Presentation : Window {
@@ -102,7 +102,7 @@ index 1a44aa3..29e737d 100644
        struct Port {
          Menu menu;
 diff --git a/higan/target-ethos/utility/utility.cpp b/higan/target-ethos/utility/utility.cpp
-index 1ed9441..8f089f1 100644
+index 1ed9441..8f089f1 100755
 --- a/higan/target-ethos/utility/utility.cpp
 +++ b/higan/target-ethos/utility/utility.cpp
 @@ -136,6 +136,10 @@ void Utility::unload() {
@@ -117,7 +117,7 @@ index 1ed9441..8f089f1 100644
    if(application->active == nullptr) return;
    serializer s = system().serialize();
 diff --git a/higan/target-ethos/utility/utility.hpp b/higan/target-ethos/utility/utility.hpp
-index dc5f3a1..639ff29 100644
+index dc5f3a1..639ff29 100755
 --- a/higan/target-ethos/utility/utility.hpp
 +++ b/higan/target-ethos/utility/utility.hpp
 @@ -14,6 +14,7 @@ struct Utility {

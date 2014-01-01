@@ -1,0 +1,4056 @@
+diff -urN ./nall/file.hpp ../../bsnes-sx2_v009/nall/file.hpp
+--- ./nall/file.hpp	2011-08-20 22:26:51.000000000 +0900
++++ ../../bsnes-sx2_v009/nall/file.hpp	2011-10-30 22:16:57.000000000 +0900
+@@ -46,8 +46,8 @@
+ 
+     uint8_t read() {
+       if(!fp) return 0xff;                       //file not open
+-      if(file_mode == mode::write) return 0xff;  //reads not permitted
+-      if(file_offset >= file_size) return 0xff;  //cannot read past end of file
++      if(file_mode == mode::write) return 0xfe;  //reads not permitted
++      if(file_offset >= file_size) return 0xfd;  //cannot read past end of file
+       buffer_sync();
+       return buffer[(file_offset++) & buffer_mask];
+     }
+diff -urN ./phoenix/gtk/platform.cpp ../../bsnes-sx2_v009/phoenix/gtk/platform.cpp
+--- ./phoenix/gtk/platform.cpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/gtk/platform.cpp	2011-10-10 19:06:36.000000000 +0900
+@@ -0,0 +1,179 @@
++#include "platform.hpp"
++
++#include "settings.cpp"
++#include "font.cpp"
++#include "timer.cpp"
++#include "message-window.cpp"
++#include "window.cpp"
++
++#include "action/action.cpp"
++#include "action/menu.cpp"
++#include "action/separator.cpp"
++#include "action/item.cpp"
++#include "action/check-item.cpp"
++#include "action/radio-item.cpp"
++
++#include "widget/widget.cpp"
++#include "widget/button.cpp"
++#include "widget/canvas.cpp"
++#include "widget/check-box.cpp"
++#include "widget/combo-box.cpp"
++#include "widget/hex-edit.cpp"
++#include "widget/horizontal-scroll-bar.cpp"
++#include "widget/horizontal-slider.cpp"
++#include "widget/label.cpp"
++#include "widget/line-edit.cpp"
++#include "widget/list-view.cpp"
++#include "widget/progress-bar.cpp"
++#include "widget/radio-box.cpp"
++#include "widget/text-edit.cpp"
++#include "widget/vertical-scroll-bar.cpp"
++#include "widget/vertical-slider.cpp"
++#include "widget/viewport.cpp"
++
++Font pOS::defaultFont;
++
++Geometry pOS::availableGeometry() {
++  Display *display = XOpenDisplay(0);
++  int screen = DefaultScreen(display);
++
++  static Atom atom = X11None;
++  if(atom == X11None) atom = XInternAtom(display, "_NET_WORKAREA", True);
++
++  int format;
++  unsigned char *data = 0;
++  unsigned long items, after;
++  Atom returnAtom;
++
++  int result = XGetWindowProperty(
++    display, RootWindow(display, screen), atom, 0, 4, False, XA_CARDINAL, &returnAtom, &format, &items, &after, &data
++  );
++
++  XCloseDisplay(display);
++
++  if(result == Success && returnAtom == XA_CARDINAL && format == 32 && items == 4) {
++    unsigned long *workarea = (unsigned long*)data;
++    return { (signed)workarea[0], (signed)workarea[1], (unsigned)workarea[2], (unsigned)workarea[3] };
++  }
++
++  return desktopGeometry();
++}
++
++Geometry pOS::desktopGeometry() {
++  return {
++    0, 0,
++    gdk_screen_get_width(gdk_screen_get_default()),
++    gdk_screen_get_height(gdk_screen_get_default())
++  };
++}
++
++static string pOS_fileDialog(bool save, Window &parent, const string &path, const lstring &filter) {
++  string name;
++
++  GtkWidget *dialog = gtk_file_chooser_dialog_new(
++    save == 0 ? "Load File" : "Save File",
++    &parent != &Window::None ? GTK_WINDOW(parent.p.widget) : (GtkWindow*)0,
++    save == 0 ? GTK_FILE_CHOOSER_ACTION_OPEN : GTK_FILE_CHOOSER_ACTION_SAVE,
++    GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
++    GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
++    (const gchar*)0
++  );
++
++  if(path) gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), path);
++
++  for(auto &filterItem : filter) {
++    GtkFileFilter *gtkFilter = gtk_file_filter_new();
++    gtk_file_filter_set_name(gtkFilter, filterItem);
++    lstring part;
++    part.split("(", filterItem);
++    part[1].rtrim<1>(")");
++    lstring list;
++    list.split(",", part[1]);
++    for(auto &pattern : list) gtk_file_filter_add_pattern(gtkFilter, pattern);
++    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), gtkFilter);
++  }
++
++  if(gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
++    char *temp = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
++    name = temp;
++    g_free(temp);
++  }
++
++  gtk_widget_destroy(dialog);
++  return name;
++}
++
++string pOS::fileLoad(Window &parent, const string &path, const lstring &filter) {
++  return pOS_fileDialog(0, parent, path, filter);
++}
++
++string pOS::fileSave(Window &parent, const string &path, const lstring &filter) {
++  return pOS_fileDialog(1, parent, path, filter);
++}
++
++string pOS::folderSelect(Window &parent, const string &path) {
++  string name;
++
++  GtkWidget *dialog = gtk_file_chooser_dialog_new(
++    "Select Folder",
++    &parent != &Window::None ? GTK_WINDOW(parent.p.widget) : (GtkWindow*)0,
++    GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER,
++    GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
++    GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
++    (const gchar*)0
++  );
++
++  if(path) gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), path);
++
++  if(gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
++    char *temp = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
++    name = temp;
++    g_free(temp);
++  }
++
++  gtk_widget_destroy(dialog);
++  if(name == "") return "";
++  if(name.endswith("/") == false) name.append("/");
++  return name;
++}
++
++void pOS::main() {
++  gtk_main();
++}
++
++bool pOS::pendingEvents() {
++  return gtk_events_pending();
++}
++
++void pOS::processEvents() {
++  while(pendingEvents()) gtk_main_iteration_do(false);
++}
++
++void pOS::quit() {
++  settings->save();
++
++  gtk_main_quit();
++}
++
++void pOS::initialize() {
++  settings = new Settings;
++  settings->load();
++
++  int argc = 1;
++  char *argv[2];
++  argv[0] = new char[8];
++  argv[1] = 0;
++  strcpy(argv[0], "phoenix");
++  char **argvp = argv;
++  gtk_init(&argc, &argvp);
++
++  gtk_rc_parse_string(
++    "style \"phoenix-gtk\"\n"
++    "{\n"
++    "  GtkComboBox::appears-as-list = 1\n"
++    "  GtkTreeView::vertical-separator = 0\n"
++    "}\n"
++  //"class \"GtkComboBox\" style \"phoenix-gtk\"\n"
++    "class \"GtkTreeView\" style \"phoenix-gtk\"\n"
++  );
++}
+diff -urN ./phoenix/gtk/platform.hpp ../../bsnes-sx2_v009/phoenix/gtk/platform.hpp
+--- ./phoenix/gtk/platform.hpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/gtk/platform.hpp	2011-10-10 19:06:36.000000000 +0900
+@@ -0,0 +1,468 @@
++struct Settings : public configuration {
++  unsigned frameGeometryX;
++  unsigned frameGeometryY;
++  unsigned frameGeometryWidth;
++  unsigned frameGeometryHeight;
++  unsigned menuGeometryHeight;
++  unsigned statusGeometryHeight;
++
++  void load();
++  void save();
++  Settings();
++};
++
++struct pWindow;
++struct pMenu;
++struct pLayout;
++struct pWidget;
++
++struct pFont {
++  static Geometry geometry(const string &description, const string &text);
++
++  static PangoFontDescription* create(const string &description);
++  static void free(PangoFontDescription *font);
++  static Geometry geometry(PangoFontDescription *font, const string &text);
++  static void setFont(GtkWidget *widget, const string &font);
++  static void setFont(GtkWidget *widget, gpointer font);
++};
++
++struct pObject {
++  Object &object;
++  bool locked;
++
++  pObject(Object &object) : object(object), locked(false) {}
++  virtual ~pObject() {}
++
++  void constructor() {}
++  void destructor() {}
++};
++
++struct pOS : public pObject {
++  static Font defaultFont;
++
++  static Geometry availableGeometry();
++  static Geometry desktopGeometry();
++  static string fileLoad(Window &parent, const string &path, const lstring &filter);
++  static string fileSave(Window &parent, const string &path, const lstring &filter);
++  static string folderSelect(Window &parent, const string &path);
++  static void main();
++  static bool pendingEvents();
++  static void processEvents();
++  static void quit();
++
++  static void initialize();
++};
++
++struct pTimer : public pObject {
++  Timer &timer;
++
++  void setEnabled(bool enabled);
++  void setInterval(unsigned milliseconds);
++
++  pTimer(Timer &timer) : pObject(timer), timer(timer) {}
++  void constructor();
++};
++
++struct pMessageWindow : public pObject {
++  static MessageWindow::Response information(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response question(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response warning(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response critical(Window &parent, const string &text, MessageWindow::Buttons buttons);
++};
++
++struct pWindow : public pObject {
++  Window &window;
++  GtkWidget *widget;
++  GtkWidget *menuContainer;
++  GtkWidget *formContainer;
++  GtkWidget *statusContainer;
++  GtkWidget *menu;
++  GtkWidget *status;
++  GdkEventConfigure lastConfigure;
++
++  void append(Layout &layout);
++  void append(Menu &menu);
++  void append(Widget &widget);
++  Color backgroundColor();
++  bool focused();
++  Geometry frameMargin();
++  Geometry geometry();
++  void remove(Layout &layout);
++  void remove(Menu &menu);
++  void remove(Widget &widget);
++  void setBackgroundColor(const Color &color);
++  void setFocused();
++  void setFullScreen(bool fullScreen);
++  void setGeometry(const Geometry &geometry);
++  void setMenuFont(const string &font);
++  void setMenuVisible(bool visible);
++  void setResizable(bool resizable);
++  void setStatusFont(const string &font);
++  void setStatusText(const string &text);
++  void setStatusVisible(bool visible);
++  void setTitle(const string &text);
++  void setVisible(bool visible);
++  void setWidgetFont(const string &font);
++
++  pWindow(Window &window) : pObject(window), window(window) {}
++  void constructor();
++  unsigned menuHeight();
++  unsigned statusHeight();
++};
++
++struct pAction : public pObject {
++  Action &action;
++  GtkWidget *widget;
++
++  void setEnabled(bool enabled);
++  void setVisible(bool visible);
++
++  pAction(Action &action) : pObject(action), action(action) {}
++  void constructor();
++  virtual void orphan();
++  virtual void setFont(const string &font);
++};
++
++struct pMenu : public pAction {
++  Menu &menu;
++  GtkWidget *gtkMenu;
++
++  void append(Action &action);
++  void remove(Action &action);
++  void setText(const string &text);
++
++  pMenu(Menu &menu) : pAction(menu), menu(menu) {}
++  void constructor();
++  void destructor();
++  void orphan();
++  void setFont(const string &font);
++};
++
++struct pSeparator : public pAction {
++  Separator &separator;
++
++  pSeparator(Separator &separator) : pAction(separator), separator(separator) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pItem : public pAction {
++  Item &item;
++
++  void setText(const string &text);
++
++  pItem(Item &item) : pAction(item), item(item) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pCheckItem : public pAction {
++  CheckItem &checkItem;
++
++  bool checked();
++  void setChecked(bool checked);
++  void setText(const string &text);
++
++  pCheckItem(CheckItem &checkItem) : pAction(checkItem), checkItem(checkItem) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pRadioItem : public pAction {
++  RadioItem &radioItem;
++
++  bool checked();
++  void setChecked();
++  void setGroup(const reference_array<RadioItem&> &group);
++  void setText(const string &text);
++
++  pRadioItem(RadioItem &radioItem) : pAction(radioItem), radioItem(radioItem) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pSizable : public pObject {
++  Sizable &sizable;
++
++  pSizable(Sizable &sizable) : pObject(sizable), sizable(sizable) {}
++};
++
++struct pLayout : public pSizable {
++  Layout &layout;
++
++  pLayout(Layout &layout) : pSizable(layout), layout(layout) {}
++};
++
++struct pWidget : public pSizable {
++  Widget &widget;
++  GtkWidget *gtkWidget;
++
++  bool enabled();
++  virtual Geometry minimumGeometry();
++  void setEnabled(bool enabled);
++  virtual void setFocused();
++  virtual void setFont(const string &font);
++  virtual void setGeometry(const Geometry &geometry);
++  void setVisible(bool visible);
++
++  pWidget(Widget &widget) : pSizable(widget), widget(widget) {}
++  void constructor();
++  void destructor();
++  virtual void orphan();
++};
++
++struct pButton : public pWidget {
++  Button &button;
++
++  Geometry minimumGeometry();
++  void setText(const string &text);
++
++  pButton(Button &button) : pWidget(button), button(button) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pCanvas : public pWidget {
++  Canvas &canvas;
++  cairo_surface_t *surface;
++
++  uint32_t* buffer();
++  void setGeometry(const Geometry &geometry);
++  void update();
++
++  pCanvas(Canvas &canvas) : pWidget(canvas), canvas(canvas) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pCheckBox : public pWidget {
++  CheckBox &checkBox;
++
++  bool checked();
++  Geometry minimumGeometry();
++  void setChecked(bool checked);
++  void setText(const string &text);
++
++  pCheckBox(CheckBox &checkBox) : pWidget(checkBox), checkBox(checkBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pComboBox : public pWidget {
++  ComboBox &comboBox;
++  unsigned itemCounter;
++
++  void append(const string &text);
++  Geometry minimumGeometry();
++  void reset();
++  unsigned selection();
++  void setSelection(unsigned row);
++
++  pComboBox(ComboBox &comboBox) : pWidget(comboBox), comboBox(comboBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pHexEdit : public pWidget {
++  HexEdit &hexEdit;
++  GtkWidget *container;
++  GtkWidget *subWidget;
++  GtkWidget *scrollBar;
++  GtkTextBuffer *textBuffer;
++  GtkTextMark *textCursor;
++
++  void setColumns(unsigned columns);
++  void setLength(unsigned length);
++  void setOffset(unsigned offset);
++  void setRows(unsigned rows);
++  void update();
++
++  pHexEdit(HexEdit &hexEdit) : pWidget(hexEdit), hexEdit(hexEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++  unsigned cursorPosition();
++  bool keyPress(unsigned scancode);
++  void scroll(unsigned position);
++  void setCursorPosition(unsigned position);
++  void setScroll();
++  void updateScroll();
++};
++
++struct pHorizontalScrollBar : public pWidget {
++  HorizontalScrollBar &horizontalScrollBar;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pHorizontalScrollBar(HorizontalScrollBar &horizontalScrollBar) : pWidget(horizontalScrollBar), horizontalScrollBar(horizontalScrollBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pHorizontalSlider : public pWidget {
++  HorizontalSlider &horizontalSlider;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pHorizontalSlider(HorizontalSlider &horizontalSlider) : pWidget(horizontalSlider), horizontalSlider(horizontalSlider) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pLabel : public pWidget {
++  Label &label;
++
++  Geometry minimumGeometry();
++  void setText(const string &text);
++
++  pLabel(Label &label) : pWidget(label), label(label) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pLineEdit : public pWidget {
++  LineEdit &lineEdit;
++
++  Geometry minimumGeometry();
++  void setEditable(bool editable);
++  void setText(const string &text);
++  string text();
++
++  pLineEdit(LineEdit &lineEdit) : pWidget(lineEdit), lineEdit(lineEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pListView : public pWidget {
++  ListView &listView;
++  GtkWidget *subWidget;
++  GtkListStore *store;
++  struct GtkColumn {
++    GtkCellRenderer *renderer;
++    GtkTreeViewColumn *column;
++    GtkWidget *label;
++  };
++  linear_vector<GtkColumn> column;
++
++  void append(const lstring &text);
++  void autoSizeColumns();
++  bool checked(unsigned row);
++  void modify(unsigned row, const lstring &text);
++  void reset();
++  bool selected();
++  unsigned selection();
++  void setCheckable(bool checkable);
++  void setChecked(unsigned row, bool checked);
++  void setHeaderText(const lstring &text);
++  void setHeaderVisible(bool visible);
++  void setSelected(bool selected);
++  void setSelection(unsigned row);
++
++  pListView(ListView &listView) : pWidget(listView), listView(listView) {}
++  void constructor();
++  void destructor();
++  void orphan();
++  void setFocused();
++  void setFont(const string &font);
++};
++
++struct pProgressBar : public pWidget {
++  ProgressBar &progressBar;
++
++  Geometry minimumGeometry();
++  void setPosition(unsigned position);
++
++  pProgressBar(ProgressBar &progressBar) : pWidget(progressBar), progressBar(progressBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pRadioBox : public pWidget {
++  RadioBox &radioBox;
++
++  bool checked();
++  Geometry minimumGeometry();
++  void setChecked();
++  void setGroup(const reference_array<RadioBox&> &group);
++  void setText(const string &text);
++
++  pRadioBox(RadioBox &radioBox) : pWidget(radioBox), radioBox(radioBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pTextEdit : public pWidget {
++  TextEdit &textEdit;
++  GtkWidget *subWidget;
++  GtkTextBuffer *textBuffer;
++
++  void setCursorPosition(unsigned position);
++  void setEditable(bool editable);
++  void setText(const string &text);
++  void setWordWrap(bool wordWrap);
++  string text();
++
++  pTextEdit(TextEdit &textEdit) : pWidget(textEdit), textEdit(textEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pVerticalScrollBar : public pWidget {
++  VerticalScrollBar &verticalScrollBar;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pVerticalScrollBar(VerticalScrollBar &verticalScrollBar) : pWidget(verticalScrollBar), verticalScrollBar(verticalScrollBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pVerticalSlider : public pWidget {
++  VerticalSlider &verticalSlider;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pVerticalSlider(VerticalSlider &verticalSlider) : pWidget(verticalSlider), verticalSlider(verticalSlider) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pViewport : public pWidget {
++  Viewport &viewport;
++
++  uintptr_t handle();
++
++  pViewport(Viewport &viewport) : pWidget(viewport), viewport(viewport) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
+diff -urN ./phoenix/qt/platform.cpp ../../bsnes-sx2_v009/phoenix/qt/platform.cpp
+--- ./phoenix/qt/platform.cpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/qt/platform.cpp	2011-10-10 19:06:36.000000000 +0900
+@@ -0,0 +1,135 @@
++#include "platform.moc.hpp"
++#include "platform.moc"
++
++#include "settings.cpp"
++#include "font.cpp"
++#include "timer.cpp"
++#include "message-window.cpp"
++#include "window.cpp"
++
++#include "action/action.cpp"
++#include "action/menu.cpp"
++#include "action/separator.cpp"
++#include "action/item.cpp"
++#include "action/check-item.cpp"
++#include "action/radio-item.cpp"
++
++#include "widget/widget.cpp"
++#include "widget/button.cpp"
++#include "widget/canvas.cpp"
++#include "widget/check-box.cpp"
++#include "widget/combo-box.cpp"
++#include "widget/hex-edit.cpp"
++#include "widget/horizontal-scroll-bar.cpp"
++#include "widget/horizontal-slider.cpp"
++#include "widget/label.cpp"
++#include "widget/line-edit.cpp"
++#include "widget/list-view.cpp"
++#include "widget/progress-bar.cpp"
++#include "widget/radio-box.cpp"
++#include "widget/text-edit.cpp"
++#include "widget/vertical-scroll-bar.cpp"
++#include "widget/vertical-slider.cpp"
++#include "widget/viewport.cpp"
++
++Geometry pOS::availableGeometry() {
++  QRect rect = QApplication::desktop()->availableGeometry();
++  return { rect.x(), rect.y(), rect.width(), rect.height() };
++}
++
++Geometry pOS::desktopGeometry() {
++  QRect rect = QApplication::desktop()->screenGeometry();
++  return { 0, 0, rect.width(), rect.height() };
++}
++
++string pOS::fileLoad(Window &parent, const string &path, const lstring &filter) {
++  string filterList;
++  for(auto &item : filter) {
++    filterList.append(item);
++    filterList.append(";;");
++  }
++  filterList.rtrim<1>(";;");
++
++  //convert filter list from phoenix to Qt format, example:
++  //"Text, XML files (*.txt,*.xml)" -> "Text, XML files (*.txt *.xml)"
++  signed parenthesis = 0;
++  for(auto &n : filterList) {
++    if(n == '(') parenthesis++;
++    if(n == ')') parenthesis--;
++    if(n == ',' && parenthesis) n = ' ';
++  }
++
++  QString filename = QFileDialog::getOpenFileName(
++    &parent != &Window::None ? parent.p.qtWindow : 0, "Load File",
++    QString::fromUtf8(path), QString::fromUtf8(filterList)
++  );
++  return filename.toUtf8().constData();
++}
++
++string pOS::fileSave(Window &parent, const string &path, const lstring &filter) {
++  string filterList;
++  for(auto &item : filter) {
++    filterList.append(item);
++    filterList.append(";;");
++  }
++  filterList.rtrim<1>(";;");
++
++  //convert filter list from phoenix to Qt format, example:
++  //"Text, XML files (*.txt,*.xml)" -> "Text, XML files (*.txt *.xml)"
++  signed parenthesis = 0;
++  for(auto &n : filterList) {
++    if(n == '(') parenthesis++;
++    if(n == ')') parenthesis--;
++    if(n == ',' && parenthesis) n = ' ';
++  }
++
++  QString filename = QFileDialog::getSaveFileName(
++    &parent != &Window::None ? parent.p.qtWindow : 0, "Save File",
++    QString::fromUtf8(path), QString::fromUtf8(filterList)
++  );
++  return filename.toUtf8().constData();
++}
++
++string pOS::folderSelect(Window &parent, const string &path) {
++  QString directory = QFileDialog::getExistingDirectory(
++    &parent != &Window::None ? parent.p.qtWindow : 0, "Select Directory",
++    QString::fromUtf8(path), QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
++  );
++  string name = directory.toUtf8().constData();
++  if(name != "" && name.endswith("/") == false) name.append("/");
++  return name;
++}
++
++void pOS::main() {
++  QApplication::exec();
++}
++
++bool pOS::pendingEvents() {
++  return QApplication::hasPendingEvents();
++}
++
++void pOS::processEvents() {
++  while(pendingEvents()) QApplication::processEvents();
++}
++
++void pOS::quit() {
++  settings->save();
++
++  QApplication::quit();
++  //note: QApplication cannot be deleted; or libQtGui will crash
++  qtApplication = 0;
++}
++
++void pOS::initialize() {
++  settings = new Settings;
++  settings->load();
++
++  static int argc = 1;
++  static char *argv[2];
++  argv[0] = new char[8];
++  argv[1] = 0;
++  strcpy(argv[0], "phoenix");
++  char **argvp = argv;
++
++  qtApplication = new QApplication(argc, argvp);
++}
+diff -urN ./phoenix/qt/platform.moc ../../bsnes-sx2_v009/phoenix/qt/platform.moc
+--- ./phoenix/qt/platform.moc	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/qt/platform.moc	2011-10-10 19:06:36.000000000 +0900
+@@ -0,0 +1,1105 @@
++/****************************************************************************
++** Meta object code from reading C++ file 'platform.moc.hpp'
++**
++** Created: Tue Sep 27 01:00:52 2011
++**      by: The Qt Meta Object Compiler version 62 (Qt 4.7.0)
++**
++** WARNING! All changes made in this file will be lost!
++*****************************************************************************/
++
++#if !defined(Q_MOC_OUTPUT_REVISION)
++#error "The header file 'platform.moc.hpp' doesn't include <QObject>."
++#elif Q_MOC_OUTPUT_REVISION != 62
++#error "This file was generated using the moc from 4.7.0. It"
++#error "cannot be used with the include files from this version of Qt."
++#error "(The moc has changed too much.)"
++#endif
++
++QT_BEGIN_MOC_NAMESPACE
++static const uint qt_meta_data_pTimer[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++       8,    7,    7,    7, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pTimer[] = {
++    "pTimer\0\0onTimeout()\0"
++};
++
++const QMetaObject pTimer::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pTimer,
++      qt_meta_data_pTimer, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pTimer::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pTimer::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pTimer::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pTimer))
++        return static_cast<void*>(const_cast< pTimer*>(this));
++    if (!strcmp(_clname, "pObject"))
++        return static_cast< pObject*>(const_cast< pTimer*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pTimer::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onTimeout(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pWindow[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       0,    0, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pWindow[] = {
++    "pWindow\0"
++};
++
++const QMetaObject pWindow::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pWindow,
++      qt_meta_data_pWindow, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pWindow::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pWindow::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pWindow::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pWindow))
++        return static_cast<void*>(const_cast< pWindow*>(this));
++    if (!strcmp(_clname, "pObject"))
++        return static_cast< pObject*>(const_cast< pWindow*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pWindow::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    return _id;
++}
++static const uint qt_meta_data_pItem[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++       7,    6,    6,    6, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pItem[] = {
++    "pItem\0\0onTick()\0"
++};
++
++const QMetaObject pItem::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pItem,
++      qt_meta_data_pItem, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pItem::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pItem::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pItem::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pItem))
++        return static_cast<void*>(const_cast< pItem*>(this));
++    if (!strcmp(_clname, "pAction"))
++        return static_cast< pAction*>(const_cast< pItem*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pItem::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onTick(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pCheckItem[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      12,   11,   11,   11, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pCheckItem[] = {
++    "pCheckItem\0\0onTick()\0"
++};
++
++const QMetaObject pCheckItem::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pCheckItem,
++      qt_meta_data_pCheckItem, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pCheckItem::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pCheckItem::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pCheckItem::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pCheckItem))
++        return static_cast<void*>(const_cast< pCheckItem*>(this));
++    if (!strcmp(_clname, "pAction"))
++        return static_cast< pAction*>(const_cast< pCheckItem*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pCheckItem::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onTick(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pRadioItem[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      12,   11,   11,   11, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pRadioItem[] = {
++    "pRadioItem\0\0onTick()\0"
++};
++
++const QMetaObject pRadioItem::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pRadioItem,
++      qt_meta_data_pRadioItem, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pRadioItem::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pRadioItem::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pRadioItem::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pRadioItem))
++        return static_cast<void*>(const_cast< pRadioItem*>(this));
++    if (!strcmp(_clname, "pAction"))
++        return static_cast< pAction*>(const_cast< pRadioItem*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pRadioItem::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onTick(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pButton[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++       9,    8,    8,    8, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pButton[] = {
++    "pButton\0\0onTick()\0"
++};
++
++const QMetaObject pButton::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pButton,
++      qt_meta_data_pButton, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pButton::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pButton::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pButton::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pButton))
++        return static_cast<void*>(const_cast< pButton*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pButton*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pButton::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onTick(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pCanvas[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       0,    0, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pCanvas[] = {
++    "pCanvas\0"
++};
++
++const QMetaObject pCanvas::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pCanvas,
++      qt_meta_data_pCanvas, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pCanvas::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pCanvas::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pCanvas::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pCanvas))
++        return static_cast<void*>(const_cast< pCanvas*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pCanvas*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pCanvas::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    return _id;
++}
++static const uint qt_meta_data_pCheckBox[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      11,   10,   10,   10, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pCheckBox[] = {
++    "pCheckBox\0\0onTick()\0"
++};
++
++const QMetaObject pCheckBox::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pCheckBox,
++      qt_meta_data_pCheckBox, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pCheckBox::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pCheckBox::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pCheckBox::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pCheckBox))
++        return static_cast<void*>(const_cast< pCheckBox*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pCheckBox*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pCheckBox::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onTick(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pComboBox[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      11,   10,   10,   10, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pComboBox[] = {
++    "pComboBox\0\0onChange()\0"
++};
++
++const QMetaObject pComboBox::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pComboBox,
++      qt_meta_data_pComboBox, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pComboBox::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pComboBox::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pComboBox::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pComboBox))
++        return static_cast<void*>(const_cast< pComboBox*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pComboBox*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pComboBox::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onChange(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pHexEdit[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      10,    9,    9,    9, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pHexEdit[] = {
++    "pHexEdit\0\0onScroll()\0"
++};
++
++const QMetaObject pHexEdit::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pHexEdit,
++      qt_meta_data_pHexEdit, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pHexEdit::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pHexEdit::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pHexEdit::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pHexEdit))
++        return static_cast<void*>(const_cast< pHexEdit*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pHexEdit*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pHexEdit::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onScroll(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pHorizontalScrollBar[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      22,   21,   21,   21, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pHorizontalScrollBar[] = {
++    "pHorizontalScrollBar\0\0onChange()\0"
++};
++
++const QMetaObject pHorizontalScrollBar::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pHorizontalScrollBar,
++      qt_meta_data_pHorizontalScrollBar, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pHorizontalScrollBar::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pHorizontalScrollBar::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pHorizontalScrollBar::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pHorizontalScrollBar))
++        return static_cast<void*>(const_cast< pHorizontalScrollBar*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pHorizontalScrollBar*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pHorizontalScrollBar::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onChange(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pHorizontalSlider[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      19,   18,   18,   18, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pHorizontalSlider[] = {
++    "pHorizontalSlider\0\0onChange()\0"
++};
++
++const QMetaObject pHorizontalSlider::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pHorizontalSlider,
++      qt_meta_data_pHorizontalSlider, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pHorizontalSlider::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pHorizontalSlider::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pHorizontalSlider::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pHorizontalSlider))
++        return static_cast<void*>(const_cast< pHorizontalSlider*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pHorizontalSlider*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pHorizontalSlider::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onChange(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pLineEdit[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       2,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      11,   10,   10,   10, 0x0a,
++      24,   10,   10,   10, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pLineEdit[] = {
++    "pLineEdit\0\0onActivate()\0onChange()\0"
++};
++
++const QMetaObject pLineEdit::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pLineEdit,
++      qt_meta_data_pLineEdit, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pLineEdit::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pLineEdit::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pLineEdit::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pLineEdit))
++        return static_cast<void*>(const_cast< pLineEdit*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pLineEdit*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pLineEdit::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onActivate(); break;
++        case 1: onChange(); break;
++        default: ;
++        }
++        _id -= 2;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pListView[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       3,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      11,   10,   10,   10, 0x0a,
++      29,   24,   10,   10, 0x0a,
++      56,   24,   10,   10, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pListView[] = {
++    "pListView\0\0onActivate()\0item\0"
++    "onChange(QTreeWidgetItem*)\0"
++    "onTick(QTreeWidgetItem*)\0"
++};
++
++const QMetaObject pListView::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pListView,
++      qt_meta_data_pListView, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pListView::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pListView::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pListView::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pListView))
++        return static_cast<void*>(const_cast< pListView*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pListView*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pListView::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onActivate(); break;
++        case 1: onChange((*reinterpret_cast< QTreeWidgetItem*(*)>(_a[1]))); break;
++        case 2: onTick((*reinterpret_cast< QTreeWidgetItem*(*)>(_a[1]))); break;
++        default: ;
++        }
++        _id -= 3;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pRadioBox[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      11,   10,   10,   10, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pRadioBox[] = {
++    "pRadioBox\0\0onTick()\0"
++};
++
++const QMetaObject pRadioBox::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pRadioBox,
++      qt_meta_data_pRadioBox, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pRadioBox::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pRadioBox::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pRadioBox::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pRadioBox))
++        return static_cast<void*>(const_cast< pRadioBox*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pRadioBox*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pRadioBox::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onTick(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pTextEdit[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      11,   10,   10,   10, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pTextEdit[] = {
++    "pTextEdit\0\0onChange()\0"
++};
++
++const QMetaObject pTextEdit::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pTextEdit,
++      qt_meta_data_pTextEdit, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pTextEdit::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pTextEdit::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pTextEdit::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pTextEdit))
++        return static_cast<void*>(const_cast< pTextEdit*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pTextEdit*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pTextEdit::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onChange(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pVerticalScrollBar[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      20,   19,   19,   19, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pVerticalScrollBar[] = {
++    "pVerticalScrollBar\0\0onChange()\0"
++};
++
++const QMetaObject pVerticalScrollBar::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pVerticalScrollBar,
++      qt_meta_data_pVerticalScrollBar, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pVerticalScrollBar::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pVerticalScrollBar::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pVerticalScrollBar::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pVerticalScrollBar))
++        return static_cast<void*>(const_cast< pVerticalScrollBar*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pVerticalScrollBar*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pVerticalScrollBar::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onChange(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++static const uint qt_meta_data_pVerticalSlider[] = {
++
++ // content:
++       5,       // revision
++       0,       // classname
++       0,    0, // classinfo
++       1,   14, // methods
++       0,    0, // properties
++       0,    0, // enums/sets
++       0,    0, // constructors
++       0,       // flags
++       0,       // signalCount
++
++ // slots: signature, parameters, type, tag, flags
++      17,   16,   16,   16, 0x0a,
++
++       0        // eod
++};
++
++static const char qt_meta_stringdata_pVerticalSlider[] = {
++    "pVerticalSlider\0\0onChange()\0"
++};
++
++const QMetaObject pVerticalSlider::staticMetaObject = {
++    { &QObject::staticMetaObject, qt_meta_stringdata_pVerticalSlider,
++      qt_meta_data_pVerticalSlider, 0 }
++};
++
++#ifdef Q_NO_DATA_RELOCATION
++const QMetaObject &pVerticalSlider::getStaticMetaObject() { return staticMetaObject; }
++#endif //Q_NO_DATA_RELOCATION
++
++const QMetaObject *pVerticalSlider::metaObject() const
++{
++    return QObject::d_ptr->metaObject ? QObject::d_ptr->metaObject : &staticMetaObject;
++}
++
++void *pVerticalSlider::qt_metacast(const char *_clname)
++{
++    if (!_clname) return 0;
++    if (!strcmp(_clname, qt_meta_stringdata_pVerticalSlider))
++        return static_cast<void*>(const_cast< pVerticalSlider*>(this));
++    if (!strcmp(_clname, "pWidget"))
++        return static_cast< pWidget*>(const_cast< pVerticalSlider*>(this));
++    return QObject::qt_metacast(_clname);
++}
++
++int pVerticalSlider::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
++{
++    _id = QObject::qt_metacall(_c, _id, _a);
++    if (_id < 0)
++        return _id;
++    if (_c == QMetaObject::InvokeMetaMethod) {
++        switch (_id) {
++        case 0: onChange(); break;
++        default: ;
++        }
++        _id -= 1;
++    }
++    return _id;
++}
++QT_END_MOC_NAMESPACE
+diff -urN ./phoenix/qt/platform.moc.hpp ../../bsnes-sx2_v009/phoenix/qt/platform.moc.hpp
+--- ./phoenix/qt/platform.moc.hpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/qt/platform.moc.hpp	2011-10-10 19:06:36.000000000 +0900
+@@ -0,0 +1,587 @@
++static QApplication *qtApplication = 0;
++
++struct Settings : public configuration {
++  unsigned frameGeometryX;
++  unsigned frameGeometryY;
++  unsigned frameGeometryWidth;
++  unsigned frameGeometryHeight;
++  unsigned menuGeometryHeight;
++  unsigned statusGeometryHeight;
++
++  void load();
++  void save();
++  Settings();
++};
++
++struct pWindow;
++struct pMenu;
++struct pLayout;
++struct pWidget;
++
++struct pFont {
++  static Geometry geometry(const string &description, const string &text);
++
++  static QFont create(const string &description);
++  static Geometry geometry(const QFont &qtFont, const string &text);
++};
++
++struct pObject {
++  Object &object;
++  bool locked;
++
++  pObject(Object &object) : object(object), locked(false) {}
++  virtual ~pObject() {}
++  void constructor() {}
++  void destructor() {}
++};
++
++struct pOS : public pObject {
++  static Geometry availableGeometry();
++  static Geometry desktopGeometry();
++  static string fileLoad(Window &parent, const string &path, const lstring &filter);
++  static string fileSave(Window &parent, const string &path, const lstring &filter);
++  static string folderSelect(Window &parent, const string &path);
++  static void main();
++  static bool pendingEvents();
++  static void processEvents();
++  static void quit();
++
++  static void initialize();
++};
++
++struct pTimer : public QObject, public pObject {
++  Q_OBJECT
++
++public:
++  Timer &timer;
++  QTimer *qtTimer;
++
++  void setEnabled(bool enabled);
++  void setInterval(unsigned milliseconds);
++
++  pTimer(Timer &timer) : pObject(timer), timer(timer) {}
++  void constructor();
++  void destructor();
++
++public slots:
++  void onTimeout();
++};
++
++struct pMessageWindow : public pObject {
++  static MessageWindow::Response information(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response question(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response warning(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response critical(Window &parent, const string &text, MessageWindow::Buttons buttons);
++};
++
++struct pWindow : public QObject, public pObject {
++  Q_OBJECT
++
++public:
++  Window &window;
++  struct QtWindow : public QWidget {
++    pWindow &self;
++    void closeEvent(QCloseEvent*);
++    void moveEvent(QMoveEvent*);
++    void resizeEvent(QResizeEvent*);
++    QSize sizeHint() const;
++    QtWindow(pWindow &self) : self(self) {}
++  } *qtWindow;
++  QVBoxLayout *qtLayout;
++  QMenuBar *qtMenu;
++  QStatusBar *qtStatus;
++  QWidget *qtContainer;
++
++  void append(Layout &layout);
++  void append(Menu &menu);
++  void append(Widget &widget);
++  Color backgroundColor();
++  Geometry frameMargin();
++  bool focused();
++  Geometry geometry();
++  void remove(Layout &layout);
++  void remove(Menu &menu);
++  void remove(Widget &widget);
++  void setBackgroundColor(const Color &color);
++  void setFocused();
++  void setFullScreen(bool fullScreen);
++  void setGeometry(const Geometry &geometry);
++  void setMenuFont(const string &font);
++  void setMenuVisible(bool visible);
++  void setResizable(bool resizable);
++  void setStatusFont(const string &font);
++  void setStatusText(const string &text);
++  void setStatusVisible(bool visible);
++  void setTitle(const string &text);
++  void setVisible(bool visible);
++  void setWidgetFont(const string &font);
++
++  pWindow(Window &window) : pObject(window), window(window) {}
++  void constructor();
++  void destructor();
++  void updateFrameGeometry();
++};
++
++struct pAction : public pObject {
++  Action &action;
++
++  void setEnabled(bool enabled);
++  void setFont(const string &font);
++  void setVisible(bool visible);
++
++  pAction(Action &action) : pObject(action), action(action) {}
++  void constructor();
++  void destructor();
++};
++
++struct pMenu : public pAction {
++  Menu &menu;
++  QMenu *qtMenu;
++
++  void append(Action &action);
++  void remove(Action &action);
++  void setFont(const string &font);
++  void setText(const string &text);
++
++  pMenu(Menu &menu) : pAction(menu), menu(menu) {}
++  void constructor();
++  void destructor();
++};
++
++struct pSeparator : public pAction {
++  Separator &separator;
++  QAction *qtAction;
++
++  pSeparator(Separator &separator) : pAction(separator), separator(separator) {}
++  void constructor();
++  void destructor();
++};
++
++struct pItem : public QObject, public pAction {
++  Q_OBJECT
++
++public:
++  Item &item;
++  QAction *qtAction;
++
++  void setText(const string &text);
++
++  pItem(Item &item) : pAction(item), item(item) {}
++  void constructor();
++  void destructor();
++
++public slots:
++  void onTick();
++};
++
++struct pCheckItem : public QObject, public pAction {
++  Q_OBJECT
++
++public:
++  CheckItem &checkItem;
++  QAction *qtAction;
++
++  bool checked();
++  void setChecked(bool checked);
++  void setText(const string &text);
++
++  pCheckItem(CheckItem &checkItem) : pAction(checkItem), checkItem(checkItem) {}
++  void constructor();
++  void destructor();
++
++public slots:
++  void onTick();
++};
++
++struct pRadioItem : public QObject, public pAction {
++  Q_OBJECT
++
++public:
++  RadioItem &radioItem;
++  QAction *qtAction;
++  QActionGroup *qtGroup;
++
++  bool checked();
++  void setChecked();
++  void setGroup(const reference_array<RadioItem&> &group);
++  void setText(const string &text);
++
++  pRadioItem(RadioItem &radioItem) : pAction(radioItem), radioItem(radioItem) {}
++  void constructor();
++  void destructor();
++
++public slots:
++  void onTick();
++};
++
++struct pSizable : public pObject {
++  Sizable &sizable;
++
++  pSizable(Sizable &sizable) : pObject(sizable), sizable(sizable) {}
++
++  void constructor() {}
++  void destructor() {}
++};
++
++struct pLayout : public pSizable {
++  Layout &layout;
++
++  pLayout(Layout &layout) : pSizable(layout), layout(layout) {}
++
++  void constructor() {}
++  void destructor() {}
++};
++
++struct pWidget : public pSizable {
++  Widget &widget;
++  QWidget *qtWidget;
++
++  virtual Geometry minimumGeometry();
++  void setEnabled(bool enabled);
++  void setFocused();
++  void setFont(const string &font);
++  virtual void setGeometry(const Geometry &geometry);
++  void setVisible(bool visible);
++
++  pWidget(Widget &widget) : pSizable(widget), widget(widget) {}
++  void constructor();
++  void synchronizeState();
++  void destructor();
++  virtual void orphan();
++};
++
++struct pButton : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  Button &button;
++  QPushButton *qtButton;
++
++  Geometry minimumGeometry();
++  void setText(const string &text);
++
++  pButton(Button &button) : pWidget(button), button(button) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onTick();
++};
++
++struct pCanvas : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  Canvas &canvas;
++  QImage *qtImage;
++  struct QtCanvas : public QWidget {
++    pCanvas &self;
++    void paintEvent(QPaintEvent*);
++    QtCanvas(pCanvas &self);
++  } *qtCanvas;
++
++  uint32_t* buffer();
++  void setGeometry(const Geometry &geometry);
++  void update();
++
++  pCanvas(Canvas &canvas) : pWidget(canvas), canvas(canvas) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++};
++
++struct pCheckBox : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  CheckBox &checkBox;
++  QCheckBox *qtCheckBox;
++
++  bool checked();
++  Geometry minimumGeometry();
++  void setChecked(bool checked);
++  void setText(const string &text);
++
++  pCheckBox(CheckBox &checkBox) : pWidget(checkBox), checkBox(checkBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onTick();
++};
++
++struct pComboBox : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  ComboBox &comboBox;
++  QComboBox *qtComboBox;
++
++  void append(const string &text);
++  Geometry minimumGeometry();
++  void reset();
++  unsigned selection();
++  void setSelection(unsigned row);
++
++  pComboBox(ComboBox &comboBox) : pWidget(comboBox), comboBox(comboBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onChange();
++};
++
++struct pHexEdit : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  HexEdit &hexEdit;
++  struct QtHexEdit : public QTextEdit {
++    pHexEdit &self;
++    void keyPressEvent(QKeyEvent*);
++    void keyPressEventAcknowledge(QKeyEvent*);
++    QtHexEdit(pHexEdit &self) : self(self) {}
++  } *qtHexEdit;
++  QHBoxLayout *qtLayout;
++  QScrollBar *qtScroll;
++
++  void setColumns(unsigned columns);
++  void setLength(unsigned length);
++  void setOffset(unsigned offset);
++  void setRows(unsigned rows);
++  void update();
++
++  pHexEdit(HexEdit &hexEdit) : pWidget(hexEdit), hexEdit(hexEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++  void keyPressEvent(QKeyEvent*);
++
++public slots:
++  void onScroll();
++};
++
++struct pHorizontalScrollBar : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  HorizontalScrollBar &horizontalScrollBar;
++  QScrollBar *qtScrollBar;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pHorizontalScrollBar(HorizontalScrollBar &horizontalScrollBar) : pWidget(horizontalScrollBar), horizontalScrollBar(horizontalScrollBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onChange();
++};
++
++struct pHorizontalSlider : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  HorizontalSlider &horizontalSlider;
++  QSlider *qtSlider;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pHorizontalSlider(HorizontalSlider &horizontalSlider) : pWidget(horizontalSlider), horizontalSlider(horizontalSlider) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onChange();
++};
++
++struct pLabel : public pWidget {
++  Label &label;
++  QLabel *qtLabel;
++
++  Geometry minimumGeometry();
++  void setText(const string &text);
++
++  pLabel(Label &label) : pWidget(label), label(label) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pLineEdit : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  LineEdit &lineEdit;
++  QLineEdit *qtLineEdit;
++
++  Geometry minimumGeometry();
++  void setEditable(bool editable);
++  void setText(const string &text);
++  string text();
++
++  pLineEdit(LineEdit &lineEdit) : pWidget(lineEdit), lineEdit(lineEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onActivate();
++  void onChange();
++};
++
++struct pListView : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  ListView &listView;
++  QTreeWidget *qtListView;
++
++  void append(const lstring &text);
++  void autoSizeColumns();
++  bool checked(unsigned row);
++  void modify(unsigned row, const lstring &text);
++  void reset();
++  bool selected();
++  unsigned selection();
++  void setCheckable(bool checkable);
++  void setChecked(unsigned row, bool checked);
++  void setHeaderText(const lstring &text);
++  void setHeaderVisible(bool visible);
++  void setSelected(bool selected);
++  void setSelection(unsigned row);
++
++  pListView(ListView &listView) : pWidget(listView), listView(listView) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onActivate();
++  void onChange(QTreeWidgetItem *item);
++  void onTick(QTreeWidgetItem *item);
++};
++
++struct pProgressBar : public pWidget {
++  ProgressBar &progressBar;
++  QProgressBar *qtProgressBar;
++
++  Geometry minimumGeometry();
++  void setPosition(unsigned position);
++
++  pProgressBar(ProgressBar &progressBar) : pWidget(progressBar), progressBar(progressBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pRadioBox : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  RadioBox &radioBox;
++  QRadioButton *qtRadioBox;
++  QButtonGroup *qtGroup;
++
++  bool checked();
++  Geometry minimumGeometry();
++  void setChecked();
++  void setGroup(const reference_array<RadioBox&> &group);
++  void setText(const string &text);
++
++  pRadioBox(RadioBox &radioBox) : pWidget(radioBox), radioBox(radioBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onTick();
++};
++
++struct pTextEdit : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  TextEdit &textEdit;
++  QTextEdit *qtTextEdit;
++
++  void setCursorPosition(unsigned position);
++  void setEditable(bool editable);
++  void setText(const string &text);
++  void setWordWrap(bool wordWrap);
++  string text();
++
++  pTextEdit(TextEdit &textEdit) : pWidget(textEdit), textEdit(textEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onChange();
++};
++
++struct pVerticalScrollBar : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  VerticalScrollBar &verticalScrollBar;
++  QScrollBar *qtScrollBar;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pVerticalScrollBar(VerticalScrollBar &verticalScrollBar) : pWidget(verticalScrollBar), verticalScrollBar(verticalScrollBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onChange();
++};
++
++struct pVerticalSlider : public QObject, public pWidget {
++  Q_OBJECT
++
++public:
++  VerticalSlider &verticalSlider;
++  QSlider *qtSlider;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pVerticalSlider(VerticalSlider &verticalSlider) : pWidget(verticalSlider), verticalSlider(verticalSlider) {}
++  void constructor();
++  void destructor();
++  void orphan();
++
++public slots:
++  void onChange();
++};
++
++struct pViewport : public pWidget {
++  Viewport &viewport;
++
++  uintptr_t handle();
++
++  pViewport(Viewport &viewport) : pWidget(viewport), viewport(viewport) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
+diff -urN ./phoenix/reference/platform.cpp ../../bsnes-sx2_v009/phoenix/reference/platform.cpp
+--- ./phoenix/reference/platform.cpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/reference/platform.cpp	2011-10-10 19:06:36.000000000 +0900
+@@ -0,0 +1,67 @@
++#include "platform.hpp"
++
++#include "font.cpp"
++#include "timer.cpp"
++#include "message-window.cpp"
++#include "window.cpp"
++
++#include "action/action.cpp"
++#include "action/menu.cpp"
++#include "action/separator.cpp"
++#include "action/item.cpp"
++#include "action/check-item.cpp"
++#include "action/radio-item.cpp"
++
++#include "widget/widget.cpp"
++#include "widget/button.cpp"
++#include "widget/canvas.cpp"
++#include "widget/check-box.cpp"
++#include "widget/combo-box.cpp"
++#include "widget/hex-edit.cpp"
++#include "widget/horizontal-scroll-bar.cpp"
++#include "widget/horizontal-slider.cpp"
++#include "widget/label.cpp"
++#include "widget/line-edit.cpp"
++#include "widget/list-view.cpp"
++#include "widget/progress-bar.cpp"
++#include "widget/radio-box.cpp"
++#include "widget/text-edit.cpp"
++#include "widget/vertical-scroll-bar.cpp"
++#include "widget/vertical-slider.cpp"
++#include "widget/viewport.cpp"
++
++Geometry pOS::availableGeometry() {
++  return { 0, 0, 0, 0 };
++}
++
++Geometry pOS::desktopGeometry() {
++  return { 0, 0, 0, 0 };
++}
++
++string pOS::fileLoad(Window &parent, const string &path, const lstring &filter) {
++  return "";
++}
++
++string pOS::fileSave(Window &parent, const string &path, const lstring &filter) {
++  return "";
++}
++
++string pOS::folderSelect(Window &parent, const string &path) {
++  return "";
++}
++
++void pOS::main() {
++}
++
++bool pOS::pendingEvents() {
++  return false;
++}
++
++void pOS::processEvents() {
++}
++
++void pOS::quit() {
++}
++
++void pOS::initialize() {
++}
+diff -urN ./phoenix/reference/platform.hpp ../../bsnes-sx2_v009/phoenix/reference/platform.hpp
+--- ./phoenix/reference/platform.hpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/reference/platform.hpp	2011-10-10 19:06:38.000000000 +0900
+@@ -0,0 +1,357 @@
++struct pFont;
++struct pWindow;
++struct pMenu;
++struct pLayout;
++struct pWidget;
++
++struct pFont {
++  static Geometry geometry(const string &description, const string &text);
++};
++
++struct pObject {
++  Object &object;
++  bool locked;
++
++  pObject(Object &object) : object(object), locked(locked) {}
++  virtual ~pObject() {}
++
++  void constructor() {}
++  void destructor() {}
++};
++
++struct pOS : public pObject {
++  static Geometry availableGeometry();
++  static Geometry desktopGeometry();
++  static string fileLoad(Window &parent, const string &path, const lstring &filter);
++  static string fileSave(Window &parent, const string &path, const lstring &filter);
++  static string folderSelect(Window &parent, const string &path);
++  static void main();
++  static bool pendingEvents();
++  static void processEvents();
++  static void quit();
++
++  static void initialize();
++};
++
++struct pTimer : public pObject {
++  Timer &timer;
++
++  void setEnabled(bool enabled);
++  void setInterval(unsigned milliseconds);
++
++  pTimer(Timer &timer) : pObject(timer), timer(timer) {}
++  void constructor();
++};
++
++struct pMessageWindow : public pObject {
++  static MessageWindow::Response information(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response question(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response warning(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response critical(Window &parent, const string &text, MessageWindow::Buttons buttons);
++};
++
++struct pWindow : public pObject {
++  Window &window;
++
++  void append(Layout &layout);
++  void append(Menu &menu);
++  void append(Widget &widget);
++  Color backgroundColor();
++  bool focused();
++  Geometry frameMargin();
++  Geometry geometry();
++  void remove(Layout &layout);
++  void remove(Menu &menu);
++  void remove(Widget &widget);
++  void setBackgroundColor(const Color &color);
++  void setFocused();
++  void setFullScreen(bool fullScreen);
++  void setGeometry(const Geometry &geometry);
++  void setMenuFont(const string &font);
++  void setMenuVisible(bool visible);
++  void setResizable(bool resizable);
++  void setStatusFont(const string &font);
++  void setStatusText(const string &text);
++  void setStatusVisible(bool visible);
++  void setTitle(const string &text);
++  void setVisible(bool visible);
++  void setWidgetFont(const string &font);
++
++  pWindow(Window &window) : pObject(window), window(window) {}
++  void constructor();
++};
++
++struct pAction : public pObject {
++  Action &action;
++
++  void setEnabled(bool enabled);
++  void setVisible(bool visible);
++
++  pAction(Action &action) : pObject(action), action(action) {}
++  void constructor();
++};
++
++struct pMenu : public pAction {
++  Menu &menu;
++
++  void append(Action &action);
++  void remove(Action &action);
++  void setText(const string &text);
++
++  pMenu(Menu &menu) : pAction(menu), menu(menu) {}
++  void constructor();
++  void destructor();
++};
++
++struct pSeparator : public pAction {
++  Separator &separator;
++
++  pSeparator(Separator &separator) : pAction(separator), separator(separator) {}
++  void constructor();
++  void destructor();
++};
++
++struct pItem : public pAction {
++  Item &item;
++
++  void setText(const string &text);
++
++  pItem(Item &item) : pAction(item), item(item) {}
++  void constructor();
++  void destructor();
++};
++
++struct pCheckItem : public pAction {
++  CheckItem &checkItem;
++
++  bool checked();
++  void setChecked(bool checked);
++  void setText(const string &text);
++
++  pCheckItem(CheckItem &checkItem) : pAction(checkItem), checkItem(checkItem) {}
++  void constructor();
++  void destructor();
++};
++
++struct pRadioItem : public pAction {
++  RadioItem &radioItem;
++
++  bool checked();
++  void setChecked();
++  void setGroup(const reference_array<RadioItem&> &group);
++  void setText(const string &text);
++
++  pRadioItem(RadioItem &radioItem) : pAction(radioItem), radioItem(radioItem) {}
++  void constructor();
++  void destructor();
++};
++
++struct pSizable : public pObject {
++  Sizable &sizable;
++
++  pSizable(Sizable &sizable) : pObject(sizable), sizable(sizable) {}
++};
++
++struct pLayout : public pSizable {
++  Layout &layout;
++
++  pLayout(Layout &layout) : pSizable(layout), layout(layout) {}
++};
++
++struct pWidget : public pSizable {
++  Widget &widget;
++
++  bool enabled();
++  Geometry minimumGeometry();
++  void setEnabled(bool enabled);
++  void setFocused();
++  void setFont(const string &font);
++  void setGeometry(const Geometry &geometry);
++  void setVisible(bool visible);
++
++  pWidget(Widget &widget) : pSizable(widget), widget(widget) {}
++  void constructor();
++};
++
++struct pButton : public pWidget {
++  Button &button;
++
++  void setText(const string &text);
++
++  pButton(Button &button) : pWidget(button), button(button) {}
++  void constructor();
++};
++
++struct pCanvas : public pWidget {
++  Canvas &canvas;
++
++  uint32_t* buffer();
++  void update();
++
++  pCanvas(Canvas &canvas) : pWidget(canvas), canvas(canvas) {}
++  void constructor();
++};
++
++struct pCheckBox : public pWidget {
++  CheckBox &checkBox;
++
++  bool checked();
++  void setChecked(bool checked);
++  void setText(const string &text);
++
++  pCheckBox(CheckBox &checkBox) : pWidget(checkBox), checkBox(checkBox) {}
++  void constructor();
++};
++
++struct pComboBox : public pWidget {
++  ComboBox &comboBox;
++
++  void append(const string &text);
++  void reset();
++  unsigned selection();
++  void setSelection(unsigned row);
++
++  pComboBox(ComboBox &comboBox) : pWidget(comboBox), comboBox(comboBox) {}
++  void constructor();
++};
++
++struct pHexEdit : public pWidget {
++  HexEdit &hexEdit;
++
++  void setColumns(unsigned columns);
++  void setLength(unsigned length);
++  void setOffset(unsigned offset);
++  void setRows(unsigned rows);
++  void update();
++
++  pHexEdit(HexEdit &hexEdit) : pWidget(hexEdit), hexEdit(hexEdit) {}
++  void constructor();
++};
++
++struct pHorizontalScrollBar : public pWidget {
++  HorizontalScrollBar &horizontalScrollBar;
++
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pHorizontalScrollBar(HorizontalScrollBar &horizontalScrollBar) : pWidget(horizontalScrollBar), horizontalScrollBar(horizontalScrollBar) {}
++  void constructor();
++};
++
++struct pHorizontalSlider : public pWidget {
++  HorizontalSlider &horizontalSlider;
++
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pHorizontalSlider(HorizontalSlider &horizontalSlider) : pWidget(horizontalSlider), horizontalSlider(horizontalSlider) {}
++  void constructor();
++};
++
++struct pLabel : public pWidget {
++  Label &label;
++
++  void setText(const string &text);
++
++  pLabel(Label &label) : pWidget(label), label(label) {}
++  void constructor();
++};
++
++struct pLineEdit : public pWidget {
++  LineEdit &lineEdit;
++
++  void setEditable(bool editable);
++  void setText(const string &text);
++  string text();
++
++  pLineEdit(LineEdit &lineEdit) : pWidget(lineEdit), lineEdit(lineEdit) {}
++  void constructor();
++};
++
++struct pListView : public pWidget {
++  ListView &listView;
++
++  void append(const lstring &text);
++  void autoSizeColumns();
++  bool checked(unsigned row);
++  void modify(unsigned row, const lstring &text);
++  void reset();
++  bool selected();
++  unsigned selection();
++  void setCheckable(bool checkable);
++  void setChecked(unsigned row, bool checked);
++  void setHeaderText(const lstring &text);
++  void setHeaderVisible(bool visible);
++  void setSelected(bool selected);
++  void setSelection(unsigned row);
++
++  pListView(ListView &listView) : pWidget(listView), listView(listView) {}
++  void constructor();
++};
++
++struct pProgressBar : public pWidget {
++  ProgressBar &progressBar;
++
++  void setPosition(unsigned position);
++
++  pProgressBar(ProgressBar &progressBar) : pWidget(progressBar), progressBar(progressBar) {}
++  void constructor();
++};
++
++struct pRadioBox : public pWidget {
++  RadioBox &radioBox;
++
++  bool checked();
++  void setChecked();
++  void setGroup(const reference_array<RadioBox&> &group);
++  void setText(const string &text);
++
++  pRadioBox(RadioBox &radioBox) : pWidget(radioBox), radioBox(radioBox) {}
++  void constructor();
++};
++
++struct pTextEdit : public pWidget {
++  TextEdit &textEdit;
++
++  void setCursorPosition(unsigned position);
++  void setEditable(bool editable);
++  void setText(const string &text);
++  void setWordWrap(bool wordWrap);
++  string text();
++
++  pTextEdit(TextEdit &textEdit) : pWidget(textEdit), textEdit(textEdit) {}
++  void constructor();
++};
++
++struct pVerticalScrollBar : public pWidget {
++  VerticalScrollBar &verticalScrollBar;
++
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pVerticalScrollBar(VerticalScrollBar &verticalScrollBar) : pWidget(verticalScrollBar), verticalScrollBar(verticalScrollBar) {}
++  void constructor();
++};
++
++struct pVerticalSlider : public pWidget {
++  VerticalSlider &verticalSlider;
++
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pVerticalSlider(VerticalSlider &verticalSlider) : pWidget(verticalSlider), verticalSlider(verticalSlider) {}
++  void constructor();
++};
++
++struct pViewport : public pWidget {
++  Viewport &viewport;
++
++  uintptr_t handle();
++
++  pViewport(Viewport &viewport) : pWidget(viewport), viewport(viewport) {}
++  void constructor();
++};
+diff -urN ./phoenix/windows/platform.cpp ../../bsnes-sx2_v009/phoenix/windows/platform.cpp
+--- ./phoenix/windows/platform.cpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/windows/platform.cpp	2011-10-10 19:06:38.000000000 +0900
+@@ -0,0 +1,489 @@
++#include "platform.hpp"
++
++#include "object.cpp"
++#include "font.cpp"
++#include "timer.cpp"
++#include "message-window.cpp"
++#include "window.cpp"
++
++#include "action/action.cpp"
++#include "action/menu.cpp"
++#include "action/separator.cpp"
++#include "action/item.cpp"
++#include "action/check-item.cpp"
++#include "action/radio-item.cpp"
++
++#include "widget/widget.cpp"
++#include "widget/button.cpp"
++#include "widget/canvas.cpp"
++#include "widget/check-box.cpp"
++#include "widget/combo-box.cpp"
++#include "widget/hex-edit.cpp"
++#include "widget/horizontal-scroll-bar.cpp"
++#include "widget/horizontal-slider.cpp"
++#include "widget/label.cpp"
++#include "widget/line-edit.cpp"
++#include "widget/list-view.cpp"
++#include "widget/progress-bar.cpp"
++#include "widget/radio-box.cpp"
++#include "widget/text-edit.cpp"
++#include "widget/vertical-scroll-bar.cpp"
++#include "widget/vertical-slider.cpp"
++#include "widget/viewport.cpp"
++
++static void OS_keyboardProc(HWND, UINT, WPARAM, LPARAM);
++static void OS_processDialogMessage(MSG&);
++static LRESULT CALLBACK OS_windowProc(HWND, UINT, WPARAM, LPARAM);
++
++Geometry pOS::availableGeometry() {
++  RECT rc;
++  SystemParametersInfo(SPI_GETWORKAREA, 0, &rc, 0);
++  return { rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top };
++}
++
++Geometry pOS::desktopGeometry() {
++  return { 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN) };
++}
++
++static string pOS_fileDialog(bool save, Window &parent, const string &path, const lstring &filter) {
++  string dir = path;
++  dir.replace("/", "\\");
++
++  string filterList;
++  for(auto &filterItem : filter) {
++    lstring part;
++    part.split("(", filterItem);
++    if(part.size() != 2) { print("--", filterItem, "\n"); continue; }
++    part[1].rtrim<1>(")");
++    part[1].replace(" ", "");
++    part[1].transform(",", ";");
++    filterList.append(string(filterItem, "\t", part[1], "\t"));
++  }
++
++  utf16_t wfilter(filterList);
++  utf16_t wdir(dir);
++  wchar_t wfilename[PATH_MAX + 1] = L"";
++
++  wchar_t *p = wfilter;
++  while(*p != L'\0') {
++    if(*p == L'\t') *p = L'\0';
++    p++;
++  }
++
++  OPENFILENAME ofn;
++  memset(&ofn, 0, sizeof(OPENFILENAME));
++  ofn.lStructSize = sizeof(OPENFILENAME);
++  ofn.hwndOwner = &parent != &Window::None ? parent.p.hwnd : 0;
++  ofn.lpstrFilter = wfilter;
++  ofn.lpstrInitialDir = wdir;
++  ofn.lpstrFile = wfilename;
++  ofn.nMaxFile = PATH_MAX;
++  ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
++  ofn.lpstrDefExt = L"";
++
++  bool result = (save == false ? GetOpenFileName(&ofn) : GetSaveFileName(&ofn));
++  if(result == false) return "";
++  string name = (const char*)utf8_t(wfilename);
++  name.transform("\\", "/");
++  return name;
++}
++
++string pOS::fileLoad(Window &parent, const string &path, const lstring &filter) {
++  return pOS_fileDialog(false, parent, path, filter);
++}
++
++string pOS::fileSave(Window &parent, const string &path, const lstring &filter) {
++  return pOS_fileDialog(true, parent, path, filter);
++}
++
++string pOS::folderSelect(Window &parent, const string &path) {
++  wchar_t wfilename[PATH_MAX + 1] = L"";
++  BROWSEINFO bi;
++  bi.hwndOwner = &parent != &Window::None ? parent.p.hwnd : 0;
++  bi.pidlRoot = NULL;
++  bi.pszDisplayName = wfilename;
++  bi.lpszTitle = L"";
++  bi.ulFlags = BIF_NEWDIALOGSTYLE | BIF_RETURNONLYFSDIRS;
++  bi.lpfn = NULL;
++  bi.lParam = 0;
++  bi.iImage = 0;
++  bool result = false;
++  LPITEMIDLIST pidl = SHBrowseForFolder(&bi);
++  if(pidl) {
++    if(SHGetPathFromIDList(pidl, wfilename)) {
++      result = true;
++      IMalloc *imalloc = 0;
++      if(SUCCEEDED(SHGetMalloc(&imalloc))) {
++        imalloc->Free(pidl);
++        imalloc->Release();
++      }
++    }
++  }
++  if(result == false) return "";
++  string name = (const char*)utf8_t(wfilename);
++  if(name == "") return "";
++  name.transform("\\", "/");
++  if(name.endswith("/") == false) name.append("/");
++  return name;
++}
++
++void pOS::main() {
++  MSG msg;
++  while(GetMessage(&msg, 0, 0, 0)) {
++    OS_processDialogMessage(msg);
++  }
++}
++
++bool pOS::pendingEvents() {
++  MSG msg;
++  return PeekMessage(&msg, 0, 0, 0, PM_NOREMOVE);
++}
++
++void pOS::processEvents() {
++  while(pendingEvents()) {
++    MSG msg;
++    if(PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
++      OS_processDialogMessage(msg);
++    }
++  }
++}
++
++void OS_processDialogMessage(MSG &msg) {
++  if(msg.message == WM_KEYDOWN || msg.message == WM_KEYUP) {
++    OS_keyboardProc(msg.hwnd, msg.message, msg.wParam, msg.lParam);
++  }
++
++  wchar_t className[256];
++  GetClassName(msg.hwnd, className, 255);
++
++  //if this HWND accepts tabs to move between controls ...
++  if(!wcscmp(className, L"BUTTON")       //Button, CheckBox, RadioBox
++  || !wcscmp(className, L"COMBOBOX")     //ComboBox
++  || !wcscmp(className, L"EDIT")         //HexEdit, LineEdit, TextEdit
++  || !wcscmp(className, L"SCROLLBAR")    //HorizontalScrollBar, VerticalScrollBar
++  || !wcscmp(className, TRACKBAR_CLASS)  //HorizontalSlider, VerticalSlider
++  || !wcscmp(className, WC_LISTVIEW)     //ListView
++  ) {
++    //... return if the message is a dialog command
++    if(IsDialogMessage(msg.hwnd, &msg)) return;
++  }
++
++  TranslateMessage(&msg);
++  DispatchMessage(&msg);
++}
++
++void pOS::quit() {
++  PostQuitMessage(0);
++}
++
++void pOS::initialize() {
++  CoInitialize(0);
++  InitCommonControls();
++
++  WNDCLASS wc;
++  wc.cbClsExtra = 0;
++  wc.cbWndExtra = 0;
++  wc.hbrBackground = GetSysColorBrush(COLOR_3DFACE);
++  wc.hCursor = LoadCursor(0, IDC_ARROW);
++  wc.hIcon = LoadIcon(GetModuleHandle(0), MAKEINTRESOURCE(2));
++  wc.hInstance = GetModuleHandle(0);
++  wc.lpfnWndProc = OS_windowProc;
++  wc.lpszClassName = L"phoenix_window";
++  wc.lpszMenuName = 0;
++  wc.style = CS_HREDRAW | CS_VREDRAW;
++  RegisterClass(&wc);
++
++  wc.cbClsExtra = 0;
++  wc.cbWndExtra = 0;
++  wc.hbrBackground = CreateSolidBrush(RGB(0, 0, 0));
++  wc.hCursor = LoadCursor(0, IDC_ARROW);
++  wc.hIcon = LoadIcon(0, IDI_APPLICATION);
++  wc.hInstance = GetModuleHandle(0);
++  wc.lpfnWndProc = Canvas_windowProc;
++  wc.lpszClassName = L"phoenix_canvas";
++  wc.lpszMenuName = 0;
++  wc.style = CS_HREDRAW | CS_VREDRAW;
++  RegisterClass(&wc);
++
++  wc.cbClsExtra = 0;
++  wc.cbWndExtra = 0;
++  wc.hbrBackground = GetSysColorBrush(COLOR_3DFACE);
++  wc.hCursor = LoadCursor(0, IDC_ARROW);
++  wc.hIcon = LoadIcon(0, IDI_APPLICATION);
++  wc.hInstance = GetModuleHandle(0);
++  wc.lpfnWndProc = Label_windowProc;
++  wc.lpszClassName = L"phoenix_label";
++  wc.lpszMenuName = 0;
++  wc.style = CS_HREDRAW | CS_VREDRAW;
++  RegisterClass(&wc);
++
++  wc.cbClsExtra = 0;
++  wc.cbWndExtra = 0;
++  wc.hbrBackground = CreateSolidBrush(RGB(0, 0, 0));
++  wc.hCursor = LoadCursor(0, IDC_ARROW);
++  wc.hIcon = LoadIcon(0, IDI_APPLICATION);
++  wc.hInstance = GetModuleHandle(0);
++  wc.lpfnWndProc = Viewport_windowProc;
++  wc.lpszClassName = L"phoenix_viewport";
++  wc.lpszMenuName = 0;
++  wc.style = CS_HREDRAW | CS_VREDRAW;
++  RegisterClass(&wc);
++}
++
++static void OS_keyboardProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
++  if(msg == WM_KEYDOWN) {
++    GUITHREADINFO info;
++    memset(&info, 0, sizeof(GUITHREADINFO));
++    info.cbSize = sizeof(GUITHREADINFO);
++    GetGUIThreadInfo(GetCurrentThreadId(), &info);
++    Object *object = (Object*)GetWindowLongPtr(info.hwndFocus, GWLP_USERDATA);
++    if(object == 0) return;
++    if(dynamic_cast<ListView*>(object)) {
++      ListView &listView = (ListView&)*object;
++      if(wparam == VK_RETURN) {
++        if(listView.onActivate) listView.onActivate();
++      }
++    } else if(dynamic_cast<LineEdit*>(object)) {
++      LineEdit &lineEdit = (LineEdit&)*object;
++      if(wparam == VK_RETURN) {
++        if(lineEdit.onActivate) lineEdit.onActivate();
++      }
++    }
++  }
++}
++
++static LRESULT CALLBACK OS_windowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
++  Object *object = (Object*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
++  if(!object || !dynamic_cast<Window*>(object)) return DefWindowProc(hwnd, msg, wparam, lparam);
++  Window &window = (Window&)*object;
++
++  switch(msg) {
++    case WM_CLOSE: {
++      window.state.ignore = false;
++      if(window.onClose) window.onClose();
++      if(window.state.ignore == false) window.setVisible(false);
++      return TRUE;
++    }
++
++    case WM_MOVE: {
++      if(window.p.locked) break;
++
++      Geometry geometry = window.geometry();
++      window.state.geometry.x = geometry.x;
++      window.state.geometry.y = geometry.y;
++
++      if(window.onMove) window.onMove();
++      break;
++    }
++
++    case WM_SIZE: {
++      if(window.p.locked) break;
++      SetWindowPos(window.p.hstatus, NULL, 0, 0, 0, 0, SWP_NOZORDER | SWP_FRAMECHANGED);
++
++      Geometry geometry = window.geometry();
++      window.state.geometry.width = geometry.width;
++      window.state.geometry.height = geometry.height;
++
++      for(auto &layout : window.state.layout) {
++        Geometry geom = window.geometry();
++        geom.x = geom.y = 0;
++        layout.setGeometry(geom);
++      }
++
++      if(window.onSize) window.onSize();
++      break;
++    }
++
++    case WM_GETMINMAXINFO: {
++      MINMAXINFO *mmi = (MINMAXINFO*)lparam;
++    //mmi->ptMinTrackSize.x = 256 + window.p.frameMargin().width;
++    //mmi->ptMinTrackSize.y = 256 + window.p.frameMargin().height;
++    //return TRUE;
++    }
++
++    case WM_ERASEBKGND: {
++      if(window.p.brush == 0) break;
++      RECT rc;
++      GetClientRect(window.p.hwnd, &rc);
++      PAINTSTRUCT ps;
++      BeginPaint(window.p.hwnd, &ps);
++      FillRect(ps.hdc, &rc, window.p.brush);
++      EndPaint(window.p.hwnd, &ps);
++      return TRUE;
++    }
++
++    case WM_CTLCOLORBTN:
++    case WM_CTLCOLORSTATIC: {
++      Object *object = (Object*)GetWindowLongPtr((HWND)lparam, GWLP_USERDATA);
++      if(object && window.p.brush) {
++        HDC hdc = (HDC)wparam;
++        SetBkColor((HDC)wparam, window.p.brushColor);
++        return (INT_PTR)window.p.brush;
++      }
++    }
++
++    case WM_COMMAND: {
++      unsigned id = LOWORD(wparam);
++      HWND control = GetDlgItem(window.p.hwnd, id);
++      if(control == 0) {
++        pObject *object = (pObject*)pObject::find(id);
++        if(!object) break;
++        if(dynamic_cast<pItem*>(object)) {
++          Item &item = ((pItem*)object)->item;
++          if(item.onTick) item.onTick();
++        } else if(dynamic_cast<pCheckItem*>(object)) {
++          CheckItem &checkItem = ((pCheckItem*)object)->checkItem;
++          checkItem.setChecked(!checkItem.state.checked);
++          if(checkItem.onTick) checkItem.onTick();
++        } else if(dynamic_cast<pRadioItem*>(object)) {
++          RadioItem &radioItem = ((pRadioItem*)object)->radioItem;
++          if(radioItem.state.checked == false) {
++            radioItem.setChecked();
++            if(radioItem.onTick) radioItem.onTick();
++          }
++        }
++      } else {
++        Object *object = (Object*)GetWindowLongPtr(control, GWLP_USERDATA);
++        if(!object) break;
++        if(dynamic_cast<Button*>(object)) {
++          Button &button = (Button&)*object;
++          if(button.onTick) button.onTick();
++        } else if(dynamic_cast<CheckBox*>(object)) {
++          CheckBox &checkBox = (CheckBox&)*object;
++          checkBox.setChecked(!checkBox.state.checked);
++          if(checkBox.onTick) checkBox.onTick();
++        } else if(dynamic_cast<ComboBox*>(object)) {
++          ComboBox &comboBox = (ComboBox&)*object;
++          if(HIWORD(wparam) == CBN_SELCHANGE) {
++            if(comboBox.state.selection != comboBox.selection()) {
++              comboBox.state.selection = comboBox.selection();
++              if(comboBox.onChange) comboBox.onChange();
++            }
++          }
++        } else if(dynamic_cast<LineEdit*>(object)) {
++          LineEdit &lineEdit = (LineEdit&)*object;
++          if(HIWORD(wparam) == EN_CHANGE) {
++            if(lineEdit.p.locked == false && lineEdit.onChange) lineEdit.onChange();
++          }
++        } else if(dynamic_cast<RadioBox*>(object)) {
++          RadioBox &radioBox = (RadioBox&)*object;
++          if(radioBox.state.checked == false) {
++            radioBox.setChecked();
++            if(radioBox.onTick) radioBox.onTick();
++          }
++        } else if(dynamic_cast<TextEdit*>(object)) {
++          TextEdit &textEdit = (TextEdit&)*object;
++          if(HIWORD(wparam) == EN_CHANGE) {
++            if(textEdit.p.locked == false && textEdit.onChange) textEdit.onChange();
++          }
++        }
++      }
++    }
++
++    case WM_NOTIFY: {
++      unsigned id = LOWORD(wparam);
++      HWND control = GetDlgItem(window.p.hwnd, id);
++      if(control == 0) break;
++      Object *object = (Object*)GetWindowLongPtr(control, GWLP_USERDATA);
++      if(object == 0) break;
++      if(dynamic_cast<ListView*>(object)) {
++        ListView &listView = (ListView&)*object;
++        LPNMHDR nmhdr = (LPNMHDR)lparam;
++        LPNMLISTVIEW nmlistview = (LPNMLISTVIEW)lparam;
++
++        if(nmhdr->code == LVN_ITEMCHANGED && (nmlistview->uChanged & LVIF_STATE)) {
++          unsigned imagemask = ((nmlistview->uNewState & LVIS_STATEIMAGEMASK) >> 12) - 1;
++          if(imagemask == 0 || imagemask == 1) {
++            if(listView.p.locked == false && listView.onTick) listView.onTick(nmlistview->iItem);
++          } else if((nmlistview->uOldState & LVIS_FOCUSED) && !(nmlistview->uNewState & LVIS_FOCUSED)) {
++            listView.p.lostFocus = true;
++          } else {
++            if(!(nmlistview->uOldState & LVIS_SELECTED) && (nmlistview->uNewState & LVIS_SELECTED)) {
++              listView.state.selected = true;
++              listView.state.selection = listView.selection();
++              if(listView.p.locked == false && listView.onChange) listView.onChange();
++            } else if(listView.p.lostFocus == false && listView.selected() == false) {
++              listView.state.selected = true;
++              listView.state.selection = listView.selection();
++              if(listView.p.locked == false && listView.onChange) listView.onChange();
++            }
++            listView.p.lostFocus = false;
++          }
++        } else if(nmhdr->code == LVN_ITEMACTIVATE) {
++          if(listView.onActivate) listView.onActivate();
++        }
++      }
++    }
++
++    case WM_HSCROLL:
++    case WM_VSCROLL: {
++      Object *object = 0;
++      if(lparam) {
++        object = (Object*)GetWindowLongPtr((HWND)lparam, GWLP_USERDATA);
++      } else {
++        unsigned id = LOWORD(wparam);
++        HWND control = GetDlgItem(window.p.hwnd, id);
++        if(control == 0) break;
++        object = (Object*)GetWindowLongPtr(control, GWLP_USERDATA);
++      }
++      if(object == 0) break;
++
++      if(dynamic_cast<HorizontalScrollBar*>(object)
++      || dynamic_cast<VerticalScrollBar*>(object)) {
++        SCROLLINFO info;
++        memset(&info, 0, sizeof(SCROLLINFO));
++        info.cbSize = sizeof(SCROLLINFO);
++        info.fMask = SIF_ALL;
++        GetScrollInfo((HWND)lparam, SB_CTL, &info);
++
++        switch(LOWORD(wparam)) {
++        case SB_LEFT: info.nPos = info.nMin; break;
++        case SB_RIGHT: info.nPos = info.nMax; break;
++        case SB_LINELEFT: info.nPos--; break;
++        case SB_LINERIGHT: info.nPos++; break;
++        case SB_PAGELEFT: info.nPos -= info.nMax >> 3; break;
++        case SB_PAGERIGHT: info.nPos += info.nMax >> 3; break;
++        case SB_THUMBTRACK: info.nPos = info.nTrackPos; break;
++        }
++
++        info.fMask = SIF_POS;
++        SetScrollInfo((HWND)lparam, SB_CTL, &info, TRUE);
++
++        //Windows may clamp position to scrollbar range
++        GetScrollInfo((HWND)lparam, SB_CTL, &info);
++
++        if(dynamic_cast<HorizontalScrollBar*>(object)) {
++          HorizontalScrollBar &horizontalScrollBar = (HorizontalScrollBar&)*object;
++          if(horizontalScrollBar.state.position != info.nPos) {
++            horizontalScrollBar.state.position = info.nPos;
++            if(horizontalScrollBar.onChange) horizontalScrollBar.onChange();
++          }
++        } else {
++          VerticalScrollBar &verticalScrollBar = (VerticalScrollBar&)*object;
++          if(verticalScrollBar.state.position != info.nPos) {
++            verticalScrollBar.state.position = info.nPos;
++            if(verticalScrollBar.onChange) verticalScrollBar.onChange();
++          }
++        }
++
++        return TRUE;
++      }
++
++      if(dynamic_cast<HorizontalSlider*>(object)) {
++        HorizontalSlider &horizontalSlider = (HorizontalSlider&)*object;
++        if(horizontalSlider.state.position != horizontalSlider.position()) {
++          horizontalSlider.state.position = horizontalSlider.position();
++          if(horizontalSlider.onChange) horizontalSlider.onChange();
++        }
++      } else if(dynamic_cast<VerticalSlider*>(object)) {
++        VerticalSlider &verticalSlider = (VerticalSlider&)*object;
++        if(verticalSlider.state.position != verticalSlider.position()) {
++          verticalSlider.state.position = verticalSlider.position();
++          if(verticalSlider.onChange) verticalSlider.onChange();
++        }
++      }
++    }
++  }
++
++  return DefWindowProc(hwnd, msg, wparam, lparam);
++}
+diff -urN ./phoenix/windows/platform.hpp ../../bsnes-sx2_v009/phoenix/windows/platform.hpp
+--- ./phoenix/windows/platform.hpp	1970-01-01 09:00:00.000000000 +0900
++++ ../../bsnes-sx2_v009/phoenix/windows/platform.hpp	2011-10-10 19:06:38.000000000 +0900
+@@ -0,0 +1,434 @@
++struct pFont;
++struct pWindow;
++struct pMenu;
++struct pLayout;
++struct pWidget;
++
++struct pFont {
++  static Geometry geometry(const string &description, const string &text);
++
++  static HFONT create(const string &description);
++  static void free(HFONT hfont);
++  static Geometry geometry(HFONT hfont, const string &text);
++};
++
++struct pObject {
++  Object &object;
++  uintptr_t id;
++  bool locked;
++  static array<pObject*> objects;
++
++  pObject(Object &object);
++  static pObject* find(unsigned id);
++  virtual ~pObject() {}
++
++  void constructor() {}
++  void destructor() {}
++};
++
++struct pOS : public pObject {
++  static Geometry availableGeometry();
++  static Geometry desktopGeometry();
++  static string fileLoad(Window &parent, const string &path, const lstring &filter);
++  static string fileSave(Window &parent, const string &path, const lstring &filter);
++  static string folderSelect(Window &parent, const string &path);
++  static void main();
++  static bool pendingEvents();
++  static void processEvents();
++  static void quit();
++
++  static void initialize();
++};
++
++struct pTimer : public pObject {
++  Timer &timer;
++  UINT_PTR htimer;
++
++  void setEnabled(bool enabled);
++  void setInterval(unsigned milliseconds);
++
++  pTimer(Timer &timer) : pObject(timer), timer(timer) {}
++  void constructor();
++};
++
++struct pMessageWindow : public pObject {
++  static MessageWindow::Response information(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response question(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response warning(Window &parent, const string &text, MessageWindow::Buttons buttons);
++  static MessageWindow::Response critical(Window &parent, const string &text, MessageWindow::Buttons buttons);
++};
++
++struct pWindow : public pObject {
++  Window &window;
++  HWND hwnd;
++  HMENU hmenu;
++  HWND hstatus;
++  HFONT hstatusfont;
++  HBRUSH brush;
++  COLORREF brushColor;
++
++  void append(Layout &layout);
++  void append(Menu &menu);
++  void append(Widget &widget);
++  Color backgroundColor();
++  bool focused();
++  Geometry frameMargin();
++  Geometry geometry();
++  void remove(Layout &layout);
++  void remove(Menu &menu);
++  void remove(Widget &widget);
++  void setBackgroundColor(const Color &color);
++  void setFocused();
++  void setFullScreen(bool fullScreen);
++  void setGeometry(const Geometry &geometry);
++  void setMenuFont(const string &font);
++  void setMenuVisible(bool visible);
++  void setResizable(bool resizable);
++  void setStatusFont(const string &font);
++  void setStatusText(const string &text);
++  void setStatusVisible(bool visible);
++  void setTitle(const string &text);
++  void setVisible(bool visible);
++  void setWidgetFont(const string &font);
++
++  pWindow(Window &window) : pObject(window), window(window) {}
++  void constructor();
++  void destructor();
++  void updateMenu();
++};
++
++struct pAction : public pObject {
++  Action &action;
++  Menu *parentMenu;
++  Window *parentWindow;
++
++  void setEnabled(bool enabled);
++  void setVisible(bool visible);
++
++  pAction(Action &action) : pObject(action), action(action) {}
++  void constructor();
++};
++
++struct pMenu : public pAction {
++  Menu &menu;
++  HMENU hmenu;
++
++  void append(Action &action);
++  void remove(Action &action);
++  void setText(const string &text);
++
++  pMenu(Menu &menu) : pAction(menu), menu(menu) {}
++  void constructor();
++  void destructor();
++  void update(Window &parentWindow, Menu *parentMenu = 0);
++};
++
++struct pSeparator : public pAction {
++  Separator &separator;
++
++  pSeparator(Separator &separator) : pAction(separator), separator(separator) {}
++  void constructor();
++  void destructor();
++};
++
++struct pItem : public pAction {
++  Item &item;
++
++  void setText(const string &text);
++
++  pItem(Item &item) : pAction(item), item(item) {}
++  void constructor();
++  void destructor();
++};
++
++struct pCheckItem : public pAction {
++  CheckItem &checkItem;
++
++  bool checked();
++  void setChecked(bool checked);
++  void setText(const string &text);
++
++  pCheckItem(CheckItem &checkItem) : pAction(checkItem), checkItem(checkItem) {}
++  void constructor();
++  void destructor();
++};
++
++struct pRadioItem : public pAction {
++  RadioItem &radioItem;
++
++  bool checked();
++  void setChecked();
++  void setGroup(const reference_array<RadioItem&> &group);
++  void setText(const string &text);
++
++  pRadioItem(RadioItem &radioItem) : pAction(radioItem), radioItem(radioItem) {}
++  void constructor();
++  void destructor();
++};
++
++struct pSizable : public pObject {
++  Sizable &sizable;
++
++  pSizable(Sizable &sizable) : pObject(sizable), sizable(sizable) {}
++};
++
++struct pLayout : public pSizable {
++  Layout &layout;
++
++  pLayout(Layout &layout) : pSizable(layout), layout(layout) {}
++};
++
++struct pWidget : public pSizable {
++  Widget &widget;
++  Window *parentWindow;
++  HWND hwnd;
++  HFONT hfont;
++
++  bool enabled();
++  virtual Geometry minimumGeometry();
++  void setEnabled(bool enabled);
++  void setFocused();
++  void setFont(const string &font);
++  virtual void setGeometry(const Geometry &geometry);
++  void setVisible(bool visible);
++
++  pWidget(Widget &widget) : pSizable(widget), widget(widget) { parentWindow = &Window::None; }
++  void constructor();
++  void destructor();
++  virtual void orphan();
++  void setDefaultFont();
++  void synchronize();
++};
++
++struct pButton : public pWidget {
++  Button &button;
++
++  Geometry minimumGeometry();
++  void setText(const string &text);
++
++  pButton(Button &button) : pWidget(button), button(button) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pCanvas : public pWidget {
++  Canvas &canvas;
++  uint32_t *bufferRGB;
++
++  uint32_t* buffer();
++  void setGeometry(const Geometry &geometry);
++  void update();
++
++  pCanvas(Canvas &canvas) : pWidget(canvas), canvas(canvas) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pCheckBox : public pWidget {
++  CheckBox &checkBox;
++
++  bool checked();
++  Geometry minimumGeometry();
++  void setChecked(bool checked);
++  void setText(const string &text);
++
++  pCheckBox(CheckBox &checkBox) : pWidget(checkBox), checkBox(checkBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pComboBox : public pWidget {
++  ComboBox &comboBox;
++
++  void append(const string &text);
++  Geometry minimumGeometry();
++  void reset();
++  unsigned selection();
++  void setSelection(unsigned row);
++
++  pComboBox(ComboBox &comboBox) : pWidget(comboBox), comboBox(comboBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++  void setGeometry(const Geometry &geometry);
++};
++
++struct pHexEdit : public pWidget {
++  HexEdit &hexEdit;
++  LRESULT CALLBACK (*windowProc)(HWND, UINT, LPARAM, WPARAM);
++
++  void setColumns(unsigned columns);
++  void setLength(unsigned length);
++  void setOffset(unsigned offset);
++  void setRows(unsigned rows);
++  void update();
++
++  pHexEdit(HexEdit &hexEdit) : pWidget(hexEdit), hexEdit(hexEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++  bool keyPress(unsigned key);
++};
++
++struct pHorizontalScrollBar : public pWidget {
++  HorizontalScrollBar &horizontalScrollBar;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pHorizontalScrollBar(HorizontalScrollBar &horizontalScrollBar) : pWidget(horizontalScrollBar), horizontalScrollBar(horizontalScrollBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pHorizontalSlider : public pWidget {
++  HorizontalSlider &horizontalSlider;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pHorizontalSlider(HorizontalSlider &horizontalSlider) : pWidget(horizontalSlider), horizontalSlider(horizontalSlider) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pLabel : public pWidget {
++  Label &label;
++
++  Geometry minimumGeometry();
++  void setText(const string &text);
++
++  pLabel(Label &label) : pWidget(label), label(label) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pLineEdit : public pWidget {
++  LineEdit &lineEdit;
++
++  Geometry minimumGeometry();
++  void setEditable(bool editable);
++  void setText(const string &text);
++  string text();
++
++  pLineEdit(LineEdit &lineEdit) : pWidget(lineEdit), lineEdit(lineEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pListView : public pWidget {
++  ListView &listView;
++  bool lostFocus;
++
++  void append(const lstring &text);
++  void autoSizeColumns();
++  bool checked(unsigned row);
++  void modify(unsigned row, const lstring &text);
++  void reset();
++  bool selected();
++  unsigned selection();
++  void setCheckable(bool checkable);
++  void setChecked(unsigned row, bool checked);
++  void setHeaderText(const lstring &text);
++  void setHeaderVisible(bool visible);
++  void setSelected(bool selected);
++  void setSelection(unsigned row);
++
++  pListView(ListView &listView) : pWidget(listView), listView(listView) {}
++  void constructor();
++  void destructor();
++  void orphan();
++  void setGeometry(const Geometry &geometry);
++};
++
++struct pProgressBar : public pWidget {
++  ProgressBar &progressBar;
++
++  Geometry minimumGeometry();
++  void setPosition(unsigned position);
++
++  pProgressBar(ProgressBar &progressBar) : pWidget(progressBar), progressBar(progressBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pRadioBox : public pWidget {
++  RadioBox &radioBox;
++
++  bool checked();
++  Geometry minimumGeometry();
++  void setChecked();
++  void setGroup(const reference_array<RadioBox&> &group);
++  void setText(const string &text);
++
++  pRadioBox(RadioBox &radioBox) : pWidget(radioBox), radioBox(radioBox) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pTextEdit : public pWidget {
++  TextEdit &textEdit;
++
++  void setCursorPosition(unsigned position);
++  void setEditable(bool editable);
++  void setText(const string &text);
++  void setWordWrap(bool wordWrap);
++  string text();
++
++  pTextEdit(TextEdit &textEdit) : pWidget(textEdit), textEdit(textEdit) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pVerticalScrollBar : public pWidget {
++  VerticalScrollBar &verticalScrollBar;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pVerticalScrollBar(VerticalScrollBar &verticalScrollBar) : pWidget(verticalScrollBar), verticalScrollBar(verticalScrollBar) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pVerticalSlider : public pWidget {
++  VerticalSlider &verticalSlider;
++
++  Geometry minimumGeometry();
++  unsigned position();
++  void setLength(unsigned length);
++  void setPosition(unsigned position);
++
++  pVerticalSlider(VerticalSlider &verticalSlider) : pWidget(verticalSlider), verticalSlider(verticalSlider) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
++
++struct pViewport : public pWidget {
++  Viewport &viewport;
++
++  uintptr_t handle();
++
++  pViewport(Viewport &viewport) : pWidget(viewport), viewport(viewport) {}
++  void constructor();
++  void destructor();
++  void orphan();
++};
+diff -urN ./snes/cartridge/cartridge.cpp ../../bsnes-sx2_v009/snes/cartridge/cartridge.cpp
+--- ./snes/cartridge/cartridge.cpp	2011-07-03 22:28:19.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/cartridge/cartridge.cpp	2012-01-19 15:05:30.000000000 +0900
+@@ -80,4 +81,16 @@
+   unload();
+ }
+ 
++void Cartridge::Tilt() {
++  rom.write_protect(false);
++  uint8 data = 0;
++  unsigned data2 = 0;
++  for(unsigned addr = 0; addr <= rom.size(); addr++) {
++	data2 = SNES::random();
++	data = (uint8)data2;	
++	if(data != 0xdb) { rom.write(addr, data); }
++  }
++  rom.write_protect(true);
++}
++
+ }
+diff -urN ./snes/cartridge/cartridge.hpp ../../bsnes-sx2_v009/snes/cartridge/cartridge.hpp
+--- ./snes/cartridge/cartridge.hpp	2011-06-26 14:06:35.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/cartridge/cartridge.hpp	2012-01-22 20:38:25.000000000 +0900
+@@ -89,6 +93,8 @@
+   void serialize(serializer&);
+   Cartridge();
+   ~Cartridge();
++  
++  void Tilt();
+ 
+ private:
+   void parse_xml(const lstring&);
+diff -urN ./snes/chip/bsx/cartridge/cartridge.hpp ../../bsnes-sx2_v009/snes/chip/bsx/cartridge/cartridge.hpp
+--- ./snes/chip/bsx/cartridge/cartridge.hpp	2011-01-25 21:58:15.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/chip/bsx/cartridge/cartridge.hpp	2012-03-19 12:27:10.000000000 +0900
+@@ -27,6 +27,7 @@
+   bool r04, r05, r06, r07;
+   bool r08, r09, r0a, r0b;
+   bool r0c, r0d, r0e, r0f;
++  
+ };
+ 
+ extern BSXCartridge bsxcartridge;
+diff -urN ./snes/cpu/core/disassembler/disassembler.cpp ../../bsnes-sx2_v009/snes/cpu/core/disassembler/disassembler.cpp
+--- ./snes/cpu/core/disassembler/disassembler.cpp	2010-08-19 13:18:17.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/cpu/core/disassembler/disassembler.cpp	2012-01-24 19:28:14.000000000 +0900
+@@ -1,7 +1,7 @@
+ #ifdef CPUCORE_CPP
+ 
+ uint8 CPUcore::dreadb(uint32 addr) {
+-  if((addr & 0x40ffff) >= 0x2000 && (addr & 0x40ffff) <= 0x5fff) {
++  if((addr & 0x40ffff) >= 0x2000 && (addr & 0x40ffff) <= 0x4fff) {
+     //$[00-3f|80-bf]:[2000-5fff]
+     //do not read MMIO registers within debugger
+     return 0x00;
+diff -urN ./snes/snes.hpp ../../bsnes-sx2_v009/snes/snes.hpp
+--- ./snes/snes.hpp	2011-08-20 22:30:16.000000000 +0900
++++ ../../bsnes-sx2_v009/snes/snes.hpp	2012-08-05 15:02:56.000000000 +0900
+@@ -1,7 +1,9 @@
+ namespace SNES {
+   namespace Info {
+     static const char Name[] = "bsnes";
++	static const char NameLB[] = "bsnes-sx2";
+     static const char Version[] = "082";
++	static const char VersionLB[] = "009";
+     static const unsigned SerializerVersion = 21;
+   }
+ }
+diff -urN ./ui/cartridge/cartridge.cpp ../../bsnes-sx2_v009/ui/cartridge/cartridge.cpp
+--- ./ui/cartridge/cartridge.cpp	2011-08-19 18:05:14.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/cartridge/cartridge.cpp	2012-01-22 20:42:07.000000000 +0900
+@@ -11,6 +11,15 @@
+   return true;
+ }
+ 
++bool Cartridge::loadTilt(const char *basename) {
++  if(loadCartridge(SNES::cartridge.rom, baseXML, basename) == false) return false;
++  baseName = nall::basename(basename);
++  SNES::cartridge.load(SNES::Cartridge::Mode::Normal, { baseXML });
++  foreach(memory, SNES::cartridge.nvram) loadMemory(memory);
++  utility.showMessage("Replaced!");
++  return true;
++}
++
+ bool Cartridge::loadBsxSlotted(const char *basename, const char *slotname) {
+   unload();
+   if(loadCartridge(SNES::cartridge.rom, baseXML, basename) == false) return false;
+diff -urN ./ui/cartridge/cartridge.hpp ../../bsnes-sx2_v009/ui/cartridge/cartridge.hpp
+--- ./ui/cartridge/cartridge.hpp	2011-08-19 17:55:48.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/cartridge/cartridge.hpp	2012-01-22 20:43:19.000000000 +0900
+@@ -1,13 +1,16 @@
+ struct Cartridge {
+   bool loadNormal(const char *basename);
++  bool loadTilt(const char *basename);
+   bool loadBsxSlotted(const char *basename, const char *slotname);
+   bool loadBsx(const char *basename, const char *slotname);
+diff -urN ./ui/general/about-window.cpp ../../bsnes-sx2_v009/ui/general/about-window.cpp
+--- ./ui/general/about-window.cpp	2011-08-06 06:57:14.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/about-window.cpp	2011-12-04 12:17:48.000000000 +0900
+@@ -10,7 +10,7 @@
+ 
+   information.setText({
+     "bsnes v", SNES::Info::Version, " ~ Profile: ", SNES::Info::Profile,
+-    " ~ Author: byuu ~ Website: http://byuu.org/"
++    " ~ Authors: byuu ~ Website: http://byuu.org/\n", SNES::Info::NameLB, " v", SNES::Info::VersionLB, " ~ LuigiBlood ~ Website: http://bsxproj.superfamicom.org/"
+   });
+ 
+   layout.setMargin(5);
+diff -urN ./ui/general/main-window.cpp ../../bsnes-sx2_v009/ui/general/main-window.cpp
+--- ./ui/general/main-window.cpp	2011-08-12 07:14:22.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/main-window.cpp	2012-01-22 20:42:30.000000000 +0900
+@@ -1,7 +1,7 @@
+ MainWindow mainWindow;
+ 
+ void MainWindow::create() {
+-  setTitle({ SNES::Info::Name, " v", SNES::Info::Version });
++  setTitle({ SNES::Info::NameLB, " v", SNES::Info::VersionLB, " (v", SNES::Info::Version, ")" });
+   setResizable(false);
+   setGeometry({ 0, 0, 595, 448 });
+   application.addWindow(this, "MainWindow", "128,128");
+@@ -38,6 +47,14 @@
+   system.append(systemReset);
+ 
+   system.append(systemSeparator2);
++  
++  systemTilt.setText("Tilt");
++  system.append(systemTilt);
++  
++  systemReplace.setText("Swap");
++  system.append(systemReplace);
++  
++  system.append(systemSeparator3);
+ 
+   systemPort1.setText("Controller Port 1");
+   system.append(systemPort1);
+@@ -275,6 +301,17 @@
+     SNES::system.reset();
+     utility.showMessage("System was reset");
+   };
++  
++  systemTilt.onTick = [] {
++	SNES::cartridge.Tilt();
++	utility.showMessage("Tilt!");
++  };
++  
++  systemReplace.onTick = [] {
++    fileBrowser.fileOpen(FileBrowser::Mode::Cartridge, [](string filename) {
++      cartridge.loadTilt(filename);
++    });
++  };
+ 
+   systemPort1None.onTick       = [] { config.controller.port1 = 0; utility.setControllers(); };
+   systemPort1Gamepad.onTick    = [] { config.controller.port1 = 1; utility.setControllers(); };
+diff -urN ./ui/general/main-window.hpp ../../bsnes-sx2_v009/ui/general/main-window.hpp
+--- ./ui/general/main-window.hpp	2011-08-12 06:43:39.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/general/main-window.hpp	2012-01-22 20:23:11.000000000 +0900
+@@ -6,10 +6,16 @@
+   Item systemLoadCartridgeBsx;
+   Item systemLoadCartridgeSufamiTurbo;
+   Item systemLoadCartridgeSuperGameBoy;
+   Separator systemSeparator1;
+   Item systemPower;
+   Item systemReset;
+   Separator systemSeparator2;
++  Item systemTilt;
++  Item systemReplace;
++  Separator systemSeparator3;
+   Menu systemPort1;
+   RadioItem systemPort1None;
+   RadioItem systemPort1Gamepad;
+diff -urN ./ui/utility/utility.cpp ../../bsnes-sx2_v009/ui/utility/utility.cpp
+--- ./ui/utility/utility.cpp	2011-08-19 17:52:06.000000000 +0900
++++ ../../bsnes-sx2_v009/ui/utility/utility.cpp	2011-12-04 12:16:21.000000000 +0900
+@@ -3,9 +3,9 @@
+ 
+ void Utility::setTitle(const string &text) {
+   if(*text) {
+-    mainWindow.setTitle({ text, " - ", SNES::Info::Name, " v", SNES::Info::Version });
++    mainWindow.setTitle({ text, " - ", SNES::Info::NameLB, " v", SNES::Info::VersionLB, " (v", SNES::Info::Version, ")" });
+   } else {
+-    mainWindow.setTitle({ SNES::Info::Name, " v", SNES::Info::Version });
++    mainWindow.setTitle({ SNES::Info::NameLB, " v", SNES::Info::VersionLB, " (v", SNES::Info::Version, ")"});
+   }
+ }
+ 
