@@ -1,0 +1,125 @@
+diff --git a/emulator/interface.hpp b/emulator/interface.hpp
+index d227087..a5aa483 100644
+--- a/emulator/interface.hpp
++++ b/emulator/interface.hpp
+@@ -87,6 +87,7 @@ struct Interface {
+   virtual void save() {}
+   virtual void load(unsigned id, const stream& memory) {}
+   virtual void save(unsigned id, const stream& memory) {}
++  virtual void savemempak() {}
+   virtual void unload() {}
+ 
+   //system interface
+diff --git a/sfc/interface/interface.cpp b/sfc/interface/interface.cpp
+index 27ce0dc..a8f323f 100644
+--- a/sfc/interface/interface.cpp
++++ b/sfc/interface/interface.cpp
+@@ -267,6 +267,10 @@ void Interface::save(unsigned id, const stream& stream) {
+   if(id == ID::SufamiTurboSlotBRAM) stream.write(sufamiturboB.ram.data(), sufamiturboB.ram.size());
+ }
+ 
++void Interface::savemempak() {
++  system.savemempak();
++}
++
+ void Interface::unload() {
+   save();
+   cartridge.unload();
+diff --git a/sfc/interface/interface.hpp b/sfc/interface/interface.hpp
+index 51fb2ef..ca59fe9 100644
+--- a/sfc/interface/interface.hpp
++++ b/sfc/interface/interface.hpp
+@@ -100,6 +100,7 @@ struct Interface : Emulator::Interface {
+   void save();
+   void load(unsigned id, const stream& stream);
+   void save(unsigned id, const stream& stream);
++  void savemempak();
+   void unload();
+ 
+   void connect(unsigned port, unsigned device);
+diff --git a/sfc/system/system.cpp b/sfc/system/system.cpp
+index 0455d3a..19a55cc 100644
+--- a/sfc/system/system.cpp
++++ b/sfc/system/system.cpp
+@@ -143,6 +143,10 @@ void System::load() {
+   cheat.init();
+ }
+ 
++void System::savemempak() {
++  if(cartridge.has_bs_slot()) satellaviewcartridge.save();
++}
++
+ void System::unload() {
+   if(expansion() == ExpansionPortDevice::Satellaview) satellaviewbaseunit.unload();
+   if(cartridge.has_gb_slot()) icd2.unload();
+diff --git a/sfc/system/system.hpp b/sfc/system/system.hpp
+index 1374fa7..7645e38 100644
+--- a/sfc/system/system.hpp
++++ b/sfc/system/system.hpp
+@@ -10,6 +10,7 @@ struct System : property<System> {
+   void init();
+   void term();
+   void load();
++  void savemempak();
+   void unload();
+   void power();
+   void reset();
+diff --git a/target-higan/general/presentation.cpp b/target-higan/general/presentation.cpp
+index 91450e2..9fc6bd6 100644
+--- a/target-higan/general/presentation.cpp
++++ b/target-higan/general/presentation.cpp
+@@ -183,6 +183,7 @@ void Presentation::bootstrap() {
+     iEmulator->menu.setText(emulator->information.name);
+     iEmulator->power.setText("Power");
+     iEmulator->reset.setText("Reset");
++    iEmulator->savemempak.setText("Save BSX Mempak");
+     iEmulator->unload.setText("Unload");
+ 
+     for(auto& port : emulator->port) {
+@@ -220,6 +221,7 @@ void Presentation::bootstrap() {
+ 
+     iEmulator->power.onActivate = {&Utility::power, utility};
+     iEmulator->reset.onActivate = {&Utility::reset, utility};
++    iEmulator->savemempak.onActivate = {&Utility::savemempak, utility};
+     iEmulator->unload.onActivate = {&Utility::unload, utility};
+ 
+     emulatorList.append(iEmulator);
+diff --git a/target-higan/general/presentation.hpp b/target-higan/general/presentation.hpp
+index c7cbbeb..3640716 100644
+--- a/target-higan/general/presentation.hpp
++++ b/target-higan/general/presentation.hpp
+@@ -8,6 +8,7 @@ struct Presentation : Window {
+     Menu menu;
+       Item power;
+       Item reset;
++      Item savemempak;
+       Item unload;
+       Separator controllerSeparator;
+       struct Port {
+diff --git a/target-higan/utility/utility.cpp b/target-higan/utility/utility.cpp
+index e2fe173..734d976 100644
+--- a/target-higan/utility/utility.cpp
++++ b/target-higan/utility/utility.cpp
+@@ -114,6 +114,10 @@ void Utility::load() {
+   cheatEditor->refresh();
+ }
+ 
++void Utility::savemempak() {
++  system().unload();
++}
++
+ void Utility::unload() {
+   if(program->active == nullptr) return;
+   if(tracerEnable) tracerToggle();
+diff --git a/target-higan/utility/utility.hpp b/target-higan/utility/utility.hpp
+index 1ba64fc..e7ee690 100644
+--- a/target-higan/utility/utility.hpp
++++ b/target-higan/utility/utility.hpp
+@@ -13,6 +13,7 @@ struct Utility {
+   void power();
+   void reset();
+   void load();
++  void savemempak();
+   void unload();
+ 
+   void saveState(unsigned slot);
