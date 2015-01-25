@@ -1,0 +1,35 @@
+diff --git a/sfc/base/satellaview/satellaview.cpp b/sfc/base/satellaview/satellaview.cpp
+index 55240e3..cb1eee7 100644
+--- a/sfc/base/satellaview/satellaview.cpp
++++ b/sfc/base/satellaview/satellaview.cpp
+@@ -41,7 +41,7 @@ void SatellaviewBaseUnit::SatellaviewTuneInA(uint8 filenumber) {
+   sprintf(filenm.data(), "%shigan/bsxdat/BSX%04.4hX-%d.bin", (const char*)nall::configpath(), Signal_Nb, filenumber);
+   BSXF.open(filenm.data(), file::mode::read);
+   if(BSXF.size()!= -1) {
+-    printf("%02.2hX, %02.2hX, %04.4hX: %s\n",regs.r2189, regs.r2188, Signal_Nb, filenm);
++    printf("%02.2hX, %02.2hX, %04.4hX: %s\n",regs.r2189, regs.r2188, Signal_Nb, filenm.data());
+     regs.BSX_access=true;
+     regs.BSXF_Signal++;
+     float QueueSize = BSXF.size() / 22.;
+@@ -62,7 +62,7 @@ void SatellaviewBaseUnit::SatellaviewTuneInB(uint8 filenumber) {
+   sprintf(filenm.data(), "%shigan/bsxdat/BSX%04.4hX-%d.bin", (const char*)nall::configpath(), Signal_Nb, filenumber);
+   BSXF2.open(filenm.data(), file::mode::read);
+   if(BSXF2.size()!= -1) {
+-    printf("%02.2hX, %02.2hX, %04.4hX: %s\n",regs.r218f, regs.r218e, Signal_Nb, filenm);
++    printf("%02.2hX, %02.2hX, %04.4hX: %s\n",regs.r218f, regs.r218e, Signal_Nb, filenm.data());
+     regs.BSX2_access=true;
+     regs.BSXF2_Signal++;
+     float QueueSize = BSXF2.size() / 22.;
+diff --git a/sfc/slot/satellaview/satellaview.cpp b/sfc/slot/satellaview/satellaview.cpp
+index 27aba59..eab12f6 100644
+--- a/sfc/slot/satellaview/satellaview.cpp
++++ b/sfc/slot/satellaview/satellaview.cpp
+@@ -92,7 +92,7 @@ uint8 SatellaviewCartridge::read(unsigned addr) {
+     default:   return 0x00;
+     }
+   }
+-  printf("Read Flash Memory: %x : %x\n", addr, memory.read(addr))
++  printf("Read Flash Memory: %x : %x\n", addr, memory.read(addr));
+   return memory.read(addr);
+ }
+ 
