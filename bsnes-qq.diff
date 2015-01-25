@@ -1,5 +1,5 @@
 diff --git a/Makefile b/Makefile
-index c524133..0c9199c 100644
+index c524133..a275f5c 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -5,9 +5,13 @@ sfc := sfc
@@ -19,7 +19,7 @@ index c524133..0c9199c 100644
  
  ifeq ($(target),loki)
    options += debugger
-@@ -29,7 +34,8 @@ ifeq ($(pgo),instrument)
+@@ -29,7 +33,8 @@ ifeq ($(pgo),instrument)
    flags += -fprofile-generate
    link += -lgcov
  else ifeq ($(pgo),optimize)
