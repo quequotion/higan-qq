@@ -70,7 +70,7 @@ index 1222d8c..3daf9b3 100644
 -	cp -R profile/* /usr/share/$(name)
 -	cp data/cheats.bml /usr/share/$(name)/cheats.bml
 -	chmod -R 777 /usr/share/$(name)
-+	install -d $(DESTDIR)$(prefix)/bin/$(name)
++	install -d $(DESTDIR)$(prefix)/bin/
 +	cp out/$(name) $(DESTDIR)$(prefix)/bin/$(name)
 +	install -d $(DESTDIR)$(prefix)/share/pixmaps/
 +	cp data/$(name).png $(DESTDIR)$(prefix)/share/pixmaps/$(name).png
@@ -126,7 +126,7 @@ index 1222d8c..3daf9b3 100644
 -	mkdir -p /usr/share/$(name)
 -	cp -R profile/* /usr/share/$(name)
 -	chmod -R 777 /usr/share/$(name)
-+	install -d $(DESTDIR)$(prefix)/bin/$(name)
++	install -d $(DESTDIR)$(prefix)/bin/
 +	cp out/$(name) $(DESTDIR)$(prefix)/bin/$(name)
 +	install -d $(DESTDIR)usr/share/$(name)
 +	cp -R profile/* $(DESTDIR)usr/share/$(name)
