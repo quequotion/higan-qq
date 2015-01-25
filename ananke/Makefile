@@ -1,7 +1,14 @@
 include ../nall/Makefile
 include ../phoenix/Makefile
 
-path := /usr/local/lib
+ifndef DESTDIR
+  DESTDIR := /
+endif
+
+ifndef prefix
+  prefix := /usr/local/lib
+endif
+
 flags := $(flags) -O3 -fomit-frame-pointer -I..
 
 all:
@@ -27,23 +34,25 @@ clean:
 install: uninstall
 ifeq ($(platform),windows)
 else ifeq ($(platform),macosx)
-	if [ ! -d ~/Library/Application\ Support/ananke ]; then mkdir ~/Library/Application\ Support/ananke; fi
-	sudo cp libananke.dylib $(path)/libananke.1.dylib
-	sudo ln -s $(path)/libananke.1.dylib $(path)/libananke.dylib
+	#if [ ! -d ~/Library/Application\ Support/ananke ]; then install -d ~/Library/Application\ Support/ananke; fi
+	install -d $(DESTDIR)$(path)
+	cp libananke.dylib $(DESTDIR)$(prefix)/libananke.1.dylib
+	ln -s $(path)/libananke.1.dylib $(DESTDIR)$(prefix)/libananke.dylib
 else
-	if [ ! -d ~/.config/ananke ]; then mkdir ~/.config/ananke; fi
-	sudo cp libananke.so $(path)/libananke.so.1
-	sudo ln -s $(path)/libananke.so.1 $(path)/libananke.so
+	#if [ ! -d ~/.config/ananke ]; then install -d ~/.config/ananke; fi
+	install -d $(DESTDIR)$(prefix)
+	cp libananke.so $(DESTDIR)$(prefix)/libananke.so.1
+	ln -s $(DESTDIR)$(path)/libananke.so.1 $(DESTDIR)$(prefix)/libananke.so
 endif
 
 uninstall:
 ifeq ($(platform),windows)
 else ifeq ($(platform),macosx)
-	if [ -f $(path)/libananke.dylib ]; then sudo rm $(path)/libananke.dylib; fi
-	if [ -f $(path)/libananke.1.dylib ]; then sudo rm $(path)/libananke.1.dylib; fi
+	if [ -f $(DESTDIR)$(path)/libananke.dylib ]; then rm $(DESTDIR)$(prefix)/libananke.dylib; fi
+	if [ -f $(DESTDIR)$(path)/libananke.1.dylib ]; then rm $(DESTDIR)$(prefix)/libananke.1.dylib; fi
 else
-	if [ -f $(path)/libananke.so ]; then sudo rm $(path)/libananke.so; fi
-	if [ -f $(path)/libananke.so.1 ]; then sudo rm $(path)/libananke.so.1; fi
+	if [ -f $(DESTDIR)$(path)/libananke.so ]; then rm $(DESTDIR)$(prefix)/libananke.so; fi
+	if [ -f $(DESTDIR)$(path)/libananke.so.1 ]; then rm $(DESTDIR)$(prefix)/libananke.so.1; fi
 endif
 
 force:

@@ -82,13 +82,13 @@ ifeq ($(platform),windows)
 else ifeq ($(platform),macosx)
 	install -d $(DESTDIR)Library/Application\ Support/$(name)
 	cp -R profile/* $(DESTDIR)Library/Application\ Support/$(name)
-	chmod -R 777 $(DESTDIR)Library/Application\ Support/$(name)
+	#chmod -R 777 $(DESTDIR)Library/Application\ Support/$(name)
 else
 	install -d $(DESTDIR)$(prefix)/bin/
 	cp out/$(name) $(DESTDIR)$(prefix)/bin/$(name)
 	install -d $(DESTDIR)usr/share/$(name)
 	cp -R profile/* $(DESTDIR)usr/share/$(name)
-	chmod -R 777 $(DESTDIR)usr/share/$(name)
+	#chmod -R 777 $(DESTDIR)usr/share/$(name)
 endif
 
 uninstall:
