@@ -45,7 +45,7 @@ index 1222d8c..3daf9b3 100644
  
  processors := arm gsu hg51b lr35902 r6502 r65816 spc700 upd96050
  include processor/Makefile
-@@ -89,29 +96,25 @@
+@@ -89,29 +96,28 @@
  	sourcery $(ui)/resource/resource.bml $(ui)/resource/resource.cpp $(ui)/resource/resource.hpp
  
  install:
@@ -58,7 +58,7 @@ index 1222d8c..3daf9b3 100644
 -	cp -R profile/* /Library/Application\ Support/$(name)
 -	cp data/cheats.bml /Library/Application\ Support/$(name)/cheats.bml
 -	chmod -R 777 /Library/Application\ Support/$(name)
-+	mkdir -p $(DESTDIR)Library/Application\ Support/$(name)
++	install -d $(DESTDIR)Library/Application\ Support/$(name)
 +	cp -R profile/* $(DESTDIR)Library/Application\ Support/$(name)
 +	cp data/cheats.bml $(DESTDIR)Library/Application\ Support/$(name)/cheats.bml
 +	chmod -R 777 $(DESTDIR)Library/Application\ Support/$(name)
@@ -70,10 +70,13 @@ index 1222d8c..3daf9b3 100644
 -	cp -R profile/* /usr/share/$(name)
 -	cp data/cheats.bml /usr/share/$(name)/cheats.bml
 -	chmod -R 777 /usr/share/$(name)
++	install -d $(DESTDIR)$(prefix)/bin/$(name)
 +	cp out/$(name) $(DESTDIR)$(prefix)/bin/$(name)
++	install -d $(DESTDIR)$(prefix)/share/pixmaps/
 +	cp data/$(name).png $(DESTDIR)$(prefix)/share/pixmaps/$(name).png
++	install -d $(DESTDIR)$(prefix)/share/applications/
 +	cp data/$(name).desktop $(DESTDIR)$(prefix)/share/applications/$(name).desktop
-+	mkdir -p $(DESTDIR)usr/share/$(name)
++	install -d $(DESTDIR)usr/share/$(name)
 +	cp -R profile/* $(DESTDIR)usr/share/$(name)
 +	cp data/cheats.bml $(DESTDIR)usr/share/$(name)/cheats.bml
 +	chmod -R 777 $(DESTDIR)usr/share/$(name)
@@ -103,7 +106,7 @@ index 1222d8c..3daf9b3 100644
  
  processors := arm gsu hg51b lr35902 r65816 spc700 upd96050
  include processor/Makefile
-@@ -72,25 +78,21 @@
+@@ -72,25 +78,22 @@
  	sourcery $(ui)/resource/resource.bml $(ui)/resource/resource.cpp $(ui)/resource/resource.hpp
  
  install:
@@ -115,7 +118,7 @@ index 1222d8c..3daf9b3 100644
 -	mkdir -p /Library/Application\ Support/$(name)
 -	cp -R profile/* /Library/Application\ Support/$(name)
 -	chmod -R 777 /Library/Application\ Support/$(name)
-+	mkdir -p $(DESTDIR)Library/Application\ Support/$(name)
++	install -d $(DESTDIR)Library/Application\ Support/$(name)
 +	cp -R profile/* $(DESTDIR)Library/Application\ Support/$(name)
 +	chmod -R 777 $(DESTDIR)Library/Application\ Support/$(name)
  else
@@ -123,8 +126,9 @@ index 1222d8c..3daf9b3 100644
 -	mkdir -p /usr/share/$(name)
 -	cp -R profile/* /usr/share/$(name)
 -	chmod -R 777 /usr/share/$(name)
++	install -d $(DESTDIR)$(prefix)/bin/$(name)
 +	cp out/$(name) $(DESTDIR)$(prefix)/bin/$(name)
-+	mkdir -p $(DESTDIR)usr/share/$(name)
++	install -d $(DESTDIR)usr/share/$(name)
 +	cp -R profile/* $(DESTDIR)usr/share/$(name)
 +	chmod -R 777 $(DESTDIR)usr/share/$(name)
  endif
