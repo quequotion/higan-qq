@@ -9982,9 +9982,9 @@ index 6e726ce..4c05293 100644
 +	install -d $(DESTDIR)$(prefix)/bin/
 +	cp out/$(name) $(DESTDIR)$(prefix)/bin/$(name)
 +	install -d $(DESTDIR)$(prefix)/share/pixmaps/
-+	cp data/$(name).png $(DESTDIR)$(prefix)/share/pixmaps/$(name).png
++	cp data/higan.png $(DESTDIR)$(prefix)/share/pixmaps/$(name).png
 +	install -d $(DESTDIR)$(prefix)/share/applications/
-+	cp data/$(name).desktop $(DESTDIR)$(prefix)/share/applications/$(name).desktop
++	cp data/higan.desktop $(DESTDIR)$(prefix)/share/applications/$(name).desktop
 +	install -d $(DESTDIR)usr/share/$(name)
 +	cp -R profile/* $(DESTDIR)usr/share/$(name)
 +	cp data/cheats.bml $(DESTDIR)usr/share/$(name)/cheats.bml
