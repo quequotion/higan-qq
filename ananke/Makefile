@@ -37,22 +37,22 @@ else ifeq ($(platform),macosx)
 	#if [ ! -d ~/Library/Application\ Support/ananke ]; then install -d ~/Library/Application\ Support/ananke; fi
 	install -d $(DESTDIR)$(path)
 	cp libananke.dylib $(DESTDIR)$(prefix)/libananke.1.dylib
-	ln -s $(path)/libananke.1.dylib $(DESTDIR)$(prefix)/libananke.dylib
+	ln -s $(prefix)/libananke.1.dylib $(DESTDIR)$(prefix)/libananke.dylib
 else
 	#if [ ! -d ~/.config/ananke ]; then install -d ~/.config/ananke; fi
 	install -d $(DESTDIR)$(prefix)
 	cp libananke.so $(DESTDIR)$(prefix)/libananke.so.1
-	ln -s $(DESTDIR)$(path)/libananke.so.1 $(DESTDIR)$(prefix)/libananke.so
+	ln -s $(DESTDIR)$(prefix)/libananke.so.1 $(DESTDIR)$(prefix)/libananke.so
 endif
 
 uninstall:
 ifeq ($(platform),windows)
 else ifeq ($(platform),macosx)
-	if [ -f $(DESTDIR)$(path)/libananke.dylib ]; then rm $(DESTDIR)$(prefix)/libananke.dylib; fi
-	if [ -f $(DESTDIR)$(path)/libananke.1.dylib ]; then rm $(DESTDIR)$(prefix)/libananke.1.dylib; fi
+	if [ -f $(DESTDIR)$(prefix)/libananke.dylib ]; then rm $(DESTDIR)$(prefix)/libananke.dylib; fi
+	if [ -f $(DESTDIR)$(prefix)/libananke.1.dylib ]; then rm $(DESTDIR)$(prefix)/libananke.1.dylib; fi
 else
-	if [ -f $(DESTDIR)$(path)/libananke.so ]; then rm $(DESTDIR)$(prefix)/libananke.so; fi
-	if [ -f $(DESTDIR)$(path)/libananke.so.1 ]; then rm $(DESTDIR)$(prefix)/libananke.so.1; fi
+	if [ -f $(DESTDIR)$(prefix)/libananke.so ]; then rm $(DESTDIR)$(prefix)/libananke.so; fi
+	if [ -f $(DESTDIR)$(prefix)/libananke.so.1 ]; then rm $(DESTDIR)$(prefix)/libananke.so.1; fi
 endif
 
 force:
