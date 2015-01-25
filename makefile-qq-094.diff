@@ -15,9 +15,10 @@ index 1222d8c..3daf9b3 100644
 +ifndef target
 +  target := higan
 +endif
- # target := loki
+-# target := loki
  
  ifeq ($(target),loki)
+  options += debugger
 @@ -29,7 +31,8 @@ ifeq ($(pgo),instrument)
    flags += -fprofile-generate
    link += -lgcov
