@@ -2,12 +2,13 @@ diff --git a/Makefile b/Makefile
 index 1222d8c..3daf9b3 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -5,8 +5,13 @@
+@@ -5,9 +5,13 @@ sfc := sfc
  gb  := gb
  gba := gba
  
 -profile := accuracy
 -target := higan
+-# target := loki
 +ifndef profile
 +  profile := accuracy
 +endif
@@ -15,10 +16,9 @@ index 1222d8c..3daf9b3 100644
 +ifndef target
 +  target := higan
 +endif
--# target := loki
  
  ifeq ($(target),loki)
-  options += debugger
+   options += debugger
 @@ -29,7 +31,8 @@ ifeq ($(pgo),instrument)
    flags += -fprofile-generate
    link += -lgcov
