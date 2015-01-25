@@ -29,10 +29,10 @@ struct Board {
   virtual void reset();
 
   virtual void serialize(serializer&);
-  Board(Markup::Node& document);
+  Board(Markup::Node& cartridge);
   virtual ~Board();
 
-  static Board* load(string manifest);
+  static Board* load(Markup::Node cartridge);
 
   struct Information {
     string type;

@@ -99,6 +99,10 @@ void Utility::load() {
   cheatEditor->refresh();
 }
 
+void Utility::savemempak() {
+  system().unload();
+}
+
 void Utility::unload() {
   if(program->active == nullptr) return;
 

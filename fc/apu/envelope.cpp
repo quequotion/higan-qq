@@ -1,3 +1,5 @@
+#ifdef APU_CPP
+
 unsigned APU::Envelope::volume() const {
   return use_speed_as_volume ? speed : decay_volume;
 }
@@ -37,3 +39,5 @@ void APU::Envelope::serialize(serializer& s) {
   s.integer(decay_counter);
   s.integer(decay_volume);
 }
+
+#endif

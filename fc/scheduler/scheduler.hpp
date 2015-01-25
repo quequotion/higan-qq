@@ -9,8 +9,8 @@ struct Scheduler : property<Scheduler> {
   void enter();
   void exit(ExitReason);
 
-  void power();
-  void reset();
+  void init();
+  Scheduler();
 };
 
 extern Scheduler scheduler;

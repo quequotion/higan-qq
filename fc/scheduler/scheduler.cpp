@@ -1,6 +1,4 @@
-#include <fc/fc.hpp>
-
-namespace Famicom {
+#ifdef SYSTEM_CPP
 
 Scheduler scheduler;
 
@@ -15,14 +13,16 @@ void Scheduler::exit(ExitReason reason) {
   co_switch(host_thread);
 }
 
-void Scheduler::power() {
-}
-
-void Scheduler::reset() {
+void Scheduler::init() {
   host_thread = co_active();
   thread = cpu.thread;
   sync = SynchronizeMode::None;
+}
+
+Scheduler::Scheduler() {
+  host_thread = nullptr;
+  thread = nullptr;
   exit_reason = ExitReason::UnknownEvent;
 }
 
-}
+#endif

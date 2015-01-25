@@ -142,6 +142,10 @@ void System::load() {
   serialize_init();
 }
 
+void System::savemempak() {
+  if(cartridge.has_bs_slot()) satellaviewcartridge.save();
+}
+
 void System::unload() {
   if(expansion() == ExpansionPortDevice::Satellaview) satellaviewbaseunit.unload();
   if(cartridge.has_gb_slot()) icd2.unload();

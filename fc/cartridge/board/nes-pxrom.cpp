@@ -90,8 +90,10 @@ void serialize(serializer& s) {
   s.array(latch);
 }
 
-NES_PxROM(Markup::Node& document) : Board(document) {
-  revision = Revision::PNROM;
+NES_PxROM(Markup::Node& cartridge) : Board(cartridge) {
+  string type = cartridge["board/type"].data;
+  if(type.match("*PEEOROM*")) revision = Revision::PEEOROM;
+  if(type.match("*PNROM*"  )) revision = Revision::PNROM;
 }
 
 };

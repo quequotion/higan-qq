@@ -45,6 +45,8 @@ struct Interface : Emulator::Interface {
 
   void paletteUpdate(PaletteMode mode);
 
+  void exportMemory();
+
   Interface();
 
 private:

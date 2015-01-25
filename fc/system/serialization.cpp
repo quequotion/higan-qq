@@ -1,3 +1,5 @@
+#ifdef SYSTEM_CPP
+
 serializer System::serialize() {
   serializer s(serialize_size);
 
@@ -32,18 +34,27 @@ bool System::unserialize(serializer& s) {
   return true;
 }
 
+//========
+//internal
+//========
+
 void System::serialize(serializer& s) {
+  s.integer((unsigned&)region);
 }
 
 void System::serialize_all(serializer& s) {
-  system.serialize(s);
-  input.serialize(s);
   cartridge.serialize(s);
+  system.serialize(s);
   cpu.serialize(s);
   apu.serialize(s);
   ppu.serialize(s);
+
+  if(revision == Revision::VSSystem) vsarcadeboard.serialize(s);
 }
 
+//perform dry-run state save:
+//determines exactly how many bytes are needed to save state for this cartridge,
+//as amount varies per game (eg different RAM sizes, etc.)
 void System::serialize_init() {
   serializer s;
 
@@ -58,3 +69,5 @@ void System::serialize_init() {
   serialize_all(s);
   serialize_size = s.size();
 }
+
+#endif

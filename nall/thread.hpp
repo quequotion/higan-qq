@@ -6,8 +6,7 @@
 #include <nall/intrinsics.hpp>
 
 #if defined(PLATFORM_XORG) || defined(PLATFORM_MACOSX)
-
-#include <pthread.h>
+  #include <pthread.h>
 
 namespace nall {
 

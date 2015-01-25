@@ -35,7 +35,10 @@ struct APU : Thread {
   #include "dmc.hpp"
 
   struct FrameCounter {
-    enum : unsigned { NtscPeriod = 14915 };  //~(21.477MHz / 6 / 240hz)
+    enum : unsigned {
+      NtscPeriod = 14915,  //~(21.477MHz / 6 / 240hz)
+      PalPeriod = 18473, // conjectural
+    };
 
     bool irq_pending;
 

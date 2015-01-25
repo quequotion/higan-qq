@@ -12,12 +12,14 @@ struct PPU : Thread, public PPUcounter {
   bool overscan() const;
   bool hires() const;
 
+  void scanline();
+  void frame();
   void enter();
   void enable();
   void power();
   void reset();
-  void scanline();
-  void frame();
+
+  void exportRegisters(string &markup);
 
   void layer_enable(unsigned layer, unsigned priority, bool enable);
   void set_frameskip(unsigned frameskip);

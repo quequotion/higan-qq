@@ -10,6 +10,8 @@ namespace Emulator {
 
   #if defined(PROFILE_ACCURACY)
   static const char Profile[] = "Accuracy";
+  #elif defined(PROFILE_ACCURACYFAST)
+  static const char Profile[] = "Accuracyfast";
   #elif defined(PROFILE_BALANCED)
   static const char Profile[] = "Balanced";
   #elif defined(PROFILE_PERFORMANCE)

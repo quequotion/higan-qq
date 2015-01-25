@@ -1,3 +1,5 @@
+#ifdef PPU_CPP
+
 void PPU::serialize(serializer& s) {
   Thread::serialize(s);
 
@@ -72,3 +74,5 @@ void PPU::serialize(serializer& s) {
   s.array(cgram);
   s.array(oam);
 }
+
+#endif

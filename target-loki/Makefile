@@ -1,4 +1,10 @@
-name := loki
+ifndef name
+  name := loki
+endif
+
+ifndef DESTDIR
+  DESTDIR := /
+endif
 
 processors := arm gsu hg51b lr35902 r65816 spc700 upd96050
 include processor/Makefile
@@ -72,25 +78,22 @@ resource:
 	sourcery $(ui)/resource/resource.bml $(ui)/resource/resource.cpp $(ui)/resource/resource.hpp
 
 install:
-ifneq ($(shell id -un),root)
-	$(error "make install must be run as root")
-else ifeq ($(platform),windows)
+ifeq ($(platform),windows)
 else ifeq ($(platform),macosx)
-	mkdir -p /Library/Application\ Support/$(name)
-	cp -R profile/* /Library/Application\ Support/$(name)
-	chmod -R 777 /Library/Application\ Support/$(name)
+	install -d $(DESTDIR)Library/Application\ Support/$(name)
+	cp -R profile/* $(DESTDIR)Library/Application\ Support/$(name)
+	chmod -R 777 $(DESTDIR)Library/Application\ Support/$(name)
 else
-	cp out/$(name) $(prefix)/bin/$(name)
-	mkdir -p /usr/share/$(name)
-	cp -R profile/* /usr/share/$(name)
-	chmod -R 777 /usr/share/$(name)
+	install -d $(DESTDIR)$(prefix)/bin/
+	cp out/$(name) $(DESTDIR)$(prefix)/bin/$(name)
+	install -d $(DESTDIR)usr/share/$(name)
+	cp -R profile/* $(DESTDIR)usr/share/$(name)
+	chmod -R 777 $(DESTDIR)usr/share/$(name)
 endif
 
 uninstall:
-ifneq ($(shell id -un),root)
-	$(error "make uninstall must be run as root")
-else ifeq ($(platform),windows)
+ifeq ($(platform),windows)
 else ifeq ($(platform),macosx)
 else
-	rm $(prefix)/bin/$(name)
+	rm $(DESTDIR)$(prefix)/bin/$(name)
 endif

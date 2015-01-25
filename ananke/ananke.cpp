@@ -10,6 +10,7 @@ using namespace nall;
 using namespace phoenix;
 
 namespace Database {
+  #include "database/famicom.hpp"
   #include "database/super-famicom.hpp"
   #include "database/sufami-turbo.hpp"
   #include "database/bsx-satellaview.hpp"
@@ -37,6 +38,7 @@ struct Ananke {
 
   //famicom.cpp
   void copyFamicomSaves(const string &pathname);
+  string createFamicomDatabase(vector<uint8_t> &buffer, Markup::Node &document, const string &manifest);
   string createFamicomHeuristic(vector<uint8_t> &buffer);
   string openFamicom(vector<uint8_t> &buffer);
   string syncFamicom(const string &pathname);

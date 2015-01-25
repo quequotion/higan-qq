@@ -1,117 +1,105 @@
 //BANDAI-FCG
+//BANDAI-FCG-1
+//BANDAI-FCG-2
+//BANDAI-JUMP2
+//BANDAI-LZ93D50
 
 struct BandaiFCG : Board {
 
-uint8 chr_bank[8];
-uint8 prg_bank;
-uint2 mirror;
-bool irq_counter_enable;
-uint16 irq_counter;
-uint16 irq_latch;
+enum class Revision : unsigned {
+  FCGAll,
+  FCG1,
+  FCG2,
+  JUMP2,
+  LZ93D50,
+} revision;
+
+FCG fcg;
+
+uint2 last_chr_bank;
 
 void main() {
-  while(true) {
-    if(scheduler.sync == Scheduler::SynchronizeMode::All) {
-      scheduler.exit(Scheduler::ExitReason::SynchronizeEvent);
-    }
-
-    if(irq_counter_enable) {
-      if(--irq_counter == 0xffff) {
-        cpu.set_irq_line(1);
-        irq_counter_enable = false;
-      }
-    }
-
-    tick();
-  }
-}
-
-unsigned ciram_addr(unsigned addr) const {
-  switch(mirror) {
-  case 0: return ((addr & 0x0400) >> 0) | (addr & 0x03ff);
-  case 1: return ((addr & 0x0800) >> 1) | (addr & 0x03ff);
-  case 2: return 0x0000 | (addr & 0x03ff);
-  case 3: return 0x0400 | (addr & 0x03ff);
-  }
+  fcg.main();
 }
 
 uint8 prg_read(unsigned addr) {
-  if(addr & 0x8000) {
-    bool region = addr & 0x4000;
-    unsigned bank = (region == 0 ? prg_bank : 0x0f);
-    return prgrom.read((bank << 14) | (addr & 0x3fff));
+  if((addr & 0xe000) == 0x6000) {
+    switch(revision) {
+    case Revision::LZ93D50:
+      //TODO: serial EEPROM support
+      return 0x00 | (cpu.mdr() & 0xef);
+    case Revision::JUMP2:
+      return fcg.eeprom_i2c_scl ? fcg.ram_read(addr) : cpu.mdr();
+    }
+  }
+  if((addr & 0x8000) == 0x8000) {
+    if(revision != Revision::JUMP2)
+      return prgrom.read(fcg.prg_addr(addr));
+    else
+      return prgrom.read(fcg.prg_addr(addr) | ((fcg.chr_bank[last_chr_bank] & 1) << 18));
   }
   return cpu.mdr();
 }
 
 void prg_write(unsigned addr, uint8 data) {
-  if(addr >= 0x6000) {
-    switch(addr & 15) {
-    case 0x00: case 0x01: case 0x02: case 0x03:
-    case 0x04: case 0x05: case 0x06: case 0x07:
-      chr_bank[addr & 7] = data;
-      break;
-    case 0x08:
-      prg_bank = data & 0x0f;
-      break;
-    case 0x09:
-      mirror = data & 0x03;
-      break;
-    case 0x0a:
-      cpu.set_irq_line(0);
-      irq_counter_enable = data & 0x01;
-      irq_counter = irq_latch;
-      break;
-    case 0x0b:
-      irq_latch = (irq_latch & 0xff00) | (data << 0);
-      break;
-    case 0x0c:
-      irq_latch = (irq_latch & 0x00ff) | (data << 8);
-      break;
-    case 0x0d:
+  if((addr & 0xe000) == 0x6000) {
+    switch(revision) {
+    case Revision::FCGAll:
+    case Revision::FCG1:
+    case Revision::FCG2:
+      return fcg.reg_write(addr, data);
+    case Revision::LZ93D50:
       //TODO: serial EEPROM support
       break;
+    case Revision::JUMP2:
+      if(fcg.eeprom_i2c_scl) return fcg.ram_write(addr, data);
+      else                   break;
+    }
+  }
+  if((addr & 0x8000) == 0x8000) {
+    switch(revision) {
+    case Revision::FCGAll:
+    case Revision::LZ93D50:
+    case Revision::JUMP2:
+      return fcg.reg_write(addr, data);
     }
   }
 }
 
 uint8 chr_read(unsigned addr) {
-  if(addr & 0x2000) return ppu.ciram_read(ciram_addr(addr));
-  addr = (chr_bank[addr >> 10] << 10) | (addr & 0x03ff);
-  return Board::chr_read(addr);
+  if(addr & 0x2000) return ppu.ciram_read(fcg.ciram_addr(addr));
+  last_chr_bank = 0;(addr & 0x0c00) >> 10;
+  if(chrrom.size) return Board::chr_read(fcg.chr_addr(addr));
+  if(chrram.size) return Board::chr_read(addr);
 }
 
 void chr_write(unsigned addr, uint8 data) {
-  if(addr & 0x2000) return ppu.ciram_write(ciram_addr(addr), data);
-  addr = (chr_bank[addr >> 10] << 10) | (addr & 0x03ff);
-  return Board::chr_write(addr, data);
+  if(addr & 0x2000) return ppu.ciram_write(fcg.ciram_addr(addr), data);
+  last_chr_bank = 0;(addr & 0x0c00) >> 10;
+  if(chrram.size) Board::chr_write(addr, data);
 }
 
 void power() {
-  reset();
+  fcg.power();
 }
 
 void reset() {
-  for(auto &n : chr_bank) n = 0;
-  prg_bank = 0;
-  mirror = 0;
-  irq_counter_enable = 0;
-  irq_counter = 0;
-  irq_latch = 0;
+  fcg.reset();
 }
 
 void serialize(serializer& s) {
   Board::serialize(s);
-
-  s.array(chr_bank);
-  s.integer(prg_bank);
-  s.integer(mirror);
-  s.integer(irq_counter_enable);
-  s.integer(irq_counter);
-  s.integer(irq_latch);
+  fcg.serialize(s);
+  s.integer(last_chr_bank);
 }
 
-BandaiFCG(Markup::Node& document) : Board(document) {
+BandaiFCG(Markup::Node& cartridge) : Board(cartridge), fcg(*this, cartridge) {
+  string type = cartridge["board/type"].data;
+  revision = Revision::FCGAll;
+  if(type.match("*FCG-1*"  )) revision = Revision::FCG1;
+  if(type.match("*FCG-2*"  )) revision = Revision::FCG2;
+  if(type.match("*JUMP2*"  )) revision = Revision::JUMP2;
+  if(type.match("*LZ93D50*")) revision = Revision::LZ93D50;
 }
 
 };

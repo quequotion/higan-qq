@@ -279,12 +279,12 @@ unsigned chr_sprite_addr(unsigned addr) {
 }
 
 unsigned chr_bg_addr(unsigned addr) {
-  addr &= 0x0fff;
-
   if(chr_mode == 0) {
     auto bank = chr_bg_bank[3];
-    return (bank * 0x2000) + (addr & 0x0fff);
+    return (bank * 0x2000) + (addr & 0x1fff);
   }
+
+  addr &= 0x0fff;
 
   if(chr_mode == 1) {
     auto bank = chr_bg_bank[3];
@@ -490,8 +490,11 @@ void serialize(serializer& s) {
   s.integer(vs_hpos);
 }
 
-MMC5(Board& board) : Chip(board) {
-  revision = Revision::MMC5;
+MMC5(Board& board, Markup::Node& cartridge) : Chip(board) {
+  string type = cartridge["chip/type"].data;
+
+  if(type.match("*MMC5*" )) revision = Revision::MMC5;
+  if(type.match("*MMC5B*")) revision = Revision::MMC5B;
 }
 
 };

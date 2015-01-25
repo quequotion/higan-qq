@@ -100,6 +100,7 @@ struct Interface : Emulator::Interface {
   void save();
   void load(unsigned id, const stream& stream);
   void save(unsigned id, const stream& stream);
+  void savemempak();
   void unload();
 
   void connect(unsigned port, unsigned device);
@@ -116,6 +117,9 @@ struct Interface : Emulator::Interface {
   void cheatSet(const lstring&);
 
   void paletteUpdate(PaletteMode mode);
+
+  //debugger functions
+  void exportMemory();
 
   Interface();
 

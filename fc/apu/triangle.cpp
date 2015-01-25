@@ -1,3 +1,5 @@
+#ifdef APU_CPP
+
 void APU::Triangle::clock_length() {
   if(halt_length_counter == 0) {
     if(length_counter > 0) length_counter--;
@@ -56,3 +58,5 @@ void APU::Triangle::serialize(serializer& s) {
   s.integer(linear_length_counter);
   s.integer(reload_linear);
 }
+
+#endif

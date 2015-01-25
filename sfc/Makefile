@@ -17,6 +17,12 @@ ifeq ($(profile),accuracy)
   sfcsmp := $(sfc)/smp
   sfcdsp := $(sfc)/dsp
   sfcppu := $(sfc)/ppu
+else ifeq ($(profile),accuracyfast)
+  flags += -DPROFILE_ACCURACYFAST
+  sfccpu := $(sfc)/cpu
+  sfcsmp := $(sfc)/smp
+  sfcdsp := $(sfc)/alt/dsp
+  sfcppu := $(sfc)/ppu
 else ifeq ($(profile),balanced)
   flags += -DPROFILE_BALANCED
   sfccpu := $(sfc)/cpu

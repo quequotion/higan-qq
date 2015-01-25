@@ -1,6 +1,27 @@
 #ifndef NALL_INTRINSICS_HPP
 #define NALL_INTRINSICS_HPP
 
+/* Platform detection */
+
+#if defined(_WIN32)
+  #define PLATFORM_WINDOWS
+#elif defined(__APPLE__)
+  #define PLATFORM_MACOSX
+  #include <machine/endian.h>
+#elif defined(linux) || defined(__linux__)
+  #define PLATFORM_LINUX
+  #define PLATFORM_XORG
+  #include <endian.h>
+#elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || defined(__OpenBSD__)
+  #define PLATFORM_BSD
+  #define PLATFORM_XORG
+  #include <sys/endian.h>
+#else
+  #warning "unable to detect platform"
+  #define PLATFORM_UNKNOWN
+  #include <endian.h>
+#endif
+
 namespace nall {
 
 struct Intrinsics {
@@ -14,6 +35,21 @@ struct Intrinsics {
   static inline Architecture architecture();
   static inline Endian endian();
 };
+
+/* Intrinsics determination */
+
+#if defined(PLATFORM_WINDOWS)
+  Intrinsics::Platform Intrinsics::platform() { return Intrinsics::Platform::Windows; }
+#elif defined(PLATFORM_MACOSX)
+  Intrinsics::Platform Intrinsics::platform() { return Intrinsics::Platform::MacOSX; }
+#elif defined(PLATFORM_LINUX)
+  Intrinsics::Platform Intrinsics::platform() { return Intrinsics::Platform::Linux; }
+#elif defined(PLATFORM_BSD)
+  Intrinsics::Platform Intrinsics::platform() { return Intrinsics::Platform::BSD; }
+#else
+  #warning "unable to determine platform intrinsics"
+  Intrinsics::Platform Intrinsics::platform() { return Intrinsics::Platform::Unknown; }
+#endif
 
 /* Compiler detection */
 
@@ -38,38 +74,6 @@ struct Intrinsics {
   #warning "unable to detect compiler"
   #define COMPILER_UNKNOWN
   Intrinsics::Compiler Intrinsics::compiler() { return Intrinsics::Compiler::Unknown; }
-#endif
-
-/* Platform detection */
-
-#if defined(_WIN32)
-  #define PLATFORM_WINDOWS
-  Intrinsics::Platform Intrinsics::platform() { return Intrinsics::Platform::Windows; }
-#elif defined(__APPLE__)
-  #define PLATFORM_MACOSX
-  Intrinsics::Platform Intrinsics::platform() { return Intrinsics::Platform::MacOSX; }
-#elif defined(linux) || defined(__linux__)
-  #define PLATFORM_LINUX
-  #define PLATFORM_XORG
-  Intrinsics::Platform Intrinsics::platform() { return Intrinsics::Platform::Linux; }
-#elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || defined(__OpenBSD__)
-  #define PLATFORM_BSD
-  #define PLATFORM_XORG
-  Intrinsics::Platform Intrinsics::platform() { return Intrinsics::Platform::BSD; }
-#else
-  #warning "unable to detect platform"
-  #define PLATFORM_UNKNOWN
-  Intrinsics::Platform Intrinsics::platform() { return Intrinsics::Platform::Unknown; }
-#endif
-
-/* Architecture Detection */
-
-#if defined(PLATFORM_MACOSX)
-  #include <machine/endian.h>
-#elif defined(PLATFORM_LINUX)
-  #include <endian.h>
-#elif defined(PLATFORM_BSD)
-  #include <sys/endian.h>
 #endif
 
 #if defined(__i386__) || defined(_M_IX86)

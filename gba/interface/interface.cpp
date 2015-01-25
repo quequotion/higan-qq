@@ -113,6 +113,21 @@ void Interface::paletteUpdate(PaletteMode mode) {
   video.generate_palette(mode);
 }
 
+void Interface::exportMemory() {
+  string pathname = {path(group(ID::ROM)), "debug/"};
+  directory::create(pathname);
+
+  file::write({pathname, "i-work.ram"}, cpu.iwram, 32 * 1024);
+  //file::write({pathname, "e-work.ram"}, cpu.ewram, 256 * 1024);
+  file::write({pathname, "video.ram"}, ppu.vram, 96 * 1024);
+  uint8 pal_data[1024];
+  for(unsigned color_id = 0; color_id < 512; color_id++) {
+    pal_data[(color_id << 1) + 0] = (ppu.pram[color_id] >> 0) & 0xFF;
+    pal_data[(color_id << 1) + 1] = (ppu.pram[color_id] >> 8) & 0x7F;
+  }
+  file::write({pathname, "palette.ram"}, pal_data, 1024);
+}
+
 Interface::Interface() {
   interface = this;
 

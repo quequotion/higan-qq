@@ -12,6 +12,7 @@ struct Utility {
   void power();
   void reset();
   void load();
+  void savemempak();
   void unload();
 
   void saveState(unsigned slot);

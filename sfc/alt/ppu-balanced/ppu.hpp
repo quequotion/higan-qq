@@ -62,6 +62,8 @@ struct PPU : Thread, public PPUcounter {
   void power();
   void reset();
 
+  void exportRegisters(string &markup);
+
   bool layer_enabled[5][4];
   void layer_enable(unsigned layer, unsigned priority, bool enable);
   unsigned frameskip;

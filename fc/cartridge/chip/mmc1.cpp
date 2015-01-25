@@ -89,7 +89,7 @@ void mmio_write(unsigned addr, uint8 data) {
         break;
 
       case 3:
-        ram_disable = (shiftdata & 0x10);
+        ram_disable = ((shiftdata & 0x10) && revision != Revision::MMC1 && revision != Revision::MMC1A);
         prg_bank = (shiftdata & 0x0f);
         break;
       }
@@ -111,7 +111,7 @@ void reset() {
   mirror = 0;
   chr_bank[0] = 0;
   chr_bank[1] = 1;
-  ram_disable = 0;
+  ram_disable = revision == Revision::MMC1C;
   prg_bank = 0;
 }
 
@@ -129,8 +129,15 @@ void serialize(serializer& s) {
   s.integer(prg_bank);
 }
 
-MMC1(Board& board) : Chip(board) {
-  revision = Revision::MMC1B2;
+MMC1(Board& board, Markup::Node& cartridge) : Chip(board) {
+  string type = cartridge["chip/type"].data;
+
+  if(type.match("*MMC1*"  )) revision = Revision::MMC1;
+  if(type.match("*MMC1A*" )) revision = Revision::MMC1A;
+  if(type.match("*MMC1B1*")) revision = Revision::MMC1B1;
+  if(type.match("*MMC1B2*")) revision = Revision::MMC1B2;
+  if(type.match("*MMC1B3*")) revision = Revision::MMC1B3;
+  if(type.match("*MMC1C*" )) revision = Revision::MMC1C;
 }
 
 };

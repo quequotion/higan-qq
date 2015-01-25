@@ -129,6 +129,18 @@ void InputManager::appendHotkeys() {
     };
   }
 
+  {
+    auto hotkey = new HotkeyInput;
+    hotkey->name    = "Export Memory";
+    hotkey->mapping = "None";
+
+    hotkey->press = [&] {
+      if(program->active == nullptr) return;
+      system().exportMemory();
+      utility->showMessage("Memory exported");
+    };
+  }
+
   Configuration::Node node;
   for(auto& hotkey : hotkeyMap) {
     node.append(hotkey->mapping, string{hotkey->name}.replace(" ", ""));

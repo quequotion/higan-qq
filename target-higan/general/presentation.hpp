@@ -8,6 +8,7 @@ struct Presentation : Window {
     Menu menu;
       Item power;
       Item reset;
+      Item savemempak;
       Item unload;
       Separator controllerSeparator;
       struct Port {

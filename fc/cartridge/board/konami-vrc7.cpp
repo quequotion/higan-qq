@@ -41,7 +41,7 @@ void serialize(serializer& s) {
   vrc7.serialize(s);
 }
 
-KonamiVRC7(Markup::Node& document) : Board(document), vrc7(*this) {
+KonamiVRC7(Markup::Node& cartridge) : Board(cartridge), vrc7(*this) {
 }
 
 };

@@ -81,14 +81,14 @@ struct R6502 {
   template<void (R6502::*op)()> void opi_rmw_zero_page_x();
   void opi_set_flag(bool& flag);
   template<void (R6502::*op)()> void opi_shift();
-  void opi_store_absolute(uint8& r);
+  void opi_store_absolute(uint8 r);
   void opi_store_absolute_x(uint8& r);
   void opi_store_absolute_y(uint8& r);
-  void opi_store_indirect_zero_page_x(uint8& r);
+  void opi_store_indirect_zero_page_x(uint8 r);
   void opi_store_indirect_zero_page_y(uint8& r);
-  void opi_store_zero_page(uint8& r);
+  void opi_store_zero_page(uint8 r);
   void opi_store_zero_page_x(uint8& r);
-  void opi_store_zero_page_y(uint8& r);
+  void opi_store_zero_page_y(uint8 r);
   void opi_transfer(uint8& s, uint8& d, bool flag);
 
   void op_brk();
@@ -101,13 +101,41 @@ struct R6502 {
   void op_rti();
   void op_rts();
 
+  void opillf_dcp();
+  void opillf_lax();
+
+  template<void (R6502::*opw)(),void (R6502::*opr)()>
+  void opilli_rmwr_absolute();
+  template<void (R6502::*opw)(),void (R6502::*opr)()>
+  void opilli_rmwr_absolute_x();
+  template<void (R6502::*opw)(),void (R6502::*opr)()>
+  void opilli_rmwr_absolute_y();
+  template<void (R6502::*opw)(),void (R6502::*opr)()>
+  void opilli_rmwr_indirect_zero_page_x();
+  template<void (R6502::*opw)(),void (R6502::*opr)()>
+  void opilli_rmwr_indirect_zero_page_y();
+  template<void (R6502::*opw)(),void (R6502::*opr)()>
+  void opilli_rmwr_zero_page();
+  template<void (R6502::*opw)(),void (R6502::*opr)()>
+  void opilli_rmwr_zero_page_x();
+
+  void opill_alr_immediate();
+  void opill_anc_immediate();
   void opill_arr_immediate();
+  void opill_axs_immediate();
+  void opill_dcp_absolute_y();
+  void opill_dcp_indirect_zero_page_x();
+  void opill_dcp_indirect_zero_page_y();
+  void opill_stp();
+  void opill_lax_immediate();
   void opill_nop_absolute();
   void opill_nop_absolute_x();
   void opill_nop_immediate();
   void opill_nop_implied();
   void opill_nop_zero_page();
   void opill_nop_zero_page_x();
+  void opill_shx_absolute_y();
+  void opill_shy_absolute_x();
 
   //disassembler.cpp
   string disassemble();

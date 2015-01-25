@@ -1,9 +1,11 @@
 #include <fc/fc.hpp>
 
+#define PPU_CPP
 namespace Famicom {
 
-#include "serialization.cpp"
 PPU ppu;
+
+#include "serialization.cpp"
 
 void PPU::Main() {
   ppu.main();
@@ -24,13 +26,24 @@ void PPU::tick() {
   if(status.ly == 241 && status.lx ==   0) status.nmi_flag = status.nmi_hold;
   if(status.ly == 241 && status.lx ==   2) cpu.set_nmi_line(status.nmi_enable && status.nmi_flag);
 
-  if(status.ly == 260 && status.lx == 340) status.sprite_zero_hit = 0, status.sprite_overflow = 0;
+  switch(system.region()) {
+  case System::Region::NTSC:
+    if(status.ly == 260 && status.lx == 340) status.sprite_zero_hit = 0, status.sprite_overflow = 0;
 
-  if(status.ly == 260 && status.lx == 340) status.nmi_hold = 0;
-  if(status.ly == 261 && status.lx ==   0) status.nmi_flag = status.nmi_hold;
-  if(status.ly == 261 && status.lx ==   2) cpu.set_nmi_line(status.nmi_enable && status.nmi_flag);
+    if(status.ly == 260 && status.lx == 340) status.nmi_hold = 0;
+    if(status.ly == 261 && status.lx ==   0) status.nmi_flag = status.nmi_hold;
+    if(status.ly == 261 && status.lx ==   2) cpu.set_nmi_line(status.nmi_enable && status.nmi_flag);
+    break;
+  case System::Region::PAL:
+    if(status.ly == 310 && status.lx == 340) status.sprite_zero_hit = 0, status.sprite_overflow = 0;
 
-  clock += 4;
+    if(status.ly == 310 && status.lx == 340) status.nmi_hold = 0;
+    if(status.ly == 311 && status.lx ==   0) status.nmi_flag = status.nmi_hold;
+    if(status.ly == 311 && status.lx ==   2) cpu.set_nmi_line(status.nmi_enable && status.nmi_flag);
+    break;
+  }
+
+  clock += (system.region() == System::Region::NTSC ? 4 : 5);
   if(clock >= 0) co_switch(cpu.thread);
 
   status.lx++;
@@ -38,7 +51,7 @@ void PPU::tick() {
 
 void PPU::scanline() {
   status.lx = 0;
-  if(++status.ly == 262) {
+  if(++status.ly == (system.region() == System::Region::NTSC ? 262 : 312)) {
     status.ly = 0;
     frame();
   }
@@ -54,7 +67,7 @@ void PPU::power() {
 }
 
 void PPU::reset() {
-  create(PPU::Main, 21477272);
+  create(PPU::Main, system.cpu_frequency());
 
   status.mdr = 0x00;
   status.field = 0;
@@ -105,30 +118,39 @@ uint8 PPU::read(uint16 addr) {
   case 2:  //PPUSTATUS
     result |= status.nmi_flag << 7;
     result |= status.sprite_zero_hit << 6;
-    result |= status.sprite_overflow << 5;
-    result |= status.mdr & 0x1f;
+    switch(revision) {
+    default:
+      result |= status.sprite_overflow << 5;
+      result |= status.mdr & 0x1f;
+      break;
+    case Revision::RC2C05_01:
+    case Revision::RC2C05_04: result |= 0x1b; break;
+    case Revision::RC2C05_02: result |= 0x3d; break;
+    case Revision::RC2C05_03: result |= 0x1c; break;
+    }
     status.address_latch = 0;
     status.nmi_hold = 0;
     cpu.set_nmi_line(status.nmi_flag = 0);
     break;
   case 4:  //OAMDATA
-    result = oam[status.oam_addr];
-    if((status.oam_addr & 3) == 3) result &= 0xe3;
+    switch(revision) {
+    case Revision::RP2C02C: result = status.mdr; break;
+    default:                result = oam[status.oam_addr]; break;
+    }
+    //if((status.oam_addr & 3) == 3) result &= 0xe3;
     break;
   case 7:  //PPUDATA
-    if(raster_enable() && (status.ly <= 240 || status.ly == 261)) return 0x00;
+    if(raster_enable() && (status.ly <= 240 || status.ly == (system.region() == System::Region::NTSC ? 261 : 311))) {
+      return 0x00;
+    }
 
     addr = status.vaddr & 0x3fff;
-    if(addr <= 0x1fff) {
+    if(addr <= 0x3eff) {
       result = status.bus_data;
-      status.bus_data = cartridge.chr_read(addr);
-    } else if(addr <= 0x3eff) {
-      result = status.bus_data;
-      status.bus_data = cartridge.chr_read(addr);
     } else if(addr <= 0x3fff) {
       result = cgram_read(addr);
-      status.bus_data = cartridge.chr_read(addr);
     }
+    status.bus_data = cartridge.chr_read(addr);
     status.vaddr += status.vram_increment;
     break;
   }
@@ -138,6 +160,14 @@ uint8 PPU::read(uint16 addr) {
 
 void PPU::write(uint16 addr, uint8 data) {
   status.mdr = data;
+
+  switch(revision) {
+  case Revision::RC2C05_01:
+  case Revision::RC2C05_02:
+  case Revision::RC2C05_03:
+  case Revision::RC2C05_04:
+  case Revision::RC2C05_05: if(addr & 6 == 0) addr ^= 1; break;
+  }
 
   switch(addr & 7) {
   case 0:  //PPUCTRL
@@ -161,6 +191,14 @@ void PPU::write(uint16 addr, uint8 data) {
   case 2:  //PPUSTATUS
     return;
   case 3:  //OAMADDR
+    if(revision != Revision::RP2C07) {
+      // below corruption code only applies for preferred CPU-PPU alignment.
+      // on an actual Famicom/NES, waiting a while after writing to OAM will
+      // make this corruption happen because the OAM will have decayed at the
+      // spot being written to.
+      for(int i = 0; i < 8; i++)
+        oam[((addr & 0xf800) >> 8) + i] = oam[(status.oam_addr & 0xf8) + i];
+    }
     status.oam_addr = data;
     return;
   case 4:  //OAMDATA
@@ -185,7 +223,9 @@ void PPU::write(uint16 addr, uint8 data) {
     status.address_latch ^= 1;
     return;
   case 7:  //PPUDATA
-    if(raster_enable() && (status.ly <= 240 || status.ly == 261)) return;
+    if(raster_enable() && (status.ly <= 240 || status.ly == (system.region() == System::Region::NTSC ? 261 : 311))) {
+      return;
+    }
 
     addr = status.vaddr & 0x3fff;
     if(addr <= 0x1fff) {
@@ -331,7 +371,7 @@ void PPU::raster_sprite() {
   if(raster_enable() == false) return;
 
   unsigned n = raster.oam_iterator++;
-  signed ly = (status.ly == 261 ? -1 : status.ly);
+  signed ly = (status.ly == (system.region() == System::Region::NTSC ? 261 : 311) ? -1 : status.ly);
   unsigned y = ly - oam[(n * 4) + 0];
 
   if(y >= sprite_height()) return;
@@ -349,7 +389,8 @@ void PPU::raster_sprite() {
 }
 
 void PPU::raster_scanline() {
-  if((status.ly >= 240 && status.ly <= 260)) {
+  unsigned last_scanline = system.region() == System::Region::NTSC ? 261 : 311;
+  if((status.ly >= 240 && status.ly <= last_scanline - 1)) {
     for(unsigned x = 0; x < 341; x++) tick();
     return scanline();
   }
@@ -437,7 +478,7 @@ void PPU::raster_scanline() {
     tick();
     tick();
 
-    if(raster_enable() && sprite == 6 && status.ly == 261) status.vaddr = status.taddr;  //304
+    if(raster_enable() && sprite == 6 && status.ly == last_scanline) status.vaddr = status.taddr;  //304
   }
 
   for(unsigned tile = 0; tile < 2; tile++) {  //320-335
@@ -471,7 +512,7 @@ void PPU::raster_scanline() {
   //336-339
   chr_load(0x2000 | (status.vaddr & 0x0fff));
   tick();
-  bool skip = (raster_enable() && status.field == 1 && status.ly == 261);
+  bool skip = (raster_enable() && status.field == 1 && status.ly == last_scanline);
   tick();
 
   chr_load(0x2000 | (status.vaddr & 0x0fff));
@@ -483,5 +524,42 @@ void PPU::raster_scanline() {
 
   return scanline();
 }
+
+//
+
+const uint9_t PPU::RP2C03[16 * 4] = {
+  0333,0014,0006,0326,0403,0503,0510,0420,0320,0120,0031,0040,0022,0000,0000,0000,
+  0555,0036,0027,0407,0507,0704,0700,0630,0430,0140,0040,0053,0044,0000,0000,0000,
+  0777,0357,0447,0637,0707,0737,0740,0750,0660,0360,0070,0276,0077,0000,0000,0000,
+  0777,0567,0657,0757,0747,0755,0764,0772,0773,0572,0473,0276,0467,0000,0000,0000,
+};
+
+const uint9_t PPU::RP2C04_0001[16 * 4] = {
+  0755,0637,0700,0447,0044,0120,0222,0704,0777,0333,0750,0503,0403,0660,0320,0777,
+  0357,0653,0310,0360,0467,0657,0764,0027,0760,0276,0000,0200,0666,0444,0707,0014,
+  0003,0567,0757,0070,0077,0022,0053,0507,0000,0420,0747,0510,0407,0006,0740,0000,
+  0000,0140,0555,0031,0572,0326,0770,0630,0020,0036,0040,0111,0773,0737,0430,0473,
+};
+
+const uint9_t PPU::RP2C04_0002[16 * 4] = {
+  0000,0750,0430,0572,0473,0737,0044,0567,0700,0407,0773,0747,0777,0637,0467,0040,
+  0020,0357,0510,0666,0053,0360,0200,0447,0222,0707,0003,0276,0657,0320,0000,0326,
+  0403,0764,0740,0757,0036,0310,0555,0006,0507,0760,0333,0120,0027,0000,0660,0777,
+  0653,0111,0070,0630,0022,0014,0704,0140,0000,0077,0420,0770,0755,0503,0031,0444,
+};
+
+const uint9_t PPU::RP2C04_0003[16 * 4] = {
+  0507,0737,0473,0555,0040,0777,0567,0120,0014,0000,0764,0320,0704,0666,0653,0467,
+  0447,0044,0503,0027,0140,0430,0630,0053,0333,0326,0000,0006,0700,0510,0747,0755,
+  0637,0020,0003,0770,0111,0750,0740,0777,0360,0403,0357,0707,0036,0444,0000,0310,
+  0077,0200,0572,0757,0420,0070,0660,0222,0031,0000,0657,0773,0407,0276,0760,0022,
+};
+
+const uint9_t PPU::RP2C04_0004[16 * 4] = {
+  0430,0326,0044,0660,0000,0755,0014,0630,0555,0310,0070,0003,0764,0770,0040,0572,
+  0737,0200,0027,0747,0000,0222,0510,0740,0653,0053,0447,0140,0403,0000,0473,0357,
+  0503,0031,0420,0006,0407,0507,0333,0704,0022,0666,0036,0020,0111,0773,0444,0707,
+  0757,0777,0320,0700,0760,0276,0777,0467,0000,0750,0637,0567,0360,0657,0077,0120,
+};
 
 }

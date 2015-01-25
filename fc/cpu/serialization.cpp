@@ -1,3 +1,5 @@
+#ifdef CPU_CPP
+
 void CPU::serialize(serializer& s) {
   R6502::serialize(s);
   Thread::serialize(s);
@@ -17,7 +19,9 @@ void CPU::serialize(serializer& s) {
   s.integer(status.oam_dma_pending);
   s.integer(status.oam_dma_page);
 
-  s.integer(status.controller_latch);
-  s.integer(status.controller_port0);
-  s.integer(status.controller_port1);
+  //s.integer(status.controller_latch);
+  //s.integer(status.controller_port0);
+  //s.integer(status.controller_port1);
 }
+
+#endif

@@ -5,9 +5,13 @@ sfc := sfc
 gb  := gb
 gba := gba
 
-profile := accuracy
-target := higan
-# target := loki
+ifndef profile
+  profile := accuracy
+endif
+
+ifndef target
+  target := higan
+endif
 
 ifeq ($(target),loki)
   options += debugger
@@ -29,7 +33,8 @@ ifeq ($(pgo),instrument)
   flags += -fprofile-generate
   link += -lgcov
 else ifeq ($(pgo),optimize)
-  flags += -fprofile-use
+  flags += -fprofile-use -fprofile-correction
+  link += -lgcov
 endif
 
 # platform

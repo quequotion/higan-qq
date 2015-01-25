@@ -1,3 +1,5 @@
+#ifdef APU_CPP
+
 void APU::serialize(serializer& s) {
   Thread::serialize(s);
 
@@ -26,3 +28,5 @@ void APU::FrameCounter::serialize(serializer& s) {
   s.integer(counter);
   s.integer(divider);
 }
+
+#endif

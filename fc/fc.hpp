@@ -46,16 +46,17 @@ namespace Famicom {
     }
   };
 
-  #include <fc/system/system.hpp>
-  #include <fc/scheduler/scheduler.hpp>
-  #include <fc/input/input.hpp>
   #include <fc/memory/memory.hpp>
-  #include <fc/cartridge/cartridge.hpp>
+
   #include <fc/cpu/cpu.hpp>
   #include <fc/apu/apu.hpp>
   #include <fc/ppu/ppu.hpp>
+
+  #include <fc/controller/controller.hpp>
+  #include <fc/system/system.hpp>
+  #include <fc/arcade/arcade.hpp>
+  #include <fc/cartridge/cartridge.hpp>
   #include <fc/cheat/cheat.hpp>
-  #include <fc/video/video.hpp>
   #include <fc/interface/interface.hpp>
 }
 

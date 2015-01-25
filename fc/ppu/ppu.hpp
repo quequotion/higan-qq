@@ -1,4 +1,28 @@
 struct PPU : Thread {
+  uint32 buffer[256 * 262];
+  uint8 ciram[2048];
+  uint8 cgram[32];
+  uint8 oam[256];
+
+  enum class Revision : unsigned {
+    RP2C02C,
+    RP2C02G,
+    RP2C07,
+    RP2C03B,
+    RP2C03G,
+    RP2C04_0001,
+    RP2C04_0002,
+    RP2C04_0003,
+    RP2C04_0004,
+    RC2C03B,
+    RC2C03C,
+    RC2C05_01,
+    RC2C05_02,
+    RC2C05_03,
+    RC2C05_04,
+    RC2C05_05,
+  } revision;
+
   static void Main();
   void main();
   void tick();
@@ -32,6 +56,12 @@ struct PPU : Thread {
   void raster_pixel();
   void raster_sprite();
   void raster_scanline();
+
+  static const uint9_t RP2C03[16 * 4];
+  static const uint9_t RP2C04_0001[16 * 4];
+  static const uint9_t RP2C04_0002[16 * 4];
+  static const uint9_t RP2C04_0003[16 * 4];
+  static const uint9_t RP2C04_0004[16 * 4];
 
   void serialize(serializer&);
 
@@ -97,11 +127,6 @@ struct PPU : Thread {
       uint8 tiledatahi;
     } oam[8], soam[8];
   } raster;
-
-  uint32 buffer[256 * 262];
-  uint8 ciram[2048];
-  uint8 cgram[32];
-  uint8 oam[256];
 };
 
 extern PPU ppu;

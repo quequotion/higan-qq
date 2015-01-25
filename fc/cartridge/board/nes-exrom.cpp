@@ -46,8 +46,12 @@ void serialize(serializer& s) {
   mmc5.serialize(s);
 }
 
-NES_ExROM(Markup::Node& document) : Board(document), mmc5(*this) {
-  revision = Revision::ELROM;
+NES_ExROM(Markup::Node& cartridge) : Board(cartridge), mmc5(*this, cartridge) {
+  string type = cartridge["board/type"].data;
+  if(type.match("*EKROM*")) revision = Revision::EKROM;
+  if(type.match("*ELROM*")) revision = Revision::ELROM;
+  if(type.match("*ETROM*")) revision = Revision::ETROM;
+  if(type.match("*EWROM*")) revision = Revision::EWROM;
 }
 
 };

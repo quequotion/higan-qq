@@ -1,5 +1,13 @@
 struct MMC3 : Chip {
 
+enum class Revision : unsigned {
+  MMC3,
+  MMC3A,
+  MMC3B,
+  MMC3C,
+  MCACC,
+} revision;
+
 bool chr_mode;
 bool prg_mode;
 uint3 bank_select;
@@ -38,6 +46,7 @@ void irq_test(unsigned addr) {
       }
     }
     irq_delay = 6;
+    //if(revision == Revision::MCACC) irq_delay += 88;
   }
   chr_abus = addr;
 }
@@ -183,7 +192,13 @@ void serialize(serializer& s) {
   s.integer(chr_abus);
 }
 
-MMC3(Board& board) : Chip(board) {
+MMC3(Board& board, Markup::Node& cartridge) : Chip(board) {
+  string type = cartridge["chip/type"].data;
+  if(type.match("*MMC3*"  )) revision = Revision::MMC3;
+  if(type.match("*MMC3A*" )) revision = Revision::MMC3A;
+  if(type.match("*MMC3B*" )) revision = Revision::MMC3B;
+  if(type.match("*MMC3C*" )) revision = Revision::MMC3C;
+  if(type.match("*MC-ACC*")) revision = Revision::MCACC;
 }
 
 };

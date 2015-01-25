@@ -267,6 +267,10 @@ void Interface::save(unsigned id, const stream& stream) {
   if(id == ID::SufamiTurboSlotBRAM) stream.write(sufamiturboB.ram.data(), sufamiturboB.ram.size());
 }
 
+void Interface::savemempak() {
+  system.savemempak();
+}
+
 void Interface::unload() {
   save();
   cartridge.unload();
@@ -338,6 +342,30 @@ void Interface::cheatSet(const lstring& list) {
 
 void Interface::paletteUpdate(PaletteMode mode) {
   video.generate_palette(mode);
+}
+
+void Interface::exportMemory() {
+  string pathname = {path(group(ID::ROM)), "debug/"};
+  directory::create(pathname);
+
+  // Registers
+  string markup = "";
+  ppu.exportRegisters(markup);
+  file::write({pathname, "registers.bml"}, markup);
+
+  file::write({pathname, "work.ram"}, cpu.wram, 128 * 1024);
+  file::write({pathname, "video.ram"}, ppu.vram, 64 * 1024);
+  file::write({pathname, "sprite.ram"}, ppu.oam, 544);
+  file::write({pathname, "palette.ram"}, ppu.cgram, 512);
+  file::write({pathname, "apu.ram"}, smp.apuram, 64 * 1024);
+  if(cartridge.has_sa1())
+    file::write({pathname, "sa1.internal.ram"}, sa1.iram.data(), sa1.iram.size());
+  if(cartridge.has_armdsp())
+    file::write({pathname, "st018.program.ram"}, armdsp.programRAM, sizeof(armdsp.programRAM));
+  if(cartridge.has_hitachidsp())
+    file::write({pathname, "cx4.data.ram"}, hitachidsp.ram.data(), hitachidsp.ram.size());
+  //if(cartridge.has_necdsp())
+  //  file::write({pathname, "dsp.data.ram"}, necdsp.dataRAM, sizeof(necdsp.dataRAM));
 }
 
 Interface::Interface() {

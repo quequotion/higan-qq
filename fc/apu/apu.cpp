@@ -1,6 +1,9 @@
 #include <fc/fc.hpp>
 
+#define APU_CPP
 namespace Famicom {
+  
+APU apu;
 
 #include "envelope.cpp"
 #include "sweep.cpp"
@@ -9,7 +12,6 @@ namespace Famicom {
 #include "noise.cpp"
 #include "dmc.cpp"
 #include "serialization.cpp"
-APU apu;
 
 const uint8 APU::length_counter_table[32] = {
   0x0a, 0xfe, 0x14, 0x02, 0x28, 0x04, 0x50, 0x06, 0xa0, 0x08, 0x3c, 0x0a, 0x0e, 0x0c, 0x1a, 0x0e,
@@ -67,7 +69,7 @@ void APU::main() {
 }
 
 void APU::tick() {
-  clock += 12;
+  clock += (system.region() == System::Region::NTSC ? 12 : 16);
   if(clock >= 0 && scheduler.sync != Scheduler::SynchronizeMode::All) co_switch(cpu.thread);
 }
 
@@ -92,7 +94,7 @@ void APU::power() {
 }
 
 void APU::reset() {
-  create(APU::Main, 21477272);
+  create(APU::Main, system.cpu_frequency());
 
   pulse[0].reset();
   pulse[1].reset();
@@ -249,7 +251,10 @@ void APU::write(uint16 addr, uint8 data) {
       frame.irq_pending = false;
       set_irq_line();
     }
-    frame.divider = FrameCounter::NtscPeriod;
+    if(system.region() == System::Region::NTSC)
+      frame.divider = FrameCounter::NtscPeriod;
+    else
+      frame.divider = FrameCounter::PalPeriod;
     break;
   }
 }
@@ -287,7 +292,12 @@ void APU::clock_frame_counter() {
   noise.envelope.clock();
 
   if(frame.counter == 0) {
-    if(frame.mode & 2) frame.divider += FrameCounter::NtscPeriod;
+    if(frame.mode & 2) {
+      if(system.region() == System::Region::NTSC)
+        frame.divider += FrameCounter::NtscPeriod;
+      else
+        frame.divider += FrameCounter::PalPeriod;
+    }
     if(frame.mode == 0) {
       frame.irq_pending = true;
       set_irq_line();
@@ -299,7 +309,10 @@ void APU::clock_frame_counter_divider() {
   frame.divider -= 2;
   if(frame.divider <= 0) {
     clock_frame_counter();
-    frame.divider += FrameCounter::NtscPeriod;
+    if(system.region() == System::Region::NTSC)
+      frame.divider += FrameCounter::NtscPeriod;
+    else
+      frame.divider += FrameCounter::PalPeriod;
   }
 }
 

@@ -89,6 +89,7 @@ struct Interface {
   virtual void save() {}
   virtual void load(unsigned id, const stream& memory) {}
   virtual void save(unsigned id, const stream& memory) {}
+  virtual void savemempak() {}
   virtual void unload() {}
 
   //system interface
@@ -111,6 +112,9 @@ struct Interface {
   //utility functions
   enum class PaletteMode : unsigned { Literal, Channel, Standard, Emulation };
   virtual void paletteUpdate(PaletteMode mode) {}
+
+  //debugger functions
+  virtual void exportMemory() {}
 };
 
 }

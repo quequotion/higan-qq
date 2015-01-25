@@ -57,6 +57,8 @@ namespace SuperFamicom {
 
   #if defined(PROFILE_ACCURACY)
   #include "profile-accuracy.hpp"
+  #elif defined(PROFILE_ACCURACYFAST)
+  #include "profile-accuracyfast.hpp"
   #elif defined(PROFILE_BALANCED)
   #include "profile-balanced.hpp"
   #elif defined(PROFILE_PERFORMANCE)

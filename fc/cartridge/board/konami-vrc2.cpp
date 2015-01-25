@@ -4,6 +4,7 @@ struct Settings {
   struct Pinout {
     unsigned a0;
     unsigned a1;
+    unsigned chr_shift;
   } pinout;
 } settings;
 
@@ -28,7 +29,9 @@ void prg_write(unsigned addr, uint8 data) {
 
 uint8 chr_read(unsigned addr) {
   if(addr & 0x2000) return ppu.ciram_read(vrc2.ciram_addr(addr));
-  return Board::chr_read(vrc2.chr_addr(addr));
+  addr = vrc2.chr_addr(addr);
+  addr = ((addr >> settings.pinout.chr_shift) & ~0x3ff) | (addr & 0x3ff);
+  return Board::chr_read(addr);
 }
 
 void chr_write(unsigned addr, uint8 data) {
@@ -49,9 +52,10 @@ void serialize(serializer& s) {
   vrc2.serialize(s);
 }
 
-KonamiVRC2(Markup::Node& document) : Board(document), vrc2(*this) {
-  settings.pinout.a0 = 1 << decimal(document["cartridge"]["chip"]["pinout"]["a0"].data);
-  settings.pinout.a1 = 1 << decimal(document["cartridge"]["chip"]["pinout"]["a1"].data);
+KonamiVRC2(Markup::Node& cartridge) : Board(cartridge), vrc2(*this) {
+  settings.pinout.a0 = 1 << decimal(cartridge["chip/pinout/a0"].data);
+  settings.pinout.a1 = 1 << decimal(cartridge["chip/pinout/a1"].data);
+  settings.pinout.chr_shift = decimal(cartridge["chip/pinout/chr-shift"].data);
 }
 
 };

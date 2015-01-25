@@ -1,4 +1,11 @@
-name := higan
+ifndef name
+  name := higan
+endif
+
+ifndef DESTDIR
+  DESTDIR := /
+endif
+
 
 processors := arm gsu hg51b lr35902 r6502 r65816 spc700 upd96050
 include processor/Makefile
@@ -89,29 +96,28 @@ resource:
 	sourcery $(ui)/resource/resource.bml $(ui)/resource/resource.cpp $(ui)/resource/resource.hpp
 
 install:
-ifneq ($(shell id -un),root)
-	$(error "make install must be run as root")
-else ifeq ($(platform),windows)
+ifeq ($(platform),windows)
 else ifeq ($(platform),macosx)
-	mkdir -p /Library/Application\ Support/$(name)
-	cp -R profile/* /Library/Application\ Support/$(name)
-	cp data/cheats.bml /Library/Application\ Support/$(name)/cheats.bml
-	chmod -R 777 /Library/Application\ Support/$(name)
+	install -d $(DESTDIR)Library/Application\ Support/$(name)
+	cp -R profile/* $(DESTDIR)Library/Application\ Support/$(name)
+	cp data/cheats.bml $(DESTDIR)Library/Application\ Support/$(name)/cheats.bml
+	chmod -R 777 $(DESTDIR)Library/Application\ Support/$(name)
 else
-	cp out/$(name) $(prefix)/bin/$(name)
-	cp data/$(name).png $(prefix)/share/pixmaps/$(name).png
-	cp data/$(name).desktop $(prefix)/share/applications/$(name).desktop
-	mkdir -p /usr/share/$(name)
-	cp -R profile/* /usr/share/$(name)
-	cp data/cheats.bml /usr/share/$(name)/cheats.bml
-	chmod -R 777 /usr/share/$(name)
+	install -d $(DESTDIR)$(prefix)/bin/
+	cp out/$(name) $(DESTDIR)$(prefix)/bin/$(name)
+	install -d $(DESTDIR)$(prefix)/share/pixmaps/
+	cp data/$(name).png $(DESTDIR)$(prefix)/share/pixmaps/$(name).png
+	install -d $(DESTDIR)$(prefix)/share/applications/
+	cp data/$(name).desktop $(DESTDIR)$(prefix)/share/applications/$(name).desktop
+	install -d $(DESTDIR)usr/share/$(name)
+	cp -R profile/* $(DESTDIR)usr/share/$(name)
+	cp data/cheats.bml $(DESTDIR)usr/share/$(name)/cheats.bml
+	chmod -R 777 $(DESTDIR)usr/share/$(name)
 endif
 
 uninstall:
-ifneq ($(shell id -un),root)
-	$(error "make uninstall must be run as root")
-else ifeq ($(platform),windows)
+ifeq ($(platform),windows)
 else ifeq ($(platform),macosx)
 else
-	rm $(prefix)/bin/$(name)
+	rm $(DESTDIR)$(prefix)/bin/$(name)
 endif

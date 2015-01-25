@@ -1,3 +1,5 @@
+#ifdef APU_CPP
+
 void APU::Noise::clock_length() {
   if(envelope.loop_mode == 0) {
     if(length_counter > 0) length_counter--;
@@ -19,7 +21,10 @@ uint8 APU::Noise::clock() {
     }
 
     lfsr = (lfsr >> 1) | (feedback << 14);
-    period_counter = apu.ntsc_noise_period_table[period];
+    if(system.region() == System::Region::NTSC)
+      period_counter = apu.ntsc_noise_period_table[period];
+    else
+      period_counter = apu.pal_noise_period_table[period];
   }
 
   return result;
@@ -55,3 +60,5 @@ void APU::Noise::serialize(serializer& s) {
   s.integer(short_mode);
   s.integer(lfsr);
 }
+
+#endif

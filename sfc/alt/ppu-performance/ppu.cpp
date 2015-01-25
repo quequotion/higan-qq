@@ -105,6 +105,9 @@ void PPU::reset() {
   display.overscan = false;
 }
 
+void PPU::exportRegisters(string &markup) {
+}
+
 void PPU::layer_enable(unsigned layer, unsigned priority, bool enable) {
   switch(layer * 4 + priority) {
   case  0: bg1.priority0_enable = enable; break;

@@ -1,3 +1,5 @@
+#ifdef APU_CPP
+
 bool APU::Sweep::check_period() {
   if(pulse_period > 0x7ff) return false;
 
@@ -51,3 +53,5 @@ void APU::Sweep::serialize(serializer& s) {
   s.integer(reload);
   s.integer(pulse_period);
 }
+
+#endif

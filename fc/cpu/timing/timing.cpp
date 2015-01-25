@@ -1,3 +1,9 @@
+#ifdef CPU_CPP
+
+void CPU::add_clocks(unsigned clocks) {
+  step(clocks);
+}
+
 uint8 CPU::op_read(uint16 addr) {
   if(status.oam_dma_pending) {
     status.oam_dma_pending = false;
@@ -7,17 +13,17 @@ uint8 CPU::op_read(uint16 addr) {
 
   while(status.rdy_line == 0) {
     regs.mdr = bus.read(status.rdy_addr_valid ? status.rdy_addr_value : addr);
-    add_clocks(12);
+    add_clocks(system.region() == System::Region::NTSC ? 12 : 16);
   }
 
   regs.mdr = bus.read(addr);
-  add_clocks(12);
+  add_clocks(system.region() == System::Region::NTSC ? 12 : 16);
   return regs.mdr;
 }
 
 void CPU::op_write(uint16 addr, uint8 data) {
   bus.write(addr, regs.mdr = data);
-  add_clocks(12);
+  add_clocks(system.region() == System::Region::NTSC ? 12 : 16);
 }
 
 void CPU::last_cycle() {
@@ -62,3 +68,5 @@ void CPU::set_rdy_addr(bool valid, uint16 value) {
   status.rdy_addr_valid = valid;
   status.rdy_addr_value = value;
 }
+
+#endif

@@ -368,6 +368,36 @@ void PPU::reset() {
   regs.bg_y[3] = 0;
 }
 
+void PPU::exportRegisters(string &markup) {
+  markup.append("ppu\n");
+  // 2105
+  markup.append("  bgmode:       ", regs.bg_mode,      "\n");
+  markup.append("  bg3-priority: ", regs.bg3_priority, "\n");
+  // 2133
+  markup.append("  pseudo-hires: ", regs.pseudo_hires, "\n");
+  markup.append("  overscan:     ", regs.overscan,     "\n");
+  // individual backgrounds
+  unsigned bg;
+  for(unsigned bg_id = 1; bg_id <= 4; bg_id++) {
+    switch(bg_id) {
+      case 1: bg = BG1; break;
+      case 2: bg = BG2; break;
+      case 3: bg = BG3; break;
+      case 4: bg = BG4; break;
+    }
+    markup.append("  bg\n");
+    markup.append("    tile-size:     ",   regs.bg_tilesize[bg],       "\n");
+    markup.append("    mosaic:        ",   regs.mosaic_enabled[bg],    "\n");
+    markup.append("    screen-addr:   0x", hex<4>(regs.bg_scaddr[bg]), "\n");
+    markup.append("    screen-size:   ",   regs.bg_scsize[bg],         "\n");
+    markup.append("    tiledata-addr: 0x", hex<4>(regs.bg_tdaddr[bg]), "\n");
+    markup.append("    hoffset:       0x", hex<4>(regs.bg_hofs[bg]),   "\n");
+    markup.append("    voffset:       0x", hex<4>(regs.bg_vofs[bg]),   "\n");
+    markup.append("    main-enable:   ",   regs.bg_enabled[bg],        "\n");
+    markup.append("    sub-enable:    ",   regs.bgsub_enabled[bg],     "\n");
+  }
+}
+
 void PPU::layer_enable(unsigned layer, unsigned priority, bool enable) {
   switch(layer * 4 + priority) {
   case  0: layer_enabled[BG1][0] = enable; break;

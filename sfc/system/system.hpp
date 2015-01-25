@@ -10,6 +10,7 @@ struct System : property<System> {
   void init();
   void term();
   void load();
+  void savemempak();
   void unload();
   void power();
   void reset();

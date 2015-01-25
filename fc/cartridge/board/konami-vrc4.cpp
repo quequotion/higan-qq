@@ -25,7 +25,7 @@ void prg_write(unsigned addr, uint8 data) {
 
   bool a0 = (addr & settings.pinout.a0);
   bool a1 = (addr & settings.pinout.a1);
-  addr &= 0xfff0;
+  addr &= 0xff00;
   addr |= (a1 << 1) | (a0 << 0);
   return vrc4.reg_write(addr, data);
 }
@@ -53,9 +53,9 @@ void serialize(serializer& s) {
   vrc4.serialize(s);
 }
 
-KonamiVRC4(Markup::Node& document) : Board(document), vrc4(*this) {
-  settings.pinout.a0 = 1 << decimal(document["cartridge"]["chip"]["pinout"]["a0"].data);
-  settings.pinout.a1 = 1 << decimal(document["cartridge"]["chip"]["pinout"]["a1"].data);
+KonamiVRC4(Markup::Node& cartridge) : Board(cartridge), vrc4(*this) {
+  settings.pinout.a0 = 1 << decimal(cartridge["chip/pinout/a0"].data);
+  settings.pinout.a1 = 1 << decimal(cartridge["chip/pinout/a1"].data);
 }
 
 };

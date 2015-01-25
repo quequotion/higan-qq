@@ -4,21 +4,23 @@ namespace Famicom {
 
 struct ID {
   enum : unsigned {
+    //cartridges (folders)
     System,
     Famicom,
-  };
+    PlayChoice10,
+    VSSystem,
 
-  enum : unsigned {
+    //memory (files)
     Manifest,
     ProgramROM,
     ProgramRAM,
     CharacterROM,
     CharacterRAM,
-  };
 
-  enum : unsigned {
+    //controller ports
     Port1 = 1,
     Port2 = 2,
+    ExpansionPort = 4,
   };
 };
 
@@ -36,6 +38,7 @@ struct Interface : Emulator::Interface {
   void save(unsigned id, const stream& stream);
   void unload();
 
+  void connect(unsigned port, unsigned device);
   void power();
   void reset();
   void run();
@@ -47,9 +50,11 @@ struct Interface : Emulator::Interface {
 
   void paletteUpdate(PaletteMode mode);
 
+  //debugger functions
+  void exportMemory();
+
   Interface();
 
-private:
   vector<Device> device;
 };
 

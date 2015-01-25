@@ -1,3 +1,5 @@
+#ifdef APU_CPP
+
 void APU::DMC::start() {
   if(length_counter == 0) {
     read_addr = 0x4000 + (addr_latch << 6);
@@ -57,7 +59,10 @@ uint8 APU::DMC::clock() {
       }
     }
 
-    period_counter = ntsc_dmc_period_table[period];
+    if(system.region() == System::Region::NTSC)
+      period_counter = ntsc_dmc_period_table[period];
+    else
+      period_counter = pal_dmc_period_table[period];
   }
 
   if(length_counter > 0 && have_dma_buffer == false && dma_delay_counter == 0) {
@@ -115,3 +120,5 @@ void APU::DMC::serialize(serializer& s) {
   s.integer(have_sample);
   s.integer(sample);
 }
+
+#endif

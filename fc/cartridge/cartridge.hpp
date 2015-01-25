@@ -2,24 +2,18 @@
 #include "board/board.hpp"
 
 struct Cartridge : Thread, property<Cartridge> {
+  enum class Region : unsigned {
+    NTSC,
+    PAL,
+  };
+
   static void Main();
   void main();
-
-  void load();
-  void unload();
-
-  void power();
-  void reset();
 
   readonly<bool> loaded;
   readonly<string> sha256;
 
-  struct Information {
-    string markup;
-    string title;
-  } information;
-
-  string title();
+  readonly<Region> region;
 
   struct Memory {
     unsigned id;
@@ -27,8 +21,29 @@ struct Cartridge : Thread, property<Cartridge> {
   };
   vector<Memory> memory;
 
+  struct Information {
+    struct Markup {
+      string cartridge;
+      //string famicomDiskSystem;
+    } markup;
+
+    struct Title {
+      string cartridge;
+      //string famicomDiskSystem;
+    } title;
+  } information;
+
+  string title();
+
+  void load(System::Revision revision);
+  void unload();
+
+  void power();
+  void reset();
+
   void serialize(serializer&);
   Cartridge();
+  ~Cartridge();
 
 //privileged:
   Board *board;
@@ -42,6 +57,9 @@ struct Cartridge : Thread, property<Cartridge> {
   //scanline() is for debugging purposes only:
   //boards must detect scanline edges on their own
   void scanline(unsigned y);
+
+private:
+  void parse_markup(const char*);
 };
 
 extern Cartridge cartridge;

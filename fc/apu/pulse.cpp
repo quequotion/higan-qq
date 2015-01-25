@@ -1,3 +1,5 @@
+#ifdef APU_CPP
+
 void APU::Pulse::clock_length() {
   if(envelope.loop_mode == 0) {
     if(length_counter) length_counter--;
@@ -49,3 +51,5 @@ void APU::Pulse::serialize(serializer& s) {
   s.integer(period);
   s.integer(period_counter);
 }
+
+#endif

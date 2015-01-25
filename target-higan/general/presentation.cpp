@@ -189,6 +189,7 @@ void Presentation::bootstrap() {
     iEmulator->menu.setText(emulator->information.name);
     iEmulator->power.setText("Power");
     iEmulator->reset.setText("Reset");
+    iEmulator->savemempak.setText("Save BSX Mempak");
     iEmulator->unload.setText("Unload");
 
     for(auto& port : emulator->port) {
@@ -226,6 +227,7 @@ void Presentation::bootstrap() {
 
     iEmulator->power.onActivate = {&Utility::power, utility};
     iEmulator->reset.onActivate = {&Utility::reset, utility};
+    iEmulator->savemempak.onActivate = {&Utility::savemempak, utility};
     iEmulator->unload.onActivate = {&Utility::unload, utility};
 
     emulatorList.append(iEmulator);

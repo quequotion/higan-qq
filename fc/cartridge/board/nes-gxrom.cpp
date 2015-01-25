@@ -4,7 +4,7 @@
 struct NES_GxROM : Board {
 
 struct Settings {
-  bool mirror;  //0 = horizontal, 1 = vertical
+  bool mirror;  //0 = vertical, 1 = horizontal
 } settings;
 
 uint2 prg_bank;
@@ -17,6 +17,8 @@ uint8 prg_read(unsigned addr) {
 
 void prg_write(unsigned addr, uint8 data) {
   if(addr & 0x8000) {
+    // Bus conflicts
+    data &= prg_read(addr);
     prg_bank = (data & 0x30) >> 4;
     chr_bank = (data & 0x03) >> 0;
   }
@@ -24,7 +26,7 @@ void prg_write(unsigned addr, uint8 data) {
 
 uint8 chr_read(unsigned addr) {
   if(addr & 0x2000) {
-    if(settings.mirror == 0) addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
+    if(settings.mirror == 1) addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
     return ppu.ciram_read(addr & 0x07ff);
   }
   addr = (chr_bank * 0x2000) + (addr & 0x1fff);
@@ -33,7 +35,7 @@ uint8 chr_read(unsigned addr) {
 
 void chr_write(unsigned addr, uint8 data) {
   if(addr & 0x2000) {
-    if(settings.mirror == 0) addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
+    if(settings.mirror == 1) addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
     return ppu.ciram_write(addr & 0x07ff, data);
   }
   addr = (chr_bank * 0x2000) + (addr & 0x1fff);
@@ -54,8 +56,8 @@ void serialize(serializer& s) {
   s.integer(chr_bank);
 }
 
-NES_GxROM(Markup::Node& document) : Board(document) {
-  settings.mirror = document["cartridge"]["mirror"]["mode"].data == "vertical" ? 1 : 0;
+NES_GxROM(Markup::Node& cartridge) : Board(cartridge) {
+  settings.mirror = cartridge["mirror/mode"].data == "horizontal";
 }
 
 };

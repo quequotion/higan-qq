@@ -32,7 +32,7 @@ void R6502::opf_bit() {
 void R6502::opf_cmp() {
   signed r = regs.a - rd;
   regs.p.n = (r & 0x80);
-  regs.p.z = (uint8)(r == 0);
+  regs.p.z = ((uint8)r == 0);
   regs.p.c = (r >= 0);
 }
 
@@ -323,7 +323,7 @@ L op_readpc();
   call(op);
 }
 
-void R6502::opi_store_absolute(uint8& r) {
+void R6502::opi_store_absolute(uint8 r) {
   abs.l = op_readpci();
   abs.h = op_readpci();
 L op_write(abs.w, r);
@@ -343,7 +343,7 @@ void R6502::opi_store_absolute_y(uint8& r) {
 L op_write(abs.w + regs.y, r);
 }
 
-void R6502::opi_store_indirect_zero_page_x(uint8& r) {
+void R6502::opi_store_indirect_zero_page_x(uint8 r) {
   zp = op_readpci();
   op_readzp(zp);
   abs.l = op_readzp(zp++ + regs.x);
@@ -359,7 +359,7 @@ void R6502::opi_store_indirect_zero_page_y(uint8& r) {
 L op_write(abs.w + regs.y, r);
 }
 
-void R6502::opi_store_zero_page(uint8& r) {
+void R6502::opi_store_zero_page(uint8 r) {
   zp = op_readpci();
 L op_writezp(zp, r);
 }
@@ -370,7 +370,7 @@ void R6502::opi_store_zero_page_x(uint8& r) {
 L op_writezp(zp + regs.x, r);
 }
 
-void R6502::opi_store_zero_page_y(uint8& r) {
+void R6502::opi_store_zero_page_y(uint8 r) {
   zp = op_readpci();
   op_readzp(zp);
 L op_writezp(zp + regs.y, r);
@@ -391,11 +391,12 @@ void R6502::op_brk() {
   op_readpci();
   op_writesp(regs.pc >> 8);
   op_writesp(regs.pc >> 0);
+  uint16 vector = 0xfffe;
+  nmi(vector);
   op_writesp(regs.p | 0x30);
-  abs.l = op_read(0xfffe);
+  abs.l = op_read(vector + 0);
   regs.p.i = 1;
-  regs.p.d = 0;
-L abs.h = op_read(0xffff);
+L abs.h = op_read(vector + 1);
   regs.pc = abs.w;
 }
 
@@ -456,8 +457,117 @@ L op_readpc();
   regs.pc = ++abs.w;
 }
 
+//illegal opcode functions
+//========================
+
+void R6502::opillf_dcp() {
+  opf_dec();
+  opf_cmp();
+}
+
+void R6502::opillf_lax() {
+  opf_lda();
+  regs.x = regs.a;
+}
+
+//illegal opcode implementations
+//==============================
+
+template<void (R6502::*opw)(),void (R6502::*opr)()>
+void R6502::opilli_rmwr_absolute() {
+  abs.l = op_readpci();
+  abs.h = op_readpci();
+  rd = op_read(abs.w);
+  op_write(abs.w, rd);
+  call(opw);
+L op_write(abs.w, rd);
+  call(opr);
+}
+
+template<void (R6502::*opw)(),void (R6502::*opr)()>
+void R6502::opilli_rmwr_absolute_x() {
+  abs.l = op_readpci();
+  abs.h = op_readpci();
+  op_page_always(abs.w, abs.w + regs.x);
+  rd = op_read(abs.w + regs.x);
+  op_write(abs.w + regs.x, rd);
+  call(opw);
+L op_write(abs.w + regs.x, rd);
+  call(opr);
+}
+
+template<void (R6502::*opw)(),void (R6502::*opr)()>
+void R6502::opilli_rmwr_absolute_y() {
+  abs.l = op_readpci();
+  abs.h = op_readpci();
+  op_page_always(abs.w, abs.w + regs.y);
+  rd = op_read(abs.w + regs.y);
+  op_write(abs.w + regs.y, rd);
+  call(opw);
+L op_write(abs.w + regs.y, rd);
+  call(opr);
+}
+
+template<void (R6502::*opw)(),void (R6502::*opr)()>
+void R6502::opilli_rmwr_indirect_zero_page_x() {
+  zp = op_readpci();
+  op_readzp(zp);
+  abs.l = op_readzp(zp++ + regs.x);
+  abs.h = op_readzp(zp++ + regs.x);
+  rd = op_read(abs.w);
+  op_write(abs.w, rd);
+  call(opw);
+L op_write(abs.w, rd);
+  call(opr);
+}
+
+template<void (R6502::*opw)(),void (R6502::*opr)()>
+void R6502::opilli_rmwr_indirect_zero_page_y() {
+  rd = op_readpci();
+  abs.l = op_readzp(rd++);
+  abs.h = op_readzp(rd++);
+  op_page(abs.w, abs.w + regs.y);
+  rd = op_read(abs.w + regs.y);
+  op_write(abs.w + regs.y, rd);
+  call(opw);
+L op_write(abs.w + regs.y, rd);
+  call(opr);
+}
+
+template<void (R6502::*opw)(),void (R6502::*opr)()>
+void R6502::opilli_rmwr_zero_page() {
+  zp = op_readpci();
+  rd = op_readzp(zp);
+  op_writezp(zp, rd);
+  call(opw);
+L op_writezp(zp, rd);
+  call(opr);
+}
+
+template<void (R6502::*opw)(),void (R6502::*opr)()>
+void R6502::opilli_rmwr_zero_page_x() {
+  zp = op_readpci();
+  op_readzp(zp);
+  rd = op_readzp(zp + regs.x);
+  op_writezp(zp + regs.x, rd);
+  call(opw);
+L op_writezp(zp + regs.x, rd);
+  call(opr);
+}
+
 //illegal opcodes
 //===============
+
+void R6502::opill_alr_immediate() {
+  opi_read_immediate<&R6502::opf_and>();
+  opf_sra();
+}
+
+void R6502::opill_anc_immediate() {
+L rd = op_readpci();
+  opf_and();
+  regs.p.c = regs.p.n;
+}
 
 void R6502::opill_arr_immediate() {
 L rd = op_readpci();
@@ -467,6 +577,62 @@ L rd = op_readpci();
   regs.p.z = (regs.a == 0);
   regs.p.c = (regs.a & 0x40);
   regs.p.v = regs.p.c ^ ((regs.a >> 5) & 1);
+}
+
+void R6502::opill_axs_immediate() {
+L rd = op_readpci();
+  signed r = (regs.a & regs.x) - rd;
+  regs.p.n = (r & 0x80);
+  regs.p.z = ((uint8)r == 0);
+  regs.p.c = (r >= 0);
+  regs.x = r;
+}
+
+void R6502::opill_dcp_absolute_y() {
+  abs.l = op_readpci();
+  abs.h = op_readpci();
+  op_page_always(abs.w, abs.w + regs.y);
+  rd = op_read(abs.w + regs.y);
+  op_write(abs.w + regs.y, rd);
+  opf_dec();
+  opf_cmp();
+L op_write(abs.w + regs.y, rd);
+}
+
+void R6502::opill_dcp_indirect_zero_page_x() {
+  zp = op_readpci();
+  op_readzp(zp);
+  abs.l = op_readzp(zp++ + regs.x);
+  abs.h = op_readzp(zp++ + regs.x);
+  rd = op_read(abs.w);
+  op_write(abs.w, rd);
+  opf_dec();
+  opf_cmp();
+L op_write(abs.w, rd);
+}
+
+void R6502::opill_dcp_indirect_zero_page_y() {
+  rd = op_readpci();
+  abs.l = op_readzp(rd++);
+  abs.h = op_readzp(rd++);
+  op_page(abs.w, abs.w + regs.y);
+  rd = op_read(abs.w + regs.y);
+  op_write(abs.w + regs.y, rd);
+  opf_dec();
+  opf_cmp();
+L op_write(abs.w + regs.y, rd);
+}
+
+void R6502::opill_stp() {
+  while(true) op_readpc();
+}
+
+// line noise on the data bus interferes with LAX #i.
+void R6502::opill_lax_immediate() {
+  //regs.x = regs.a | 0xee;
+  opi_read_immediate<&R6502::opf_lda>();
+  //regs.a = regs.a & regs.x;
+  regs.x = regs.a;
 }
 
 void R6502::opill_nop_absolute() {
@@ -483,7 +649,7 @@ L op_readpc();
 }
 
 void R6502::opill_nop_immediate() {
-L rd = op_readpc();
+L rd = op_readpci();
 }
 
 void R6502::opill_nop_implied() {
@@ -499,4 +665,18 @@ void R6502::opill_nop_zero_page_x() {
   zp = op_readpci();
   op_readzp(zp);
 L op_readzp(zp + regs.x);
+}
+
+void R6502::opill_shx_absolute_y() {
+  abs.l = op_readpci();
+  abs.h = op_readpci();
+  op_page_always(abs.w, abs.w + regs.y);
+L op_write(abs.w + regs.y, regs.x & (abs.h + 1));
+}
+
+void R6502::opill_shy_absolute_x() {
+  abs.l = op_readpci();
+  abs.h = op_readpci();
+  op_page_always(abs.w, abs.w + regs.x);
+L op_write(abs.w + regs.x, regs.y & (abs.h + 1));
 }

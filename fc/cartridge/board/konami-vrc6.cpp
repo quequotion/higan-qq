@@ -1,20 +1,29 @@
 struct KonamiVRC6 : Board {
 
+struct Settings {
+  struct Pinout {
+    unsigned a0;
+    unsigned a1;
+  } pinout;
+} settings;
+
 VRC6 vrc6;
 
 uint8 prg_read(unsigned addr) {
-  if((addr & 0xe000) == 0x6000) return vrc6.ram_read(addr);
-  if(addr & 0x8000) return prgrom.read(vrc6.prg_addr(addr));
-  return cpu.mdr();
+  if(addr < 0x6000) return cpu.mdr();
+  if(addr < 0x8000) return vrc6.ram_read(addr);
+  return prgrom.read(vrc6.prg_addr(addr));
 }
 
 void prg_write(unsigned addr, uint8 data) {
-  if((addr & 0xe000) == 0x6000) return vrc6.ram_write(addr, data);
-  if(addr & 0x8000) {
-    addr = (addr & 0xf003);
-    if(prgram.size) addr = (addr & ~3) | ((addr & 2) >> 1) | ((addr & 1) << 1);
-    return vrc6.reg_write(addr, data);
-  }
+  if(addr < 0x6000) return;
+  if(addr < 0x8000) return vrc6.ram_write(addr, data);
+
+  bool a0 = (addr & settings.pinout.a0);
+  bool a1 = (addr & settings.pinout.a1);
+  addr &= 0xf000;
+  addr |= (a1 << 1) | (a0 << 0);
+  return vrc6.reg_write(addr, data);
 }
 
 uint8 chr_read(unsigned addr) {
@@ -36,7 +45,9 @@ void main() { vrc6.main(); }
 void power() { vrc6.power(); }
 void reset() { vrc6.reset(); }
 
-KonamiVRC6(Markup::Node& document) : Board(document), vrc6(*this) {
+KonamiVRC6(Markup::Node& cartridge) : Board(cartridge), vrc6(*this) {
+  settings.pinout.a0 = 1 << decimal(cartridge["chip/pinout/a0"].data);
+  settings.pinout.a1 = 1 << decimal(cartridge["chip/pinout/a1"].data);
 }
 
 };

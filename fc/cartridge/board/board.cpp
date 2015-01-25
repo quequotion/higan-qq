@@ -5,9 +5,11 @@
 #include "konami-vrc4.cpp"
 #include "konami-vrc6.cpp"
 #include "konami-vrc7.cpp"
+#include "namco-163.cpp"
+#include "namco-34xx.cpp"
 #include "nes-axrom.cpp"
 #include "nes-bnrom.cpp"
-#include "nes-cnrom.cpp"
+#include "nes-cxrom.cpp"
 #include "nes-exrom.cpp"
 #include "nes-fxrom.cpp"
 #include "nes-gxrom.cpp"
@@ -17,7 +19,18 @@
 #include "nes-sxrom.cpp"
 #include "nes-txrom.cpp"
 #include "nes-uxrom.cpp"
+#include "sunsoft-4.cpp"
 #include "sunsoft-5b.cpp"
+#include "fds.cpp"
+#include "vs.cpp"
+
+// Unlicensed board definitions; feel free to remove
+#include "unlicensed/camerica.cpp"
+#include "unlicensed/colordreams-74377.cpp"
+#include "unlicensed/mlt-action52.cpp"
+#include "unlicensed/nina.cpp"
+#include "unlicensed/noconflicts-cnrom.cpp"
+#include "unlicensed/single-chip.cpp"
 
 uint8 Board::Memory::read(unsigned addr) const {
   return data[mirror(addr, size)];
@@ -51,13 +64,13 @@ void Board::main() {
       scheduler.exit(Scheduler::ExitReason::SynchronizeEvent);
     }
 
-    cartridge.clock += 12 * 4095;
+    cartridge.clock += (system.region() == System::Region::NTSC ? 12 : 16) * 4095;
     tick();
   }
 }
 
 void Board::tick() {
-  cartridge.clock += 12;
+  cartridge.clock += (system.region() == System::Region::NTSC ? 12 : 16);
   if(cartridge.clock >= 0 && scheduler.sync != Scheduler::SynchronizeMode::All) co_switch(cpu.thread);
 }
 
@@ -82,9 +95,8 @@ void Board::serialize(serializer& s) {
   if(chrram.size) s.array(chrram.data, chrram.size);
 }
 
-Board::Board(Markup::Node& document) {
-  cartridge.board = this;
-  auto cartridge = document["cartridge"];
+Board::Board(Markup::Node& cartridge) {
+  Famicom::cartridge.board = this;
 
   information.type = cartridge["board/type"].data;
   information.battery = cartridge["prg/ram/name"].exists();
@@ -119,94 +131,183 @@ Board::Board(Markup::Node& document) {
 Board::~Board() {
 }
 
-Board* Board::load(string manifest) {
-  auto document = Markup::Document(manifest);
-  cartridge.information.title = document["information/title"].text();
+Board* Board::load(Markup::Node cartridge) {
+  string type = cartridge["board/type"].text();
 
-  string type = document["cartridge/board/type"].text();
+  if(substr(type,0,4) == "HVC-" || substr(type,0,4) == "NES-") {
+    type = substr(type,4);
+    if(type == "AMROM"   ) return new NES_AxROM(cartridge);
+    if(type == "ANROM"   ) return new NES_AxROM(cartridge);
+    if(type == "AN1ROM"  ) return new NES_AxROM(cartridge);
+    if(type == "AOROM"   ) return new NES_AxROM(cartridge);
 
-  if(type == "BANDAI-FCG"  ) return new BandaiFCG(document);
+    if(type == "BNROM"   ) return new NES_BNROM(cartridge);
 
-  if(type == "KONAMI-VRC-1") return new KonamiVRC1(document);
-  if(type == "KONAMI-VRC-2") return new KonamiVRC2(document);
-  if(type == "KONAMI-VRC-3") return new KonamiVRC3(document);
-  if(type == "KONAMI-VRC-4") return new KonamiVRC4(document);
-  if(type == "KONAMI-VRC-6") return new KonamiVRC6(document);
-  if(type == "KONAMI-VRC-7") return new KonamiVRC7(document);
+    if(type == "BTR"     ) return new Sunsoft5B(cartridge);
 
-  if(type == "NES-AMROM"   ) return new NES_AxROM(document);
-  if(type == "NES-ANROM"   ) return new NES_AxROM(document);
-  if(type == "NES-AN1ROM"  ) return new NES_AxROM(document);
-  if(type == "NES-AOROM"   ) return new NES_AxROM(document);
+    if(type == "CNROM"   ) return new NES_CxROM(cartridge);
+    if(type == "CPROM"   ) return new NES_CxROM(cartridge);
 
-  if(type == "NES-BNROM"   ) return new NES_BNROM(document);
+    if(type == "DEROM"   ) return new Namco34xx(cartridge);
+    if(type == "DE1ROM"  ) return new Namco34xx(cartridge);
+    if(type == "DRROM"   ) return new Namco34xx(cartridge);
 
-  if(type == "NES-CNROM"   ) return new NES_CNROM(document);
+    if(type == "EKROM"   ) return new NES_ExROM(cartridge);
+    if(type == "ELROM"   ) return new NES_ExROM(cartridge);
+    if(type == "ETROM"   ) return new NES_ExROM(cartridge);
+    if(type == "EWROM"   ) return new NES_ExROM(cartridge);
 
-  if(type == "NES-EKROM"   ) return new NES_ExROM(document);
-  if(type == "NES-ELROM"   ) return new NES_ExROM(document);
-  if(type == "NES-ETROM"   ) return new NES_ExROM(document);
-  if(type == "NES-EWROM"   ) return new NES_ExROM(document);
+    if(type == "FJROM"   ) return new NES_FxROM(cartridge);
+    if(type == "FKROM"   ) return new NES_FxROM(cartridge);
 
-  if(type == "NES-FJROM"   ) return new NES_FxROM(document);
-  if(type == "NES-FKROM"   ) return new NES_FxROM(document);
+    if(type == "GNROM"   ) return new NES_GxROM(cartridge);
+    if(type == "MHROM"   ) return new NES_GxROM(cartridge);
 
-  if(type == "NES-GNROM"   ) return new NES_GxROM(document);
-  if(type == "NES-MHROM"   ) return new NES_GxROM(document);
+    if(type == "HKROM"   ) return new NES_HKROM(cartridge);
 
-  if(type == "NES-HKROM"   ) return new NES_HKROM(document);
+    if(type == "JLROM"   ) return new Sunsoft5B(cartridge);
+    if(type == "JSROM"   ) return new Sunsoft5B(cartridge);
 
-  if(type == "NES-NROM"    ) return new NES_NROM(document);
-  if(type == "NES-NROM-128") return new NES_NROM(document);
-  if(type == "NES-NROM-256") return new NES_NROM(document);
+    if(type == "NROM"    ) return new NES_NROM(cartridge);
+    if(type == "NROM-128") return new NES_NROM(cartridge);
+    if(type == "NROM-256") return new NES_NROM(cartridge);
+    if(type == "HROM"    ) return new NES_NROM(cartridge);
+    if(type == "RROM"    ) return new NES_NROM(cartridge);
+    if(type == "RROM-128") return new NES_NROM(cartridge);
+    if(type == "RTROM"   ) return new NES_NROM(cartridge);
+    if(type == "SROM"    ) return new NES_NROM(cartridge);
+    if(type == "STROM"   ) return new NES_NROM(cartridge);
 
-  if(type == "NES-PEEOROM" ) return new NES_PxROM(document);
-  if(type == "NES-PNROM"   ) return new NES_PxROM(document);
+    if(type == "PEEOROM" ) return new NES_PxROM(cartridge);
+    if(type == "PNROM"   ) return new NES_PxROM(cartridge);
 
-  if(type == "NES-SAROM"   ) return new NES_SxROM(document);
-  if(type == "NES-SBROM"   ) return new NES_SxROM(document);
-  if(type == "NES-SCROM"   ) return new NES_SxROM(document);
-  if(type == "NES-SC1ROM"  ) return new NES_SxROM(document);
-  if(type == "NES-SEROM"   ) return new NES_SxROM(document);
-  if(type == "NES-SFROM"   ) return new NES_SxROM(document);
-  if(type == "NES-SFEXPROM") return new NES_SxROM(document);
-  if(type == "NES-SGROM"   ) return new NES_SxROM(document);
-  if(type == "NES-SHROM"   ) return new NES_SxROM(document);
-  if(type == "NES-SH1ROM"  ) return new NES_SxROM(document);
-  if(type == "NES-SIROM"   ) return new NES_SxROM(document);
-  if(type == "NES-SJROM"   ) return new NES_SxROM(document);
-  if(type == "NES-SKROM"   ) return new NES_SxROM(document);
-  if(type == "NES-SLROM"   ) return new NES_SxROM(document);
-  if(type == "NES-SL1ROM"  ) return new NES_SxROM(document);
-  if(type == "NES-SL2ROM"  ) return new NES_SxROM(document);
-  if(type == "NES-SL3ROM"  ) return new NES_SxROM(document);
-  if(type == "NES-SLRROM"  ) return new NES_SxROM(document);
-  if(type == "NES-SMROM"   ) return new NES_SxROM(document);
-  if(type == "NES-SNROM"   ) return new NES_SxROM(document);
-  if(type == "NES-SOROM"   ) return new NES_SxROM(document);
-  if(type == "NES-SUROM"   ) return new NES_SxROM(document);
-  if(type == "NES-SXROM"   ) return new NES_SxROM(document);
+    if(type == "SAROM"   ) return new NES_SxROM(cartridge);
+    if(type == "SBROM"   ) return new NES_SxROM(cartridge);
+    if(type == "SCROM"   ) return new NES_SxROM(cartridge);
+    if(type == "SC1ROM"  ) return new NES_SxROM(cartridge);
+    if(type == "SEROM"   ) return new NES_SxROM(cartridge);
+    if(type == "SFROM"   ) return new NES_SxROM(cartridge);
+    if(type == "SFEXPROM") return new NES_SxROM(cartridge);
+    if(type == "SGROM"   ) return new NES_SxROM(cartridge);
+    if(type == "SHROM"   ) return new NES_SxROM(cartridge);
+    if(type == "SH1ROM"  ) return new NES_SxROM(cartridge);
+    if(type == "SIROM"   ) return new NES_SxROM(cartridge);
+    if(type == "SJROM"   ) return new NES_SxROM(cartridge);
+    if(type == "SKROM"   ) return new NES_SxROM(cartridge);
+    if(type == "SLROM"   ) return new NES_SxROM(cartridge);
+    if(type == "SL1ROM"  ) return new NES_SxROM(cartridge);
+    if(type == "SL2ROM"  ) return new NES_SxROM(cartridge);
+    if(type == "SL3ROM"  ) return new NES_SxROM(cartridge);
+    if(type == "SLRROM"  ) return new NES_SxROM(cartridge);
+    if(type == "SMROM"   ) return new NES_SxROM(cartridge);
+    if(type == "SNROM"   ) return new NES_SxROM(cartridge);
+    if(type == "SNWEPROM") return new NES_SxROM(cartridge);
+    if(type == "SOROM"   ) return new NES_SxROM(cartridge);
+    if(type == "SUROM"   ) return new NES_SxROM(cartridge);
+    if(type == "SXROM"   ) return new NES_SxROM(cartridge);
 
-  if(type == "NES-TBROM"   ) return new NES_TxROM(document);
-  if(type == "NES-TEROM"   ) return new NES_TxROM(document);
-  if(type == "NES-TFROM"   ) return new NES_TxROM(document);
-  if(type == "NES-TGROM"   ) return new NES_TxROM(document);
-  if(type == "NES-TKROM"   ) return new NES_TxROM(document);
-  if(type == "NES-TKSROM"  ) return new NES_TxROM(document);
-  if(type == "NES-TLROM"   ) return new NES_TxROM(document);
-  if(type == "NES-TL1ROM"  ) return new NES_TxROM(document);
-  if(type == "NES-TL2ROM"  ) return new NES_TxROM(document);
-  if(type == "NES-TLSROM"  ) return new NES_TxROM(document);
-  if(type == "NES-TNROM"   ) return new NES_TxROM(document);
-  if(type == "NES-TQROM"   ) return new NES_TxROM(document);
-  if(type == "NES-TR1ROM"  ) return new NES_TxROM(document);
-  if(type == "NES-TSROM"   ) return new NES_TxROM(document);
-  if(type == "NES-TVROM"   ) return new NES_TxROM(document);
+    if(type == "TBROM"   ) return new NES_TxROM(cartridge);
+    if(type == "TEROM"   ) return new NES_TxROM(cartridge);
+    if(type == "TFROM"   ) return new NES_TxROM(cartridge);
+    if(type == "TGROM"   ) return new NES_TxROM(cartridge);
+    if(type == "TKROM"   ) return new NES_TxROM(cartridge);
+    if(type == "TKSROM"  ) return new NES_TxROM(cartridge);
+    if(type == "TLROM"   ) return new NES_TxROM(cartridge);
+    if(type == "TL1ROM"  ) return new NES_TxROM(cartridge);
+    if(type == "TL2ROM"  ) return new NES_TxROM(cartridge);
+    if(type == "TLSROM"  ) return new NES_TxROM(cartridge);
+    if(type == "TNROM"   ) return new NES_TxROM(cartridge);
+    if(type == "TQROM"   ) return new NES_TxROM(cartridge);
+    if(type == "TR1ROM"  ) return new NES_TxROM(cartridge);
+    if(type == "TSROM"   ) return new NES_TxROM(cartridge);
+    if(type == "TVROM"   ) return new NES_TxROM(cartridge);
 
-  if(type == "NES-UNROM"   ) return new NES_UxROM(document);
-  if(type == "NES-UOROM"   ) return new NES_UxROM(document);
+    if(type == "UNROM"   ) return new NES_UxROM(cartridge);
+    if(type == "UOROM"   ) return new NES_UxROM(cartridge);
+  }
 
-  if(type == "SUNSOFT-5B"  ) return new Sunsoft5B(document);
+  if(type == "ACCLAIM-MC-ACC") return new NES_TxROM(cartridge);
+
+  if(type == "AVE-NINA-01") return new Nina(cartridge);
+  if(type == "AVE-NINA-02") return new Nina(cartridge);
+  if(type == "AVE-NINA-03") return new Nina(cartridge);
+  if(type == "AVE-NINA-06") return new Nina(cartridge);
+
+  if(type == "BANDAI-74*161/32") return new NES_CxROM(cartridge);
+  if(type == "BANDAI-CNROM"    ) return new NES_CxROM(cartridge);
+  if(type == "BANDAI-FCG"      ) return new BandaiFCG(cartridge);
+  if(type == "BANDAI-FCG-1"    ) return new BandaiFCG(cartridge);
+  if(type == "BANDAI-FCG-2"    ) return new BandaiFCG(cartridge);
+  if(type == "BANDAI-GNROM"    ) return new NES_GxROM(cartridge);
+  if(type == "BANDAI-JUMP2"    ) return new BandaiFCG(cartridge);
+  if(type == "BANDAI-LZ93D50"  ) return new BandaiFCG(cartridge);
+  if(type == "BANDAI-NROM-128" ) return new NES_NROM(cartridge);
+  if(type == "BANDAI-NROM-256" ) return new NES_NROM(cartridge);
+  if(type == "BANDAI-PT-544"   ) return new NES_CxROM(cartridge);
+
+  if(type == "IREM-BNROM"   ) return new NES_BNROM(cartridge);
+  if(type == "IREM-FCG-1"   ) return new BandaiFCG(cartridge);
+  if(type == "IREM-NROM-128") return new NES_NROM(cartridge);
+  if(type == "IREM-NROM-256") return new NES_NROM(cartridge);
+  if(type == "IREM-UNROM"   ) return new NES_UxROM(cartridge);
+  //TODO:
+  //IREM-G101 (iNES 032)
+  //IREM-H3001 (iNES 065)
+  //IREM-74*161/161/21/138 (iNES 077)
+  //IREM-HOLYDIVER (iNES 078)
+  //IREM-TAM-S1 (iNES 097)
+
+  if(type == "KONAMI-CNROM"   ) return new NES_CxROM(cartridge);
+  if(type == "KONAMI-NROM-128") return new NES_NROM(cartridge);
+  if(type == "KONAMI-SLROM"   ) return new NES_SxROM(cartridge);
+  if(type == "KONAMI-TLROM"   ) return new NES_TxROM(cartridge);
+  if(type == "KONAMI-UNROM"   ) return new NES_UxROM(cartridge);
+  if(type == "KONAMI-VRC-1"   ) return new KonamiVRC1(cartridge);
+  if(type == "KONAMI-VRC-2"   ) return new KonamiVRC2(cartridge);
+  if(type == "KONAMI-VRC-3"   ) return new KonamiVRC3(cartridge);
+  if(type == "KONAMI-VRC-4"   ) return new KonamiVRC4(cartridge);
+  if(type == "KONAMI-VRC-6"   ) return new KonamiVRC6(cartridge);
+  if(type == "KONAMI-VRC-7"   ) return new KonamiVRC7(cartridge);
+
+  if(type == "NAMCOT-163" ) return new Namco163(cartridge);
+  if(type == "NAMCOT-3301") return new NES_NROM(cartridge);
+  if(type == "NAMCOT-3302") return new NES_NROM(cartridge);
+  if(type == "NAMCOT-3305") return new NES_NROM(cartridge);
+  if(type == "NAMCOT-3311") return new NES_NROM(cartridge);
+  if(type == "NAMCOT-3312") return new NES_NROM(cartridge);
+  if(type == "NAMCOT-3401") return new Namco34xx(cartridge);
+  if(type == "NAMCOT-3406") return new Namco34xx(cartridge);
+  if(type == "NAMCOT-3407") return new Namco34xx(cartridge);
+  if(type == "NAMCOT-3416") return new Namco34xx(cartridge);
+  if(type == "NAMCOT-3417") return new Namco34xx(cartridge);
+  if(type == "NAMCOT-3443") return new Namco34xx(cartridge);
+  if(type == "NAMCOT-3446") return new Namco34xx(cartridge);
+  if(type == "NAMCOT-3453") return new Namco34xx(cartridge);
+
+  if(type == "SUNSOFT-4" ) return new Sunsoft4(cartridge);
+  if(type == "SUNSOFT-5B") return new Sunsoft5B(cartridge);
+
+  if(type == "FDS") return new FDS(cartridge);
+  if(type == "VS" ) return new VS(cartridge);
+
+  // Unlicensed boards below; feel free to remove
+  if(type == "CAMERICA-ALGN"     ) return new Camerica(cartridge);
+  if(type == "CAMERICA-ALGQ"     ) return new Camerica(cartridge);
+  if(type == "CAMERICA-BF9093"   ) return new Camerica(cartridge);
+  if(type == "CAMERICA-BF9096"   ) return new Camerica(cartridge);
+  if(type == "CAMERICA-BF9097"   ) return new Camerica(cartridge);
+  if(type == "CODEMASTERS-NR8N"  ) return new Camerica(cartridge);
+  if(type == "COLORDREAMS-74*377") return new ColorDreams74377(cartridge);
+  if(type == "MLT-ACTION52"      ) return new MLT_Action52(cartridge);
+  if(type == "TENGEN-800002"     ) return new Namco34xx(cartridge);
+  if(type == "TENGEN-800003"     ) return new NES_NROM(cartridge);
+  if(type == "TENGEN-800004"     ) return new Namco34xx(cartridge);
+  if(type == "TENGEN-800008"     ) return new NES_CxROM(cartridge);
+  if(type == "TENGEN-800030"     ) return new Namco34xx(cartridge);
+  if(type == "TENGEN-800042"     ) return new Sunsoft4(cartridge);
+  // Homebrew boards; feel free to remove
+  if(type == "NoConflicts-CNROM") return new NoConflicts_CNROM(cartridge);
+  if(type == "SingleChip") return new SingleChip(cartridge);
 
   return nullptr;
 }
