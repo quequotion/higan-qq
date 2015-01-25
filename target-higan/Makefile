@@ -106,13 +106,13 @@ else
 	install -d $(DESTDIR)$(prefix)/bin/
 	cp out/$(name) $(DESTDIR)$(prefix)/bin/$(name)
 	install -d $(DESTDIR)$(prefix)/share/pixmaps/
-	cp data/higan.png $(DESTDIR)$(prefix)/share/pixmaps/$(name).png
+	cp data/higan.png $(DESTDIR)$(prefix)/share/pixmaps/higan.png
 	install -d $(DESTDIR)$(prefix)/share/applications/
-	cp data/higan.desktop $(DESTDIR)$(prefix)/share/applications/$(name).desktop
-	install -d $(DESTDIR)/usr/share/$(name)
-	cp -R profile/* $(DESTDIR)/usr/share/$(name)
-	cp data/cheats.bml $(DESTDIR)/usr/share/$(name)/cheats.bml
-	#chmod -R 777 $(DESTDIR)/usr/share/$(name)
+	cp data/higan.desktop $(DESTDIR)$(prefix)/share/applications/higan.desktop
+	install -d $(DESTDIR)/usr/share/higan
+	cp -R profile/* $(DESTDIR)/usr/share/higan
+	cp data/cheats.bml $(DESTDIR)/usr/share/higan/cheats.bml
+	#chmod -R 777 $(DESTDIR)/usr/share/higan
 endif
 
 uninstall:

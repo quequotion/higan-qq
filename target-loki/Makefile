@@ -86,9 +86,9 @@ else ifeq ($(platform),macosx)
 else
 	install -d $(DESTDIR)$(prefix)/bin/
 	cp out/$(name) $(DESTDIR)$(prefix)/bin/$(name)
-	install -d $(DESTDIR)/usr/share/$(name)
-	cp -R profile/* $(DESTDIR)/usr/share/$(name)
-	#chmod -R 777 $(DESTDIR)/usr/share/$(name)
+	install -d $(DESTDIR)/usr/share/loki
+	cp -R profile/* $(DESTDIR)/usr/share/loki
+	#chmod -R 777 $(DESTDIR)/usr/share/loki
 endif
 
 uninstall:
