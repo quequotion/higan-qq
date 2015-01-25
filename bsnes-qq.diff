@@ -1,3 +1,10 @@
+diff --git a/.gitignore b/.gitignore
+index 1a53358..3fbc1b5 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1 +1,2 @@
+ ananke/libananke.so
++*.orig
 diff --git a/Makefile b/Makefile
 index c524133..a275f5c 100644
 --- a/Makefile
@@ -49,6 +56,1161 @@ index 51be602..9060c30 100644
    string createFamicomHeuristic(vector<uint8_t> &buffer);
    string openFamicom(vector<uint8_t> &buffer);
    string syncFamicom(const string &pathname);
+diff --git a/ananke/database/famicom.hpp b/ananke/database/famicom.hpp
+new file mode 100644
+index 0000000..79a4746
+--- /dev/null
++++ b/ananke/database/famicom.hpp
+@@ -0,0 +1,1113 @@
++string Famicom = R"(
++
++database revision=2012-10-22
++
++release
++  cartridge region=NTSC
++    board type=HVC-TLSROM
++    chip type=MMC3B
++    prg
++      rom name=program.rom size=0x40000
++    chr
++      rom name=character.rom size=0x20000
++  information
++    title:    アルマジロ
++    name:     Armadillo
++    region:   JP
++    revision: 1.0
++    board:    HVC-TLSROM-01
++    serial:   IGS-9T
++    sha256:   54526dc9444c0eb4b0e5814f98b5e522bcb9881a6f2c0644fc7a21ca8c03502b
++    configuration
++      rom name=program.rom size=0x40000
++      rom name=character.rom size=0x20000
++
++release
++  cartridge region=NTSC
++    board type=NAMCOT-3401
++    mirror mode=horizontal
++    prg
++      rom name=program.rom size=0x8000
++    chr
++      rom name=character.rom size=0x8000
++  information
++    title:    バベルの塔
++    name:     Babel no Tou
++    region:   JP
++    revision: 1.0
++    board:    3401
++    serial:   NAM-NBL-3900-16
++    sha256:   a9d7e89bd4ea28cfd169e32c4516ef5d059e19afb9dfa4ede8412f2373dfb0a7
++    configuration
++      rom name=program.rom size=0x8000
++      rom name=character.rom size=0x8000
++
++release
++  cartridge region=NTSC
++    board type=HVC-CNROM
++      security pass=0x3
++    mirror mode=horizontal
++    prg
++      rom name=program.rom size=0x8000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    B-ワイング
++    name:     B-Wings
++    region:   JP
++    revision: 1.0
++    board:    HVC-CNROM-256K-01
++    serial:   DFC-BW
++    sha256:   2b4ac20082e2f45a8f8fd4922a0e995829719a523e118a9eec891c3206adf25b
++    configuration
++      rom name=program.rom size=0x8000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=HVC-CNROM
++      security pass=0x3
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x4000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    バード・ウィーク
++    name:     Bird Week
++    region:   JP
++    revision: 1.0
++    board:    HVC-CNROM-256K-01
++    serial:   TFS-BK
++    sha256:   acf054b0886a2ca74a0280fc36bc1d55e9845acc29759f1893c1da4c1389f9c2
++    configuration
++      rom name=program.rom size=0x4000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=KONAMI-VRC-2
++    chip type=VRC2
++      pinout a0=0 a1=1
++    prg
++      rom name=program.rom size=0x20000
++    chr
++      rom name=character.rom size=0x20000
++  information
++    title:    コントラ 魂斗羅
++    name:     Contra
++    region:   JP
++    revision: 1.0
++    board:    LROG009-00
++    serial:   KON-RC826
++    sha256:   62c9d4e0578cb1e615ce9bb2c8ebc15b1e8de4c928c5c07ba9a85c11aa36ae4d
++    configuration
++      rom name=program.rom size=0x20000
++      rom name=character.rom size=0x20000
++
++release
++  cartridge region=NTSC
++    board type=HVC-UNROM
++    chip type=74HC08
++    mirror mode=horizontal
++    prg
++      rom name=program.rom size=0x20000
++    chr
++      ram size=0x2000
++  information
++    title:    クレイジークライマー
++    name:     Crazy Climber
++    region:   JP
++    revision: 1.0
++    board:    HVC-UNROM-02
++    serial:   NBF-CY (04)
++    sha256:   e24d3c754dce20e27046afeacb2dfc217950d4be766ded80c20283392cb3891e
++    configuration
++      rom name=program.rom size=0x20000
++      ram name=character.ram size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NAMCOT-3453
++    chip type=118
++    prg
++      rom name=program.rom size=0x20000
++    chr
++      rom name=character.rom size=0x20000
++  information
++    title:    デビルマン
++    name:     Devil Man
++    region:   JP
++    revision: 1.0
++    board:    UNK-NAMCOT-DM
++    serial:   NAM-DM-5500
++    sha256:   d2140fc2e6354a9f4d0154dabac757e5559890edba4885799c1c979d8b7a8b20
++    configuration
++      rom name=program.rom size=0x20000
++      rom name=character.rom size=0x20000
++
++release
++  cartridge region=NTSC
++    board type=HVC-HROM
++    prg
++      rom name=program.rom size=0x4000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    ドンキーコングJr
++    name:     Donkey Kong Jr.
++    region:   JP
++    revision: 1.0
++    board:    HVC-HROM-01
++    serial:   HVC-JR
++    sha256:   950ebe68e7f74219b9e5e104200b03165d59c24264f02e32c12be967fd311ac2
++    configuration
++      rom name=program.rom size=0x4000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=HVC-RROM
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x4000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    ダックハント
++    name:     Duck Hunt
++    region:   JP
++    revision: 1.0
++    board:    HVC-RROM-05
++    serial:   HVC-DH
++    sha256:   7026334a7e8742b61b450f4b3b182922c6a69fc723d7cd19c83db365f15e45ba
++    configuration
++      rom name=program.rom size=0x4000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=FDS
++    prg
++      rom name=program.rom size=0x2000
++      ram size=0x8000
++    chr
++      ram size=0x2000
++  information
++    title:    Famicom Disk System
++    name:     Famicom Disk System
++    region:   JP
++    revision: 1.0
++    board:    Famicom Disk System
++    serial:   N/A
++    sha256:   99c18490ed9002d9c6d999b9d8d15be5c051bdfa7cc7e73318053c9a994b0178
++    configuration
++      rom name=program.rom size=0x2000
++      ram name=work.ram size=0x8000
++      ram name=character.ram size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=BANDAI-JUMP2
++    chip type=LZ93D50
++    prg
++      rom name=program.rom size=0x80000
++      ram name=save.ram size=0x2000
++    chr
++      ram size=0x2000
++  information
++    title:    ファミコンジャンプII 最強の7人
++    name:     Famicom Jump II - Saikyou no 7 Nin
++    region:   JP
++    revision: 1.0
++    board:    BA-JUMP2
++    serial:   BA-FJ2
++    sha256:   dd031b72924e1d080f8758412c73224a274ae5e5a50d90310d578975df74101f
++    configuration
++      rom name=program.rom size=0x80000
++      ram name=save.ram size=0x2000
++      ram name=character.ram size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NAMCOT-3301
++    mirror mode=horizontal
++    prg
++      rom name=program.rom size=0x4000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    ギャラガ
++    name:     Galaga
++    region:   JP
++    revision: 1.0
++    board:    3301
++    serial:   NAM-NGG-4500-05
++    sha256:   e6fe68b9f12578e74ba016ca146aaf8232b20475fb675c7d32e0ea4e47eb1cc8
++    configuration
++      rom name=program.rom size=0x4000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NAMCOT-3301
++    mirror mode=horizontal
++    prg
++      rom name=program.rom size=0x2000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    ギャラクシアン
++    name:     Galaxian
++    region:   JP
++    revision: 1.0
++    board:    3301
++    serial:   NAM-NGX-4500-01
++    sha256:   50178a2856f8ed3574b4e7fd45b9d1ec44c660d51fe9783d0012a19df5892cce
++    configuration
++      rom name=program.rom size=0x2000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=SUNSOFT-5B
++    chip type=Sunsoft-5B
++    prg
++      rom name=program.rom size=0x40000
++    chr
++      rom name=character.rom size=0x20000
++  information
++    title:    ギミック!
++    name:     Gimmick!
++    region:   JP
++    revision: 1.0
++    board:    FC-GMK
++    serial:   SUN-GMK-6200
++    sha256:   1bbe4b3e20a004a4f741018e31e6ae291772b8876d6fb6f01494c9c5b0917c6c
++    configuration
++      rom name=program.rom size=0x40000
++      rom name=character.rom size=0x20000
++
++release
++  cartridge region=NTSC
++    board type=HVC-SROM
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x4000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    ホーガンズアレイ
++    name:     Hogan's Alley
++    region:   JP
++    revision: 1.0
++    board:    HVC-SROM-03
++    serial:   HVC-HA
++    sha256:   8e4a04076b6a728a7e65a09737776dcb9defed7922bf0437d9a89bbe8c724b55
++    configuration
++      rom name=program.rom size=0x4000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=HVC-TLROM
++    chip type=MMC3C
++    prg
++      rom name=program.rom size=0x20000
++    chr
++      rom name=character.rom size=0x20000
++  information
++    title:    熱血格闘伝説
++    name:     Nekketsu Kakutou Densetsu
++    region:   JP
++    revision: 1.0
++    board:    HVC-TLROM-04
++    serial:   TJC-NA
++    sha256:   3c419e3ecf328c03364afbcf5bd15bf0029a525db9e8f74379ae1cce4062b3c3
++    configuration
++      rom name=program.rom size=0x20000
++      rom name=character.rom size=0x20000
++
++release
++  cartridge region=NTSC
++    board type=NAMCOT-3416
++    chip type=118
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x20000
++    chr
++      rom name=character.rom size=0x10000
++  information
++    title:    カイの冒険: The Quest of Ki
++    name:     Quest of Ki, The
++    region:   JP
++    revision: 1.0
++    serial:   NAM-QK-3900
++    sha256:   67123fe28cf5fbadeafc77400a0812f0135ab36706ec7d1267f84931d044e71d
++    configuration
++      rom name=program.rom size=0x20000
++      rom name=character.rom size=0x10000
++
++release
++  cartridge region=NTSC
++    board type=HVC-CNROM
++      security pass=0x1
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x8000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    スパイVSスパイ
++    name:     Spy vs. Spy
++    region:   JP
++    revision: 1.0
++    board:    HVC-CNROM-256K-01
++    serial:   KSC-SP
++    sha256:   a9cf92ec1a080faa195d0b3dcb48fbb5ee3362f0f2f14e14e4257def48ac4346
++    configuration
++      rom name=program.rom size=0x8000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=HVC-NROM-256
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x8000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    スーパーマリオブラザーズ
++    name:     Super Mario Bros.
++    region:   JP
++    revision: 1.0
++    board:    HVC-NROM-256K-02
++    serial:   HVC-SM
++    sha256:   fcb6a0ef3a20c19b356005fbb21dc8009563b1cb5a9aaebc8e9386b4a8c5912e
++    configuration
++      rom name=program.rom size=0x8000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=HVC-NROM-256
++    mirror mode=horizontal
++    prg
++      rom name=program.rom size=0x8000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    テグザー
++    name:     Thexder
++    region:   JP
++    revision: 1.0
++    board:    HVC-NROM-256K-02S
++    serial:   SQF-TX
++    sha256:   18d41a2dc65d8afce295eaf29c391539a69d7cfe6dd32503713ae13d4495a545
++    configuration
++      rom name=program.rom size=0x8000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=FDS
++    prg
++      rom name=program.rom size=0x2000
++      ram size=0x8000
++    chr
++      ram size=0x2000
++  information
++    title:    Twin Famicom Disk System
++    name:     Twin Famicom Disk System
++    region:   JP
++    revision: 1.0
++    board:    Famicom Disk System
++    serial:   N/A
++    sha256:   a0a9d57cbace21bf9c85c2b85e86656317f0768d7772acc90c7411ab1dbff2bf
++    configuration
++      rom name=program.rom size=0x2000
++      ram name=work.ram size=0x8000
++      ram name=character.ram size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=HVC-NROM-128
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x4000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    Wild Gunman
++    name:     Wild Gunman
++    region:   JP
++    revision: 1.1
++    board:    2I
++    serial:   HVC-WG
++    sha256:   adff304553b64384f86f6c2b63571f43972b9d087f92359a1b9b93b54d523542
++    configuration
++      rom name=program.rom size=0x4000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NES-SGROM
++    chip type=MMC1A
++    prg
++      rom name=program.rom size=0x40000
++    chr
++      ram size=0x2000
++  information
++    title:    Bionic Commando
++    name:     Bionic Commando
++    region:   NA
++    revision: 1.0
++    board:    NES-SGROM-03
++    serial:   NES-CM-USA
++    sha256:   aeb61fd5cf5a5ed73344c46a43f8a8d539f601ff57e8f56c49bc1caea4ab3d9e
++    configuration
++      rom name=program.rom size=0x40000
++      ram name=character.ram size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NES-SLROM
++    chip type=MMC1B2
++    prg
++      rom name=program.rom size=0x20000
++    chr
++      rom name=character.rom size=0x20000
++  information
++    title:    Clash at Demonhead
++    name:     Clash at Demonhead
++    region:   NA
++    revision: 1.0
++    board:    NES-SLROM-05
++    serial:   NES-B6-USA
++    sha256:   cf226f0d9486103bbaa19ee124b673d47aa2b3766334b6b7587d704c03e6649e
++    configuration
++      rom name=program.rom size=0x20000
++      rom name=character.rom size=0x20000
++
++release
++  cartridge region=NTSC
++    board type=NES-CNROM
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x8000
++    chr
++      rom name=character.rom size=0x8000
++  information
++    title:    Cybernoid: The Fighting Machine
++    name:     Cybernoid - The Fighting Machine
++    region:   NA
++    revision: 1.0
++    serial:   NES-YN-USA
++    sha256:   ad1e14d08657d99c8b70f779931f62524b4beb529090b82b368925d8b642e40c
++    configuration
++      rom name=program.rom size=0x8000
++      rom name=character.rom size=0x8000
++
++release
++  cartridge region=NTSC
++    board type=NES-BNROM
++    mirror mode=horizontal
++    prg
++      rom name=program.rom size=0x20000
++    chr
++      ram size=0x2000
++  information
++    title:    Deadly Towers
++    name:     Deadly Towers
++    region:   NA
++    revision: 1.0
++    board:    NES-BN-ROM-01
++    serial:   NES-DE-USA
++    sha256:   0115356b0791cc8ddcb7d3163d6ef7aa664f3ff4e68dba561ffffb79eefcbca9
++    configuration
++      rom name=program.rom size=0x20000
++      ram name=character.ram size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NES-SNROM
++    chip type=MMC1B2
++    prg
++      rom name=program.rom size=0x40000
++      ram name=save.ram size=0x2000
++    chr
++      ram size=0x2000
++  information
++    title:    Destiny of an Emperor
++    name:     Destiny of an Emperor
++    region:   NA
++    revision: 1.0
++    serial:   NES-YZ-USA
++    sha256:   6d082c801942ce6787b471428ab4c8a6acb3e21f3f38fa197f2aeb698d9a2d7e
++    configuration
++      rom name=program.rom size=0x40000
++      ram name=save.ram size=0x2000
++      ram name=character.ram size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NES-NROM-128
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x4000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    Donkey Kong Jr.
++    name:     Donkey Kong Jr.
++    region:   NA
++    revision: 1.0
++    board:    NES-NROM-128-03
++    serial:   NES-JR-USA
++    sha256:   950ebe68e7f74219b9e5e104200b03165d59c24264f02e32c12be967fd311ac2
++    configuration
++      rom name=program.rom size=0x4000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NES-NROM-128
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x4000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    Duck Hunt
++    name:     Duck Hunt
++    region:   NA
++    revision: 1.0
++    board:    NES-NROM-128-03
++    serial:   NES-DH-USA
++    serial:   NES-DH-CAN
++    sha256:   7026334a7e8742b61b450f4b3b182922c6a69fc723d7cd19c83db365f15e45ba
++    configuration
++      rom name=program.rom size=0x4000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NES-UNROM
++    chip type=74HC32
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x20000
++    chr
++      ram size=0x2000
++  information
++    title:    Disney's DuckTales
++    name:     DuckTales
++    region:   NA
++    revision: 1.0
++    board:    NES-UNROM-09
++    serial:   NES-UK-USA
++    sha256:   8ba8baed01a9fbaf1e9ff29e0c9825db1963ac2aff211d6f1f3bcfd3839e2013
++    configuration
++      rom name=program.rom size=0x20000
++      ram name=character.ram size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NES-UNROM
++    chip type=74HC32
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x20000
++    chr
++      ram size=0x2000
++  information
++    title:    Disney's DuckTales 2
++    name:     DuckTales 2
++    region:   NA
++    revision: 1.0
++    board:    NES-UNROM-10
++    serial:   NES-DL-USA
++    sha256:   54c70628739c9cfab40b8d79555e9076adae34127ef369988ca91635b4a688bf
++    configuration
++      rom name=program.rom size=0x20000
++      ram name=character.ram size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NES-GNROM
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x20000
++    chr
++      rom name=character.rom size=0x8000
++  information
++    title:    Gumshoe
++    name:     Gumshoe
++    region:   NA
++    revision: 1.0
++    board:    NES-GN-ROM-01
++    serial:   NES-GS-USA
++    sha256:   4628f32db9b826d19fe5dd8e2c45a9f70e1041f15b7b44b06dee2f01731566e8
++    configuration
++      rom name=program.rom size=0x20000
++      rom name=character.rom size=0x8000
++
++release
++  cartridge region=NTSC
++    board type=NES-TQROM
++    chip type=MMC3B
++    prg
++      rom name=program.rom size=0x20000
++    chr
++      rom name=character.rom size=0x10000
++      ram size=0x2000
++  information
++    title:    High Speed
++    name:     High Speed
++    region:   NA
++    revision: 1.0
++    serial:   NES-8H-USA
++    sha256:   710e907230bbd82143286b40a56a298b25cf326697a9f07bfd8e043c1936a4b1
++    configuration
++      rom name=program.rom size=0x20000
++      rom name=character.rom size=0x10000
++      rom name=nametable.ram size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NES-NROM-128
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x4000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    Hogan's Alley
++    name:     Hogan's Alley
++    region:   NA
++    revision: 1.0
++    board:    NES-NROM-128-04
++    serial:   NES-HA-USA
++    sha256:   8e4a04076b6a728a7e65a09737776dcb9defed7922bf0437d9a89bbe8c724b55
++    configuration
++      rom name=program.rom size=0x4000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NES-SNROM
++    chip type=MMC1B2
++    prg
++      rom name=program.rom size=0x20000
++      ram name=save.ram size=0x2000
++    chr
++      ram size=0x2000
++  information
++    title:    The Legend of Zelda
++    name:     Legend of Zelda, The
++    region:   NA
++    revision: 1.1
++    serial:   NES-ZL-USA
++    serial:   ec0d4ebf6d2fcecd1d95fef7329954efe79676959bc281ea908b226459bc6dc2
++    configuration
++      rom name=program.rom size=0x20000
++      ram name=save.ram size=0x2000
++      ram name=character.ram size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NES-TLROM
++    chip type=MMC3C
++    prg
++      rom name=program.rom size=0x40000
++    chr
++      rom name=character.rom size=0x20000
++  information
++    title:    Little Samson
++    name:     Little Samson
++    region:   NA
++    revision: 1.0
++    board:    NES-TLROM-03
++    serial:   NES-LT-USA
++    sha256:   a5165565263eaf8bdc45a8e6a615704f9bf271cd6d547d22c098c80cbaffd879
++    configuration
++      rom name=program.rom size=0x40000
++      rom name=character.rom size=0x20000
++
++release
++  cartridge region=NTSC
++    board type=NES-SGROM
++    chip type=MMC1B2
++    prg
++      rom name=program.rom size=0x40000
++    chr
++      ram size=0x2000
++  information
++    title:    Mega Man 2
++    name:     Mega Man 2
++    region:   NA
++    revision: 1.0
++    sha256:   1e588d435e75d80c5c0b578b4fa8d196f2cf4346c11c9a7b7e435d768828ad01
++    configuration
++      rom name=program.rom size=0x40000
++      ram name=character.ram size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NES-TQROM
++    chip type=MMC3A
++    prg
++      rom name=program.rom size=0x20000
++    chr
++      rom name=character.rom size=0x10000
++      ram size=0x2000
++  information
++    title:    Pin-Bot
++    name:     Pin-Bot
++    region:   NA
++    revision: 1.0
++    serial:   NES-IO-USA
++    sha256:   f4ddb0f1a02f823ebed30b55547344de3c8fb9d87254ff993584373ecadd9141
++    configuration
++      rom name=program.rom size=0x20000
++      rom name=character.rom size=0x10000
++      rom name=nametable.ram size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NES-CNROM
++    mirror mode=horizontal
++    prg
++      rom name=program.rom size=0x8000
++    chr
++      rom name=character.rom size=0x8000
++  information
++    title:    Puzznic
++    name:     Puzznic
++    region:   NA
++    revision: 1.0
++    board:    NES-CNROM-07
++    serial:   NES-ZP-USA
++    sha256:   0cf2fc17a59a0932ce43e6b2e9ea4e2570f03139784b5c9df429a499e734b92e
++    configuration
++      rom name=program.rom size=0x8000
++      rom name=character.rom size=0x8000
++
++release
++  cartridge region=NTSC
++    board type=NES-HKROM
++    chip type=MMC6B
++    prg
++      rom name=program.rom size=0x40000
++      ram name=save.ram size=0x400
++    chr
++      rom name=character.rom size=0x40000
++  information
++    title:    StarTropics
++    name:     StarTropics
++    region:   NA
++    revision: 1.0
++    serial:   NES-OC-USA
++    sha256:   69de2c7552fa81ca5921da0e457abf1be35f18ffbad159788a76141be59c9f6b
++    configuration
++      rom name=program.rom size=0x40000
++      ram name=save.ram size=0x400
++      rom name=character.rom size=0x40000
++
++release
++  cartridge region=NTSC
++    board type=NES-NROM-256
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x8000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    Super Mario Bros.
++    name:     Super Mario Bros.
++    region:   NA
++    revision: 1.0
++    board:    NES-NROM-256-04
++    serial:   NES-SM-USA
++    sha256:   fcb6a0ef3a20c19b356005fbb21dc8009563b1cb5a9aaebc8e9386b4a8c5912e
++    configuration
++      rom name=program.rom size=0x8000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NES-MHROM
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x10000
++    chr
++      rom name=character.rom size=0x4000
++  information
++    title:    Super Mario Bros. / Duck Hunt
++    name:     Super Mario Bros. + Duck Hunt
++    region:   NA
++    revision: 1.0
++    board:    NES-MHROM-04
++    serial:   NES-MH-USA
++    sha256:   5dde385041aa7364c78205f2ba49615f416c701b6025e38aa1d7b9c4f99a62db
++    configuration
++      rom name=program.rom size=0x10000
++      rom name=character.rom size=0x4000
++
++release
++  cartridge region=NTSC
++    board type=NES-TSROM
++    chip type=MMC3B
++    prg
++      rom name=program.rom size=0x20000
++      ram size=0x2000
++    chr
++      rom name=character.rom size=0x20000
++  information
++    title:    Super Mario Bros. 2
++    name:     Super Mario Bros. 2
++    region:   NA
++    revision: 1.1
++    board:    NES-TSROM-08
++    serial:   NES-MW-USA
++    serial:   NES-MW-CAN
++    sha256:   728d0ca6751b0c039fc3e34f2e7f27a870afcab30f5e270244ac40979c5f69ca
++    configuration
++      rom name=program.rom size=0x20000
++      ram name=work.ram size=0x2000
++      rom name=character.rom size=0x20000
++
++release
++  cartridge region=NTSC
++    board type=NES-TSROM
++    chip type=MMC3B
++    prg
++      rom name=program.rom size=0x40000
++      ram size=0x2000
++    chr
++      rom name=character.rom size=0x20000
++  information
++    title:    Super Mario Bros. 3
++    name:     Super Mario Bros. 3
++    region:   NA
++    revision: 1.0
++    board:    NES-TSROM-06
++    serial:   NES-UM-USA
++    sha256:   d77d17d34af24871d7ce1160ccd3330555835c8e940b7100e095ac38973d927a
++    configuration
++      rom name=program.rom size=0x40000
++      ram name=work.ram size=0x2000
++      rom name=character.rom size=0x20000
++
++release
++  cartridge region=NTSC
++    board type=NES-TSROM
++    chip type=MMC3B
++    prg
++      rom name=program.rom size=0x40000
++      ram size=0x2000
++    chr
++      rom name=character.rom size=0x20000
++  information
++    title:    Super Mario Bros. 3
++    name:     Super Mario Bros. 3
++    region:   NA
++    revision: 1.1
++    board:    NES-TSROM-07
++    serial:   NES-UM-USA
++    serial:   NES-UM-CAN
++    sha256:   959fdd32c71735d6fb2bd16a646d39f4ee65623273dd035e6a968e991bd13ef8
++    configuration
++      rom name=program.rom size=0x40000
++      ram name=work.ram size=0x2000
++      rom name=character.rom size=0x20000
++
++release
++  cartridge region=NTSC
++    board type=NES-SEROM
++    chip type=MMC1B2
++    prg
++      rom name=program.rom size=0x8000
++    chr
++      rom name=character.rom size=0x4000
++  information
++    title:    Tetris
++    name:     Tetris
++    region:   NA
++    revision: 1.0
++    board:    NES-SEROM-04
++    serial:   NES-EI-USA
++    serial:   NES-EI-CAN
++    sha256:   2ae5fb18a1bf841077e3872ba05060f030ea0bfc573994b2f8fe2fb570dc7853
++    configuration
++      rom name=program.rom size=0x8000
++      rom name=character.rom size=0x4000
++
++release
++  cartridge region=NTSC
++    board type=NES-TKROM
++    chip type=MMC3C
++    prg
++      rom name=program.rom size=0x40000
++      ram name=save.ram size=0x2000
++    chr
++      rom name=character.rom size=0x40000
++  information
++    title:    Wario's Woods
++    name:     Wario's Woods
++    region:   NA
++    revision: 1.0
++    board:    NES-TKROM-10
++    serial:   NES-WB-USA
++    sha256:   c12771e8155b030eff0081bfabd98e57a162d6592899f29dd16f141f0e6e08a3
++    configuration
++      rom name=program.rom size=0x40000
++      ram name=save.ram size=0x2000
++      rom name=character.rom size=0x40000
++
++release
++  cartridge region=NTSC
++    board type=NES-NROM-128
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x4000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    Wild Gunman
++    name:     Wild Gunman
++    region:   NA
++    revision: 1.0
++    board:    NES-NROM-128-01
++    serial:   NES-WG-USA
++    sha256:   62aec65696ecf24a487b7cdd19bad5cbd19f4229a89a7888634d468c67da378a
++    configuration
++      rom name=program.rom size=0x4000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NES-NROM-128
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x4000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    Wild Gunman
++    name:     Wild Gunman
++    region:   NA
++    revision: 1.1
++    board:    NES-NROM-128-04
++    serial:   NES-WG-USA
++    sha256:   adff304553b64384f86f6c2b63571f43972b9d087f92359a1b9b93b54d523542
++    configuration
++      rom name=program.rom size=0x4000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=NTSC
++    board type=NES-CNROM
++    mirror mode=horizontal
++    prg
++      rom name=program.rom size=0x8000
++    chr
++      rom name=character.rom size=0x8000
++  information
++    title:    World Class Track Meet
++    name:     World Class Track Meet
++    region:   NA
++    revision: 1.1
++    serial:   NES-WT-USA
++    sha256:   ac766a8d99bfd8e95c02b9a9c68279c72ba5b3307b78edc67b52781ed185fa89
++    configuration
++      rom name=program.rom size=0x8000
++      rom name=character.rom size=0x8000
++
++release
++  cartridge region=NTSC
++    board type=NES-HKROM
++    chip type=MMC6B
++    prg
++      rom name=program.rom size=0x40000
++      ram name=save.ram size=0x400
++    chr
++      rom name=character.rom size=0x40000
++  information
++    title:    Zoda's Revenge: StarTropics 2
++    name:     Zoda's Revenge - StarTropics 2
++    region:   NA
++    revision: 1.0
++    board:    NES-HKROM-02
++    serial:   NES-6C-USA
++    sha256:   d0850075065ecbd125a33accc952de5d012527be45aa14a1b8223a9adf1643ae
++    configuration
++      rom name=program.rom size=0x40000
++      ram name=save.ram size=0x400
++      rom name=character.rom size=0x40000
++
++release
++  cartridge region=PAL
++    board type=NES-NROM-128
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x4000
++    chr
++      rom name=character.rom size=0x2000
++  information
++    title:    Hogan's Alley
++    name:     Hogan's Alley
++    region:   EU
++    revision: 1.0
++    board:    NES-NROM-128-03
++    serial:   NES-HA-EEC
++    sha256:   8e4a04076b6a728a7e65a09737776dcb9defed7922bf0437d9a89bbe8c724b55
++    configuration
++      rom name=program.rom size=0x4000
++      rom name=character.rom size=0x2000
++
++release
++  cartridge region=PAL
++    board type=NES-TSROM
++    chip type=MMC3C
++    prg
++      rom name=program.rom size=0x20000
++      ram size=0x2000
++    chr
++      rom name=character.rom size=0x20000
++  information
++    title:    Noah's Ark
++    name:     Noah's Ark
++    region:   EU
++    revision: 1.0
++    serial:   NES-NH-NOE
++    sha256:   6157c99fe7a214025c65fd3649e4afe9cd2d38c333e65af028b935e49fbeb500
++    configuration
++      rom name=program.rom size=0x20000
++      ram name=work.ram size=0x2000
++      rom name=character.rom size=0x20000
++
++release
++  cartridge region=PAL
++    board type=NES-TKROM
++    chip type=MMC3C
++    prg
++      rom name=program.rom size=0x40000
++      ram name=save.ram size=0x2000
++    chr
++      rom name=character.rom size=0x40000
++  information
++    title:    Wario's Woods
++    name:     Wario's Woods
++    region:   EU
++    revision: 1.0
++    board:    NES-TKROM-10
++    serial:   NES-WB-NOE
++    sha256:   9fe815d8fd175ef9ef03fb010638f2b6b7aa9d11d5a40eda2476450918543e6f
++    configuration
++      rom name=program.rom size=0x40000
++      ram name=save.ram size=0x2000
++      rom name=character.rom size=0x40000
++
++)";
+diff --git a/ananke/database/playchoice-10.hpp b/ananke/database/playchoice-10.hpp
+new file mode 100644
+index 0000000..4096187
+--- /dev/null
++++ b/ananke/database/playchoice-10.hpp
+@@ -0,0 +1,30 @@
++string Famicom = R"(
++
++database revision=2012-10-22
++
++release
++  cartridge region=NTSC
++    board type=NES-NROM-256
++    mirror mode=vertical
++    prg
++      rom name=program.rom size=0x8000
++    chr
++      rom name=character.rom size=0x2000
++    pc10
++      rom name=instructions.rom size=0x2000
++      rom name=key1.rom size=0x10
++      rom name=key2.rom size=0x10
++  information
++    title:    Super Mario Bros.
++    name:     Super Mario Bros.
++    region:   NA
++    revision: 1.0
++    sha256:   fd8652394c0c9cba34c35a5f8c0ed6ab155e2c99aa4180fc940bdf1e25a0132d
++    configuration
++      rom name=program.rom size=0x8000
++      rom name=character.rom size=0x2000
++      rom name=instructions.rom size=0x2000
++      rom name=key1.rom size=0x10
++      rom name=key2.rom size=0x10
++
++)";
 diff --git a/ananke/famicom.cpp b/ananke/famicom.cpp
 index a54039c..f4083ba 100644
 --- a/ananke/famicom.cpp
@@ -794,6 +1956,138 @@ index 1249b38..d1c9123 100644
  }
 +
 +#endif
+diff --git a/fc/arcade/arcade.hpp b/fc/arcade/arcade.hpp
+new file mode 100644
+index 0000000..090f493
+--- /dev/null
++++ b/fc/arcade/arcade.hpp
+@@ -0,0 +1 @@
++#include <fc/arcade/vs/vs.hpp>
+diff --git a/fc/arcade/vs/serialization.cpp b/fc/arcade/vs/serialization.cpp
+new file mode 100644
+index 0000000..503f919
+--- /dev/null
++++ b/fc/arcade/vs/serialization.cpp
+@@ -0,0 +1,8 @@
++#ifdef VS_ARCADE_BOARD_CPP
++
++void VSArcadeBoard::serialize(serializer& s) {
++  s.integer(swap_controllers);
++  s.integer(dip);
++}
++
++#endif
+diff --git a/fc/arcade/vs/vs.cpp b/fc/arcade/vs/vs.cpp
+new file mode 100644
+index 0000000..b8d9c32
+--- /dev/null
++++ b/fc/arcade/vs/vs.cpp
+@@ -0,0 +1,74 @@
++#include <fc/fc.hpp>
++
++#define VS_ARCADE_BOARD_CPP
++namespace Famicom {
++
++VSArcadeBoard vsarcadeboard;
++
++#include "serialization.cpp"
++
++void VSArcadeBoard::init() {
++}
++
++void VSArcadeBoard::load() {
++}
++
++void VSArcadeBoard::unload() {
++}
++
++void VSArcadeBoard::power() {
++}
++
++void VSArcadeBoard::reset() {
++}
++
++void VSArcadeBoard::set_dip(uint16 dip) {
++  this->dip = dip;
++}
++
++uint8 VSArcadeBoard::read(uint16 addr) {
++  if(addr == 0x4016) return r4016();
++  if(addr == 0x4017) return r4017();
++  if(addr >= 0x4020 && addr <= 0x5fff) return r4020();
++}
++
++void VSArcadeBoard::write(uint16 addr, uint8 data) {
++  if(addr == 0x4016) w4016(data);
++  if(addr >= 0x4020 && addr <= 0x5fff) w4020(data);
++}
++
++uint8 VSArcadeBoard::r4016() {
++  uint8 data = 0x80; // 0x00 for slave CPU, 0x80 for master CPU
++  if(!swap_controllers) data |= input.port1->data() & 0x03;
++  else                  data |= input.port2->data() & 0x03;
++  data |= input.expansion->data1(); // buttons 1 and 3
++  data |= (dip & 0x03) << 3;
++  data |= input.expansion->data() << 2; // Service button and coins
++  return data;
++}
++
++uint8 VSArcadeBoard::r4017() {
++  uint8 data = 0x00;
++  if(!swap_controllers) data |= input.port2->data() & 0x03;
++  else                  data |= input.port1->data() & 0x03;
++  data |= input.expansion->data2(); // buttons 2 and 4
++  data |= dip & 0xfc;
++  return data;
++}
++
++uint8 VSArcadeBoard::r4020() {
++  write(0x4020, cpu.mdr());
++  return cpu.mdr();
++}
++
++void VSArcadeBoard::w4016(uint8 data) {
++  input.port1->latch(data & 1);
++  input.port2->latch(data & 1);
++  input.expansion->latch(data & 1);
++}
++
++void VSArcadeBoard::w4020(uint8 data) {
++  // increment coin counter
++}
++
++}
+diff --git a/fc/arcade/vs/vs.hpp b/fc/arcade/vs/vs.hpp
+new file mode 100644
+index 0000000..11f14d0
+--- /dev/null
++++ b/fc/arcade/vs/vs.hpp
+@@ -0,0 +1,25 @@
++struct VSArcadeBoard {
++  bool swap_controllers;
++  uint16 dip; // 16-bit for DualSystem games
++
++  void init();
++  void load();
++  void unload();
++  void power();
++  void reset();
++
++  void set_dip(uint16 dip);
++  uint8 read(uint16 addr);
++  void write(uint16 addr, uint8 data);
++
++  void serialize(serializer& s);
++
++private:
++  uint8 r4016();
++  uint8 r4017();
++  uint8 r4020();
++  void w4016(uint8 data);
++  void w4020(uint8 data);
++};
++
++extern VSArcadeBoard vsarcadeboard;
 diff --git a/fc/cartridge/board/bandai-fcg.cpp b/fc/cartridge/board/bandai-fcg.cpp
 index a23ad2a..4342b4e 100644
 --- a/fc/cartridge/board/bandai-fcg.cpp
@@ -1334,6 +2628,79 @@ index 8910631..29ec610 100644
  
    struct Information {
      string type;
+diff --git a/fc/cartridge/board/fds.cpp b/fc/cartridge/board/fds.cpp
+new file mode 100644
+index 0000000..5e97922
+--- /dev/null
++++ b/fc/cartridge/board/fds.cpp
+@@ -0,0 +1,67 @@
++struct FDS : Board {
++
++uint16 irq_timer = 0x0000;
++uint8 fds_control = 0x2E;
++bool irq_enable = false;
++uint2 io_enable = 0b00;
++
++uint8 prg_read(unsigned addr) {
++  switch(addr) {
++  case 0x4032:
++    // 0x01: 0=Disk inserted;       1=Disk ejected
++    // 0x02: 0=Disk ready;          1=Disk not ready
++    // 0x04: 0=Not write protected; 1=Write protected (on if disk ejected)
++    return 0x07;
++  case 0x4033: return 0x00; // 7-bit expansion input; 0x80 means low battery
++  }
++  switch(addr & 0xe000) {
++  case 0x6000:
++  case 0x8000:
++  case 0xa000:
++  case 0xc000: return prgram.read(addr);
++  case 0xe000: return prgrom.read(addr);
++  }
++  return cpu.mdr();
++}
++
++void prg_write(unsigned addr, uint8 data) {
++  switch(addr) {
++  case 0x4020: irq_timer &= 0xff00 | data;
++  case 0x4021: irq_timer &= 0x00ff | (data << 8);
++  case 0x4022: irq_enable = data & 0x02;
++  case 0x4023: io_enable = data & 0x03;
++  case 0x4025: fds_control = data;
++  }
++  switch(addr & 0xe000) {
++  case 0x6000:
++  case 0x8000:
++  case 0xa000:
++  case 0xc000: prgram.write(addr,data); break;
++  }
++}
++
++uint8 chr_read(unsigned addr) {
++  if(addr & 0x2000) {
++    if(fds_control & 0x08) addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++    return ppu.ciram_read(addr & 0x07ff);
++  }
++  if(chrram.size) return chrram.read(addr);
++  return chrrom.read(addr);
++}
++
++void chr_write(unsigned addr, uint8 data) {
++  if(addr & 0x2000) {
++    if(fds_control & 0x08) addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++    return ppu.ciram_write(addr & 0x07ff, data);
++  }
++  if(chrram.size) return chrram.write(addr, data);
++}
++
++void serialize(serializer& s) {
++  Board::serialize(s);
++}
++
++FDS(Markup::Node& cartridge) : Board(cartridge) {
++}
++
++};
 diff --git a/fc/cartridge/board/konami-vrc1.cpp b/fc/cartridge/board/konami-vrc1.cpp
 index b91c2d8..6fe2256 100644
 --- a/fc/cartridge/board/konami-vrc1.cpp
@@ -1492,6 +2859,279 @@ index 8c72a3f..9664fa3 100644
  }
  
  };
+diff --git a/fc/cartridge/board/namco-163.cpp b/fc/cartridge/board/namco-163.cpp
+new file mode 100644
+index 0000000..1706cd7
+--- /dev/null
++++ b/fc/cartridge/board/namco-163.cpp
+@@ -0,0 +1,133 @@
++struct Namco163 : Board {
++
++uint6 prg_bank[3];
++uint8 chr_bank[12];
++uint15 irq_counter;
++bool irq_enable;
++uint2 mirror;
++uint2 chrram_disable;
++
++uint8 prg_read(unsigned addr) {
++  switch(addr & 0xf800) {
++  case 0x4800: break; // Audio
++  case 0x5000: return irq_counter & 0xff;
++  case 0x5800: return ((irq_counter >> 8) & 0x7f) | (irq_enable << 7);
++  case 0x6000: case 0x6800: case 0x7000: case 0x7800:
++    return prgram.read(addr & 0x1fff);
++  case 0x8000: case 0x8800: case 0x9000: case 0x9800:
++  case 0xa000: case 0xa800: case 0xb000: case 0xb800:
++  case 0xc000: case 0xc800: case 0xd000: case 0xd800:
++    return prgrom.read((prg_bank[(addr & 0x6000) >> 13] << 13) | (addr & 0x1fff));
++  case 0xe000: case 0xe800: case 0xf000: case 0xf800:
++    return prgrom.read((0x3f << 13) | (addr & 0x1fff));
++  default: return cpu.mdr();
++  }
++}
++
++void prg_write(unsigned addr, uint8 data) {
++  switch(addr & 0xf800) {
++  case 0x4800: break; // Audio
++  case 0x5000: // IRQ Low
++    irq_counter = (irq_counter & ~0xff) | data;
++    break;
++  case 0x5800: // IRQ High
++    irq_counter = (irq_counter & 0xff) | ((data & 0x7f) << 8);
++    irq_enable = data & 0x80;
++    break;
++  case 0x6000: case 0x6800: case 0x7000: case 0x7800:
++    prgram.data[addr & 0x1fff] = data;
++    break;
++  case 0x8000: case 0x8800: case 0x9000: case 0x9800: // CHR Select
++  case 0xa000: case 0xa800: case 0xb000: case 0xb800:
++  case 0xc000: case 0xc800: case 0xd000: case 0xd800: // Nametable Select
++    chr_bank[(addr & 0x7800) >> 11] = data;
++    break;
++  case 0xe000: // PRG Select 8000
++    prg_bank[0] = data & 0x3f;
++    mirror = (data & 0xc0) >> 6;
++    break;
++  case 0xe800: // PRG Select A000
++    prg_bank[1] = data & 0x3f;
++    chrram_disable = (data & 0xc0) >> 6;
++    break;
++  case 0xf000: // PRG Select C000
++    prg_bank[2] = data & 0x3f;
++    break;
++  case 0xf800: // Write Protection for External RAM
++    break;
++  }
++}
++
++unsigned ciram_addr(unsigned addr) {
++  bool nt;
++  switch(mirror) {
++  case 0: nt = 0; break;
++  case 1: nt = addr & 0x400; break;
++  case 2: nt = addr & 0x800; break;
++  case 3: nt = 1; break;
++  }
++  return (addr & 0x03ff) | (nt << 10);
++}
++
++uint8 chr_read(unsigned addr) {
++  if(addr & 0x2000) return ppu.ciram_read(ciram_addr(addr));
++  uint8 bank = chr_bank[(addr & 0x1c00) >> 10];
++  if(bank >= 0xe0 && chrram_disable & (1 << ((addr & 0x1000) >> 12))) {
++    if(chrram.size) return chrram.read(addr);
++    else            return ppu.ciram_read(ciram_addr(addr));
++  } else return chrrom.read((bank << 10) | (addr & 0x3ff));
++}
++
++void chr_write(unsigned addr, uint8 data) {
++  if(addr & 0x2000) return ppu.ciram_write(ciram_addr(addr), data);
++  uint8 bank = chr_bank[(addr & 0x1c00) >> 10];
++  if(bank >= 0xe0 && chrram_disable & (1 << ((addr & 0x1000) >> 12))) {
++    if(chrram.size) return chrram.write(addr, data);
++    else            return ppu.ciram_write(ciram_addr(addr), data);
++  }
++}
++
++void serialize(serializer& s) {
++  Board::serialize(s);
++}
++
++void main() {
++  while(true) {
++    if(irq_enable && irq_counter != 0x7fff) {
++      irq_counter++;
++      if(irq_counter == 0x7fff) cpu.set_irq_line(1);
++    }
++
++    tick();
++  }
++}
++
++void power() {
++}
++
++void reset() {
++  prg_bank[0] = 0;
++  prg_bank[1] = 0;
++  prg_bank[2] = 0;
++  chr_bank[0] = 0;
++  chr_bank[1] = 0;
++  chr_bank[2] = 0;
++  chr_bank[3] = 0;
++  chr_bank[4] = 0;
++  chr_bank[5] = 0;
++  chr_bank[6] = 0;
++  chr_bank[7] = 0;
++  chr_bank[8] = 0;
++  chr_bank[9] = 0;
++  chr_bank[10] = 0;
++  chr_bank[11] = 0;
++  irq_counter = 0;
++  irq_enable = false;
++  mirror = 0;
++  chrram_disable = 0;
++}
++
++Namco163(Markup::Node& cartridge) : Board(cartridge) {
++}
++
++};
+diff --git a/fc/cartridge/board/namco-34xx.cpp b/fc/cartridge/board/namco-34xx.cpp
+new file mode 100644
+index 0000000..55d3fa0
+--- /dev/null
++++ b/fc/cartridge/board/namco-34xx.cpp
+@@ -0,0 +1,128 @@
++//NAMCOT-3401
++//NAMCOT-3406
++//NAMCOT-3407
++//NAMCOT-3416
++//NAMCOT-3425
++//NAMCOT-3443
++//NAMCOT-3446
++//NAMCOT-3453
++//NES-DEROM
++//NES-DE1ROM
++//NES-DRROM
++
++struct Namco34xx : Board {
++
++enum class Revision : unsigned {
++  Namco3401, // bankswitching used even if PRG is 32KB (バベルの塔/Tower of Babel)
++  Namco3406,
++  Namco3407,
++  Namco3416,
++  Namco3425,
++  Namco3443,
++  Namco3446,
++  Namco3453,
++  DEROM,
++  DE1ROM,
++  DRROM,
++} revision;
++
++struct Settings {
++  bool mirror;  //0 = vertical, 1 = horizontal
++} settings;
++
++Namco108 namco108;
++
++bool nametable; // for Namco3453, used only by Devil Man
++
++unsigned prg_addr(unsigned addr) {
++  if(revision == Revision::Namco3401 || prgrom.size > 0x8000) return namco108.prg_addr(addr);
++  else return addr & 0x7fff;
++}
++
++uint8 prg_read(unsigned addr) {
++  if(addr & 0x8000) return prgrom.read(prg_addr(addr));
++  return cpu.mdr();
++}
++
++void prg_write(unsigned addr, uint8 data) {
++  if(addr & 0x8000) {
++    namco108.reg_write(addr, data);
++    if(revision == Revision::Namco3453) nametable = data & 0x40;
++  }
++}
++
++unsigned chr_addr(unsigned addr) {
++  switch(revision) {
++  case Revision::Namco3443:
++  case Revision::Namco3453:
++    return namco108.chr_addr(addr) | ((addr & 0x1000) << 4);
++  case Revision::Namco3446:
++    if(addr <= 0x07ff) return (namco108.chr_addr(0x1000) << 1) | (addr & 0x07ff);
++    if(addr <= 0x0fff) return (namco108.chr_addr(0x1400) << 1) | (addr & 0x07ff);
++    if(addr <= 0x17ff) return (namco108.chr_addr(0x1800) << 1) | (addr & 0x07ff);
++    if(addr <= 0x1fff) return (namco108.chr_addr(0x1c00) << 1) | (addr & 0x07ff);
++  default:
++    return namco108.chr_addr(addr);
++  }
++}
++
++uint8 chr_read(unsigned addr) {
++  if(revision == Revision::DRROM) {
++    if(addr & 0x2000) return chrram.data[mirror(addr & 0x0FFF, chrram.size)];
++    return chrrom.data[mirror(namco108.chr_addr(addr), chrrom.size)];
++  }
++  if(addr & 0x2000) return ppu.ciram_read(ciram_addr(addr));
++  return Board::chr_read(chr_addr(addr));
++}
++
++void chr_write(unsigned addr, uint8 data) {
++  if(revision == Revision::DRROM) {
++    if(addr & 0x2000) chrram.data[mirror(addr & 0x0FFF, chrram.size)] = data;
++    return;
++  }
++  if(addr & 0x2000) return ppu.ciram_write(ciram_addr(addr), data);
++  return Board::chr_write(chr_addr(addr), data);
++}
++
++unsigned ciram_addr(unsigned addr) const {
++  switch(revision) {
++  case Revision::Namco3425:
++    return ((namco108.chr_addr(addr) & 0x8000) >> 5) | (addr & 0x03ff);
++  case Revision::Namco3453:
++    return (addr & 0x03ff) | (nametable ? 0x0400 : 0x0000);
++  default:
++    if(settings.mirror == 0) return ((addr & 0x0400) >> 0) | (addr & 0x03ff);
++    if(settings.mirror == 1) return ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++  }
++}
++
++void reset() {
++  nametable = 0;
++}
++
++void serialize(serializer& s) {
++  Board::serialize(s);
++}
++
++Namco34xx(Markup::Node& cartridge) : Board(cartridge), namco108(*this, cartridge) {
++  string type = cartridge["board/type"].data;
++  if(type.match("*3401*")) revision = Revision::Namco3401;
++  if(type.match("*3406*")) revision = Revision::Namco3406;
++  if(type.match("*3407*")) revision = Revision::Namco3407;
++  if(type.match("*3416*")) revision = Revision::Namco3416;
++  if(type.match("*3425*")) revision = Revision::Namco3425;
++  if(type.match("*3443*")) revision = Revision::Namco3443;
++  if(type.match("*3446*")) revision = Revision::Namco3446;
++  if(type.match("*3453*")) revision = Revision::Namco3453;
++  if(type.match("*DEROM*")) revision = Revision::DEROM;
++  if(type.match("*DE1ROM*")) revision = Revision::DE1ROM;
++  if(type.match("*DRROM*")) revision = Revision::DRROM;
++  if(type.match("*TENGEN-800002*")) revision = Revision::DEROM;
++  if(type.match("*TENGEN-800030*")) revision = Revision::DE1ROM;
++  if(type.match("*TENGEN-800004*")) revision = Revision::DRROM;
++
++  if(revision != Revision::Namco3425 && revision != Revision::Namco3453)
++    settings.mirror = cartridge["mirror/mode"].data == "horizontal";
++}
++
++};
 diff --git a/fc/cartridge/board/nes-axrom.cpp b/fc/cartridge/board/nes-axrom.cpp
 index 6d468cf..34dc46a 100644
 --- a/fc/cartridge/board/nes-axrom.cpp
@@ -1649,6 +3289,104 @@ index aafc7bd..0000000
 -}
 -
 -};
+diff --git a/fc/cartridge/board/nes-cxrom.cpp b/fc/cartridge/board/nes-cxrom.cpp
+new file mode 100644
+index 0000000..239a629
+--- /dev/null
++++ b/fc/cartridge/board/nes-cxrom.cpp
+@@ -0,0 +1,92 @@
++//NES-CNROM
++//NES-CPROM
++
++struct NES_CxROM : Board {
++
++enum class Revision : unsigned {
++  CNROM,
++  CPROM,
++} revision;
++
++struct Settings {
++  bool mirror;  //0 = vertical, 1 = horizontal
++  bool security;
++  uint2 pass;
++} settings;
++
++uint2 chr_bank;
++
++uint8 prg_read(unsigned addr) {
++  if(addr & 0x8000) return prgrom.read(addr & 0x7fff);
++  return cpu.mdr();
++}
++
++void prg_write(unsigned addr, uint8 data) {
++  if(addr & 0x8000) {
++    data &= prg_read(addr); // Bus conflicts
++    chr_bank = data & 0x03;
++  }
++}
++
++uint8 chr_read(unsigned addr) {
++  if(addr & 0x2000) {
++    if(settings.mirror == 1) addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++    return ppu.ciram_read(addr & 0x07ff);
++  }
++  if(settings.security) {
++    if(chr_bank != settings.pass) return ppu.status.mdr;
++  }
++  switch(revision) {
++  case Revision::CNROM:
++    addr = (chr_bank * 0x2000) + (addr & 0x1fff);
++    break;
++  case Revision::CPROM:
++    if(addr < 0x1000) addr = addr & 0x1fff;
++    else              addr = (chr_bank * 0x1000) + (addr & 0x0fff);
++    break;
++  }
++  return Board::chr_read(addr);
++}
++
++void chr_write(unsigned addr, uint8 data) {
++  if(addr & 0x2000) {
++    if(settings.mirror == 1) addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++    return ppu.ciram_write(addr & 0x07ff, data);
++  }
++  switch(revision) {
++  case Revision::CNROM:
++    addr = (chr_bank * 0x2000) + (addr & 0x1fff);
++    break;
++  case Revision::CPROM:
++    if(addr < 0x1000) addr = addr & 0x1fff;
++    else              addr = (chr_bank * 0x1000) + (addr & 0x0fff);
++    break;
++  }
++  Board::chr_write(addr, data);
++}
++
++void power() {
++}
++
++void reset() {
++  chr_bank = 0;
++}
++
++void serialize(serializer& s) {
++  Board::serialize(s);
++  s.integer(chr_bank);
++}
++
++NES_CxROM(Markup::Node& cartridge) : Board(cartridge) {
++  string type = cartridge["board/type"].data;
++  if(type.match("*CNROM*")) revision = Revision::CNROM;
++  if(type.match("*CPROM*")) revision = Revision::CPROM;
++
++  settings.mirror = cartridge["mirror/mode"].data == "horizontal";
++  settings.security = cartridge["board/security"].exists();
++  if(settings.security) {
++    settings.pass = cartridge["board/security/pass"].integer();
++  }
++}
++
++};
 diff --git a/fc/cartridge/board/nes-exrom.cpp b/fc/cartridge/board/nes-exrom.cpp
 index 42bd56c..b94e38e 100644
 --- a/fc/cartridge/board/nes-exrom.cpp
@@ -2132,6 +3870,99 @@ index 7aced28..83f1acd 100644
  }
  
  };
+diff --git a/fc/cartridge/board/sunsoft-4.cpp b/fc/cartridge/board/sunsoft-4.cpp
+new file mode 100644
+index 0000000..15f5727
+--- /dev/null
++++ b/fc/cartridge/board/sunsoft-4.cpp
+@@ -0,0 +1,87 @@
++//SUNSOFT-4
++
++struct Sunsoft4 : Board {
++
++uint8 chr_bank[4];
++uint7 ntrom_bank[2];
++uint2 mirror;
++bool nametable_mode;
++uint8 prg_bank;
++
++uint8 prg_read(unsigned addr) {
++  if((addr & 0xc000) == 0x8000) return prgrom.read((prg_bank << 14) | (addr & 0x3fff));
++  if((addr & 0xc000) == 0xc000) return prgrom.read((    0xff << 14) | (addr & 0x3fff));
++  return cpu.mdr();
++}
++
++void prg_write(unsigned addr, uint8 data) {
++  switch(addr & 0xf000) {
++  case 0x8000: chr_bank[0] = data; break;
++  case 0x9000: chr_bank[1] = data; break;
++  case 0xa000: chr_bank[2] = data; break;
++  case 0xb000: chr_bank[3] = data; break;
++  case 0xc000: ntrom_bank[0] = data | 0x80; break;
++  case 0xd000: ntrom_bank[1] = data | 0x80; break;
++  case 0xe000:
++    mirror = data & 0x03;
++    nametable_mode = data & 0x10;
++    break;
++  case 0xf000: prg_bank = data; break;
++  }
++}
++
++unsigned ciram_addr(unsigned addr) {
++  switch(mirror) {
++  case 0: return ((addr & 0x0400) >> 0) | (addr & 0x03ff);
++  case 1: return ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++  case 2: return 0x0000 | (addr & 0x03ff);
++  case 3: return 0x0400 | (addr & 0x03ff);
++  }
++}
++
++uint8 chr_read(unsigned addr) {
++  if(addr & 0x2000) {
++    addr = ciram_addr(addr);
++    if(nametable_mode) return Board::chr_read(((ntrom_bank[(addr & 0x0400) >> 10] | 0x80) << 10) | (addr & 0x03FF));
++    else               return ppu.ciram_read(addr);
++  }
++  addr = (chr_bank[(addr & 0x1800) >> 11] << 11) | (addr & 0x07ff);
++  return Board::chr_read(addr);
++}
++
++void chr_write(unsigned addr, uint8 data) {
++  if(addr & 0x2000) {
++    if(nametable_mode == 0) return ppu.ciram_write(ciram_addr(addr), data);
++  } else {
++    return Board::chr_write(addr, data);
++  }
++}
++
++void power() {
++}
++
++void reset() {
++  chr_bank[0] = 0;
++  chr_bank[1] = 0;
++  chr_bank[2] = 0;
++  chr_bank[3] = 0;
++  ntrom_bank[0] = 0;
++  ntrom_bank[1] = 0;
++  mirror = 0;
++  nametable_mode = 0;
++  prg_bank = 0;
++}
++
++void serialize(serializer& s) {
++  Board::serialize(s);
++  s.array(chr_bank);
++  s.array(ntrom_bank);
++  s.integer(mirror);
++  s.integer(nametable_mode);
++  s.integer(prg_bank);
++}
++
++Sunsoft4(Markup::Node& cartridge) : Board(cartridge) {
++}
++
++};
 diff --git a/fc/cartridge/board/sunsoft-5b.cpp b/fc/cartridge/board/sunsoft-5b.cpp
 index bbfc418..2216539 100644
 --- a/fc/cartridge/board/sunsoft-5b.cpp
@@ -2145,6 +3976,547 @@ index bbfc418..2216539 100644
  }
  
  };
+diff --git a/fc/cartridge/board/unlicensed/camerica.cpp b/fc/cartridge/board/unlicensed/camerica.cpp
+new file mode 100644
+index 0000000..da7fe6a
+--- /dev/null
++++ b/fc/cartridge/board/unlicensed/camerica.cpp
+@@ -0,0 +1,105 @@
++struct Camerica : Board {
++
++enum class Revision : unsigned {
++  ALGN, // Aladdin Game Enhancer
++  ALGQ, // Aladdin Game Enhancer (Quattro Multicarts)
++  BF9093,
++  BF9096,
++  BF9097,
++} revision;
++
++struct Settings {
++  bool mirror;    //0 = vertical, 1 = horizontal
++} settings;
++
++uint4 prg_bank;
++uint2 prg_block; // for ALGQ and BF9096
++bool nametable; // for BF9097
++
++uint8 prg_read(unsigned addr) {
++  if((addr & 0x8000) == 0x0000) return cpu.mdr();
++  if((addr & 0xc000) == 0x8000) {
++    return prgrom.read((prg_block << 16) | (prg_bank << 14) | (addr & 0x3fff));
++  } else {
++    if(revision != Revision::ALGQ && revision != Revision::BF9096)
++      return prgrom.read((0x0f << 14) | (addr & 0x3fff));
++    else
++      return prgrom.read((prg_block << 16) | (0x03 << 14) | (addr & 0x3fff));
++  }
++}
++
++void prg_write(unsigned addr, uint8 data) {
++  switch(revision) {
++  case Revision::ALGQ:
++  case Revision::BF9096:
++    if((addr & 0xc000) == 0x8000) {
++      prg_block = (data & 0x18) >> 3;
++    }
++    break;
++  case Revision::BF9097:
++    if((addr & 0xe000) == 0x8000) {
++      nametable = data & 0x10;
++    }
++    break;
++  }
++  if((addr & 0xc000) == 0xc000) {
++    switch(revision) {
++    case Revision::ALGN:
++    case Revision::BF9093: prg_bank = data & 0x0f; break;
++    case Revision::ALGQ:
++    case Revision::BF9096: prg_bank = data & 0x03; break;
++    case Revision::BF9097: prg_bank = data & 0x07; break;
++    }
++  }
++}
++
++uint8 chr_read(unsigned addr) {
++  if(addr & 0x2000) return ppu.ciram_read(ciram_addr(addr));
++  return Board::chr_read(addr);
++}
++
++void chr_write(unsigned addr, uint8 data) {
++  if(addr & 0x2000) return ppu.ciram_write(ciram_addr(addr), data);
++  return Board::chr_write(addr, data);
++}
++
++unsigned ciram_addr(unsigned addr) const {
++  if(revision != Revision::BF9097) {
++    switch(settings.mirror) {
++    case 0: return ((addr & 0x0400) >> 0) | (addr & 0x03ff);
++    case 1: return ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++    }
++  } else {
++    return (addr & 0x03ff) | (nametable << 10);
++  }
++}
++
++void power() {
++}
++
++void reset() {
++  prg_bank = 0;
++  prg_block = 0;
++  nametable = 0;
++}
++
++void serialize(serializer& s) {
++  Board::serialize(s);
++
++  s.integer(prg_bank);
++  s.integer(prg_block);
++  s.integer(nametable);
++}
++
++Camerica(Markup::Node& cartridge) : Board(cartridge) {
++  string type = cartridge["board/type"].data;
++  if(type.match("*ALGN*"  )) revision = Revision::ALGN;
++  if(type.match("*ALGQ*"  )) revision = Revision::ALGQ;
++  if(type.match("*BF9093*")) revision = Revision::BF9093;
++  if(type.match("*BF9096*")) revision = Revision::BF9096;
++  if(type.match("*BF9097*")) revision = Revision::BF9097;
++
++  settings.mirror = cartridge["mirror/mode"].data == "horizontal";
++}
++
++};
+diff --git a/fc/cartridge/board/unlicensed/colordreams-74377.cpp b/fc/cartridge/board/unlicensed/colordreams-74377.cpp
+new file mode 100644
+index 0000000..62fc472
+--- /dev/null
++++ b/fc/cartridge/board/unlicensed/colordreams-74377.cpp
+@@ -0,0 +1,64 @@
++//COLORDREAMS-74*377
++
++struct ColorDreams74377 : Board {
++
++struct Settings {
++  bool mirror;  //0 = vertical, 1 = horizontal
++} settings;
++
++uint2 prg_bank;
++uint4 chr_bank;
++
++uint8 prg_read(unsigned addr) {
++  if(addr & 0x8000) return prgrom.read((prg_bank << 15) | (addr & 0x7fff));
++  return cpu.mdr();
++}
++
++void prg_write(unsigned addr, uint8 data) {
++  if(addr & 0x8000) {
++    // Bus conflicts
++    data &= prg_read(addr);
++    // PRG and CHR bits are swapped relative to NES-GxROM.
++    // Additionally, up to 16 CHR banks are available instead of 4.
++    prg_bank = (data & 0x03) >> 0;
++    chr_bank = (data & 0xf0) >> 4;
++  }
++}
++
++uint8 chr_read(unsigned addr) {
++  if(addr & 0x2000) {
++    if(settings.mirror == 1) addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++    return ppu.ciram_read(addr & 0x07ff);
++  }
++  addr = (chr_bank * 0x2000) + (addr & 0x1fff);
++  return Board::chr_read(addr);
++}
++
++void chr_write(unsigned addr, uint8 data) {
++  if(addr & 0x2000) {
++    if(settings.mirror == 1) addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++    return ppu.ciram_write(addr & 0x07ff, data);
++  }
++  addr = (chr_bank * 0x2000) + (addr & 0x1fff);
++  Board::chr_write(addr, data);
++}
++
++void power() {
++}
++
++void reset() {
++  prg_bank = 0;
++  chr_bank = 0;
++}
++
++void serialize(serializer& s) {
++  Board::serialize(s);
++  s.integer(prg_bank);
++  s.integer(chr_bank);
++}
++
++ColorDreams74377(Markup::Node& cartridge) : Board(cartridge) {
++  settings.mirror = cartridge["mirror/mode"].data == "horizontal";
++}
++
++};
+diff --git a/fc/cartridge/board/unlicensed/mlt-action52.cpp b/fc/cartridge/board/unlicensed/mlt-action52.cpp
+new file mode 100644
+index 0000000..1bc6567
+--- /dev/null
++++ b/fc/cartridge/board/unlicensed/mlt-action52.cpp
+@@ -0,0 +1,82 @@
++//MLT-ACTION52
++
++struct MLT_Action52 : Board {
++
++struct Settings {
++  uint4 connected_chips;
++  uint2 chip_map[4];
++} settings;
++
++bool mirror;
++uint2 prg_chip;
++uint5 prg_bank;
++bool prg_mode;
++uint6 chr_bank;
++
++uint8 prg_read(unsigned addr) {
++  if(addr & 0x8000 && settings.connected_chips & (1 << prg_chip)) {
++    unsigned target_bank = prg_bank;
++    target_bank |= settings.chip_map[prg_chip] << 5;
++    if(prg_mode) return prgrom.read((target_bank << 14) | (addr & 0x3fff));
++    else         return prgrom.read((target_bank << 14) | (addr & 0x7fff));
++  }
++  return cpu.mdr();
++}
++
++void prg_write(unsigned addr, uint8 data) {
++  if(addr & 0x8000) {
++    mirror = (addr & 0x2000) >> 13;
++    prg_chip = (addr & 0x1800) >> 11;
++    prg_bank = (addr & 0x07c0) >> 6;
++    prg_mode = (addr & 0x0020) >> 5;
++    chr_bank = ((addr & 0x000f) << 2) + (data & 0x03);
++  }
++}
++
++uint8 chr_read(unsigned addr) {
++  if(addr & 0x2000) {
++    if(mirror) addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++    return ppu.ciram_read(addr & 0x07ff);
++  }
++  addr = (chr_bank * 0x2000) + (addr & 0x1fff);
++  return Board::chr_read(addr);
++}
++
++void chr_write(unsigned addr, uint8 data) {
++  if(addr & 0x2000) {
++    if(mirror) addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++    return ppu.ciram_write(addr & 0x07ff, data);
++  }
++  addr = (chr_bank * 0x2000) + (addr & 0x1fff);
++  Board::chr_write(addr, data);
++}
++
++void power() {
++}
++
++void reset() {
++  mirror = 0;
++  prg_chip = 0;
++  prg_bank = 0;
++  prg_mode = 0;
++  chr_bank = 0;
++}
++
++void serialize(serializer &s) {
++  Board::serialize(s);
++  s.integer(mirror);
++  s.integer(prg_chip);
++  s.integer(prg_bank);
++  s.integer(prg_mode);
++  s.integer(chr_bank);
++}
++
++MLT_Action52(Markup::Node& cartridge) : Board(cartridge) {
++  settings.connected_chips = numeral(cartridge["board/connected-chips"].data);
++  uint2 chip_block = 0;
++  for(unsigned chip_id = 0; chip_id < 4; chip_id++) {
++    if(settings.connected_chips & (0x1 << chip_id)) settings.chip_map[chip_id] = chip_block++;
++  }
++}
++
++};
+diff --git a/fc/cartridge/board/unlicensed/nina.cpp b/fc/cartridge/board/unlicensed/nina.cpp
+new file mode 100644
+index 0000000..a053268
+--- /dev/null
++++ b/fc/cartridge/board/unlicensed/nina.cpp
+@@ -0,0 +1,94 @@
++//AVE-NINA-01
++//AVE-NINA-02
++//AVE-NINA-03
++//AVE-NINA-06
++
++struct Nina : Board {
++
++unsigned revision;
++
++struct Settings {
++  bool mirror;  //0 = vertical, 1 = horizontal
++} settings;
++
++bool prg_bank;
++uint4 chr_bank[2];
++
++uint8 prg_read(unsigned addr) {
++  if(addr & 0x8000) return prgrom.read((prg_bank << 15) | (addr & 0x7fff));
++  if((addr & 0xe000) == 0x6000) {
++    if(prgram.size > 0) return prgram.read(addr);
++  }
++  return cpu.mdr();
++}
++
++void prg_write(unsigned addr, uint8 data) {
++  switch(revision) {
++  case  1:
++  case  2:
++    switch(addr) {
++    case 0x7ffd: prg_bank    = data & 0x01; break;
++    case 0x7ffe: chr_bank[0] = data & 0x0f; break;
++    case 0x7fff: chr_bank[1] = data & 0x0f; break;
++    }
++    break;
++  case  3:
++  case  6:
++    if((addr & 0xe100) == 0x4100) {
++      prg_bank    = (data & 0x08) >> 3;
++      chr_bank[0] = ((data & 0x07) << 1) | 0;
++      chr_bank[1] = ((data & 0x07) << 1) | 1;
++    }
++    break;
++  }
++  if((addr & 0xe000) == 0x6000 && prgram.size > 0) prgram.write(addr, data);
++}
++
++uint8 chr_read(unsigned addr) {
++  if(addr & 0x2000) {
++    if(settings.mirror == 1) addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++    return ppu.ciram_read(addr);
++  }
++  return Board::chr_read((addr & 0x0fff) | (chr_bank[(addr & 0x1000) >> 12] << 12));
++}
++
++void chr_write(unsigned addr, uint8 data) {
++  if(addr & 0x2000) {
++    if(settings.mirror == 1) addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++    return ppu.ciram_write(addr, data);
++  }
++  return Board::chr_write((addr & 0x0fff) | (chr_bank[(addr & 0x1000) >> 12] << 12), data);
++}
++
++void power() {
++  reset();
++}
++
++void reset() {
++  prg_bank = 0;
++  chr_bank[0] = 0;
++  chr_bank[1] = 0;
++}
++
++void serialize(serializer& s) {
++  Board::serialize(s);
++  s.integer(prg_bank);
++  s.array(chr_bank);
++}
++
++Nina(Markup::Node& cartridge) : Board(cartridge) {
++  string type = cartridge["board/type"].data;
++  if(type.match("*NINA-01*")) revision =  1;
++  if(type.match("*NINA-02*")) revision =  2;
++  if(type.match("*NINA-03*")) revision =  3;
++  if(type.match("*NINA-06*")) revision =  6;
++
++  print("Revision: 0", revision, "\n");
++  if(revision ==  1 || revision ==  2) {
++    settings.mirror = 1;
++  } else {
++    settings.mirror = cartridge["mirror/mode"].data == "horizontal";
++  }
++}
++
++};
+diff --git a/fc/cartridge/board/unlicensed/noconflicts-cnrom.cpp b/fc/cartridge/board/unlicensed/noconflicts-cnrom.cpp
+new file mode 100644
+index 0000000..82c6983
+--- /dev/null
++++ b/fc/cartridge/board/unlicensed/noconflicts-cnrom.cpp
+@@ -0,0 +1,56 @@
++// This board is intended for homebrew games that do not account for bus
++// conflicts. Many Sachen and Panesian games require this board, but they were
++// not the reason for its inclusion.
++
++struct NoConflicts_CNROM : Board {
++
++struct Settings {
++  bool mirror;  //0 = vertical, 1 = horizontal
++} settings;
++
++uint2 chr_bank;
++
++uint8 prg_read(unsigned addr) {
++  if(addr & 0x8000) return prgrom.read(addr & 0x7fff);
++  return cpu.mdr();
++}
++
++void prg_write(unsigned addr, uint8 data) {
++  if(addr & 0x8000) chr_bank = data & 0x03;
++}
++
++uint8 chr_read(unsigned addr) {
++  if(addr & 0x2000) {
++    if(settings.mirror == 1) addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++    return ppu.ciram_read(addr & 0x07ff);
++  }
++  addr = (chr_bank * 0x2000) + (addr & 0x1fff);
++  return Board::chr_read(addr);
++}
++
++void chr_write(unsigned addr, uint8 data) {
++  if(addr & 0x2000) {
++    if(settings.mirror == 1) addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++    return ppu.ciram_write(addr & 0x07ff, data);
++  }
++  addr = (chr_bank * 0x2000) + (addr & 0x1fff);
++  Board::chr_write(addr, data);
++}
++
++void power() {
++}
++
++void reset() {
++  chr_bank = 0;
++}
++
++void serialize(serializer& s) {
++  Board::serialize(s);
++  s.integer(chr_bank);
++}
++
++NoConflicts_CNROM(Markup::Node& cartridge) : Board(cartridge) {
++  settings.mirror = cartridge["mirror/mode"].data == "horizontal";
++}
++
++};
+diff --git a/fc/cartridge/board/unlicensed/single-chip.cpp b/fc/cartridge/board/unlicensed/single-chip.cpp
+new file mode 100644
+index 0000000..e1f80ff
+--- /dev/null
++++ b/fc/cartridge/board/unlicensed/single-chip.cpp
+@@ -0,0 +1,49 @@
++struct SingleChip : Board {
++
++struct Settings {
++  uint4 va10;  //10 = vertical, 11 = horizontal, 12 = BLK0, 13 = BLK1
++} settings;
++
++uint8 prg_read(unsigned addr) {
++  if(addr & 0x8000) return prgrom.read(addr);
++  return cpu.mdr();
++}
++
++void prg_write(unsigned addr, uint8 data) {
++}
++
++uint8 chr_read(unsigned addr) {
++  if(addr & 0x2000) {
++    switch(settings.va10) {
++    case 10: addr = (addr & 0x07ff);
++    case 11: addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++    case 12: addr = (addr & 0x03ff);
++    case 13: addr = (addr & 0x03ff) | 0x0400;
++    }
++    return ppu.ciram_read(addr & 0x07ff);
++  }
++  return ppu.ciram_read(addr & 0x07ff);
++}
++
++void chr_write(unsigned addr, uint8 data) {
++  if(addr & 0x2000) {
++    switch(settings.va10) {
++    case 10: addr = (addr & 0x07ff);
++    case 11: addr = ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++    case 12: addr = (addr & 0x03ff);
++    case 13: addr = (addr & 0x03ff) | 0x0400;
++    }
++    return ppu.ciram_write(addr & 0x07ff, data);
++  }
++  return ppu.ciram_write(addr & 0x07ff, data);
++}
++
++void serialize(serializer& s) {
++  Board::serialize(s);
++}
++
++SingleChip(Markup::Node& cartridge) : Board(cartridge) {
++  settings.va10 = numeral(cartridge["board/va10"].data);
++}
++
++};
+diff --git a/fc/cartridge/board/vs.cpp b/fc/cartridge/board/vs.cpp
+new file mode 100644
+index 0000000..80ac9c6
+--- /dev/null
++++ b/fc/cartridge/board/vs.cpp
+@@ -0,0 +1,49 @@
++//VS
++
++struct VS : Board {
++
++bool bank;
++
++uint8 prg_read(unsigned addr) {
++  if((addr & 0xe000) == 0x6000) return prgram.read(addr);
++  if(addr & 0x8000) {
++    if(prgrom.size <= 0x8000 || (addr & 0xe000) > 0x8000 || bank == 0) {
++      return prgrom.read(addr & 0x7fff);
++    } else {
++      return prgrom.read((addr & 0x1fff) | 0x8000);
++    }
++  }
++  return cpu.mdr();
++}
++
++void prg_write(unsigned addr, uint8 data) {
++  if(addr == 0x4016) bank = (data & 0x04) >> 2;
++  if((addr & 0xe000) == 0x6000) prgram.write(addr, data);
++}
++
++uint8 chr_read(unsigned addr) {
++  if(addr & 0x2000) return chrram.read(addr & 0x0fff);
++  if(bank && chrrom.size < 0x2000) return ppu.status.mdr;
++  return chrrom.read((bank * 0x2000) + (addr & 0x1fff));
++}
++
++void chr_write(unsigned addr, uint8 data) {
++  if(addr & 0x2000) return chrram.write(addr & 0x0fff, data);
++}
++
++void power() {
++}
++
++void reset() {
++  bank = 0;
++}
++
++void serialize(serializer& s) {
++  Board::serialize(s);
++  s.integer(bank);
++}
++
++VS(Markup::Node& cartridge) : Board(cartridge) {
++}
++
++};
 diff --git a/fc/cartridge/cartridge.cpp b/fc/cartridge/cartridge.cpp
 index 57dc723..91ecea8 100644
 --- a/fc/cartridge/cartridge.cpp
@@ -2326,6 +4698,148 @@ index e3cabdc..44f003a 100644
  #include "vrc1.cpp"
  #include "vrc2.cpp"
  #include "vrc3.cpp"
+diff --git a/fc/cartridge/chip/fcg.cpp b/fc/cartridge/chip/fcg.cpp
+new file mode 100644
+index 0000000..f2447ed
+--- /dev/null
++++ b/fc/cartridge/chip/fcg.cpp
+@@ -0,0 +1,136 @@
++struct FCG : Chip {
++
++enum class Revision : unsigned {
++  FCG1,
++  FCG2,
++  LZ93D50,
++} revision;
++
++enum class EEPROM : unsigned {
++  None,
++  _24C01,
++  _24C02
++} eeprom;
++
++uint8 chr_bank[8];
++uint8 prg_bank;
++uint2 mirror;
++bool irq_counter_enable;
++uint16 irq_counter;
++uint16 irq_latch;
++bool eeprom_i2c_scl; // When using SRAM, enables RAM chip
++bool eeprom_enable_read;
++
++void main() {
++  while(true) {
++    if(scheduler.sync == Scheduler::SynchronizeMode::All) {
++      scheduler.exit(Scheduler::ExitReason::SynchronizeEvent);
++    }
++
++    if(irq_counter_enable) {
++      if(--irq_counter == 0xffff) {
++        cpu.set_irq_line(1);
++        irq_counter_enable = false;
++      }
++    }
++
++    tick();
++  }
++}
++
++unsigned prg_addr(unsigned addr) const {
++  bool region = addr & 0x4000;
++  return ((region == 0 ? prg_bank : 15) << 14) | (addr & 0x3fff);
++}
++
++unsigned chr_addr(unsigned addr) const {
++  return (chr_bank[addr >> 10] << 10) | (addr & 0x03ff);
++}
++
++unsigned ciram_addr(unsigned addr) const {
++  switch(mirror) {
++  case 0: return ((addr & 0x0400) >> 0) | (addr & 0x03ff);
++  case 1: return ((addr & 0x0800) >> 1) | (addr & 0x03ff);
++  case 2: return 0x0000 | (addr & 0x03ff);
++  case 3: return 0x0400 | (addr & 0x03ff);
++  }
++}
++
++uint8 ram_read(unsigned addr) {
++  return board.prgram.data[addr & 0x1fff];
++}
++
++void ram_write(unsigned addr, uint8 data) {
++  board.prgram.data[addr & 0x1fff] = data;
++}
++
++void reg_write(unsigned addr, uint8 data) {
++  switch(addr & 0x0f) {
++  case 0x00: case 0x01: case 0x02: case 0x03:
++  case 0x04: case 0x05: case 0x06: case 0x07:
++    chr_bank[addr & 7] = data;
++    break;
++  case 0x08:
++    prg_bank = data & 0x0f;
++    break;
++  case 0x09:
++    mirror = data & 0x03;
++    break;
++  case 0x0a:
++    cpu.set_irq_line(0);
++    irq_counter_enable = data & 0x01;
++    irq_counter = irq_latch;
++    break;
++  case 0x0b:
++    irq_latch = (irq_latch & 0xff00) | (data << 0);
++    break;
++  case 0x0c:
++    irq_latch = (irq_latch & 0x00ff) | (data << 8);
++    break;
++  case 0x0d:
++    //TODO: serial EEPROM support
++    eeprom_i2c_scl = data & 0x20;
++    eeprom_enable_read = data & 0x80;
++    break;
++  }
++}
++
++void power() {
++  reset();
++}
++
++void reset() {
++  for(auto &n : chr_bank) n = 0;
++  prg_bank = 0;
++  mirror = 0;
++  irq_counter_enable = 0;
++  irq_counter = 0;
++  irq_latch = 0;
++  eeprom_i2c_scl = 0;
++  eeprom_enable_read = 0;
++}
++
++void serialize(serializer& s) {
++  s.array(chr_bank);
++  s.integer(prg_bank);
++  s.integer(mirror);
++  s.integer(irq_counter_enable);
++  s.integer(irq_counter);
++  s.integer(irq_latch);
++  s.integer(eeprom_i2c_scl);
++  s.integer(eeprom_enable_read);
++}
++
++FCG(Board& board, Markup::Node& cartridge) : Chip(board) {
++  string type = cartridge["chip[0]/type"].data;
++  if(type.match("*FCG-1*"  )) revision = Revision::FCG1;
++  if(type.match("*FCG-2*"  )) revision = Revision::FCG2;
++  if(type.match("*LZ93D50*")) revision = Revision::LZ93D50;
++
++  eeprom = EEPROM::None;
++  type = cartridge["chip[1]/type"].data;
++  if(type.match("*24C01*"  )) eeprom = EEPROM::_24C01;
++  if(type.match("*24C02*"  )) eeprom = EEPROM::_24C02;
++}
++
++};
 diff --git a/fc/cartridge/chip/mmc1.cpp b/fc/cartridge/chip/mmc1.cpp
 index 3983bda..59409f2 100644
 --- a/fc/cartridge/chip/mmc1.cpp
@@ -2442,6 +4956,1084 @@ index 5cd94fa..8c23c05 100644
  }
  
  };
+diff --git a/fc/cartridge/chip/namco-108.cpp b/fc/cartridge/chip/namco-108.cpp
+new file mode 100644
+index 0000000..8f333c1
+--- /dev/null
++++ b/fc/cartridge/chip/namco-108.cpp
+@@ -0,0 +1,83 @@
++struct Namco108 : Chip {
++
++enum class Revision : unsigned {
++  Namco108,
++  Namco109,
++  Namco118,
++  Namco119,
++} revision;
++
++uint3 bank_select;
++uint8 prg_bank[2];
++uint8 chr_bank[6];
++
++unsigned prg_addr(unsigned addr) const {
++  switch((addr >> 13) & 3) {
++  case 0: return (prg_bank[0] << 13) | (addr & 0x1fff);
++  case 1: return (prg_bank[1] << 13) | (addr & 0x1fff);
++  case 2: return (0x0e << 13) | (addr & 0x1fff);
++  case 3: return (0x0f << 13) | (addr & 0x1fff);
++  }
++}
++
++unsigned chr_addr(unsigned addr) const {
++  if(addr <= 0x07ff) return (chr_bank[0] << 10) | (addr & 0x07ff);
++  if(addr <= 0x0fff) return (chr_bank[1] << 10) | (addr & 0x07ff);
++  if(addr <= 0x13ff) return (chr_bank[2] << 10) | (addr & 0x03ff);
++  if(addr <= 0x17ff) return (chr_bank[3] << 10) | (addr & 0x03ff);
++  if(addr <= 0x1bff) return (chr_bank[4] << 10) | (addr & 0x03ff);
++  if(addr <= 0x1fff) return (chr_bank[5] << 10) | (addr & 0x03ff);
++}
++
++void reg_write(unsigned addr, uint8 data) {
++  switch(addr & 0x8001) {
++  case 0x8000:
++    bank_select = data & 0x07;
++    break;
++
++  case 0x8001:
++    switch(bank_select) {
++    case 0: chr_bank[0] = data & 0x3e; break;
++    case 1: chr_bank[1] = data & 0x3e; break;
++    case 2: chr_bank[2] = data & 0x3f; break;
++    case 3: chr_bank[3] = data & 0x3f; break;
++    case 4: chr_bank[4] = data & 0x3f; break;
++    case 5: chr_bank[5] = data & 0x3f; break;
++    case 6: prg_bank[0] = data & 0x0f; break;
++    case 7: prg_bank[1] = data & 0x0f; break;
++    }
++    break;
++  }
++}
++
++void power() {
++}
++
++void reset() {
++  bank_select = 0;
++  prg_bank[0] = 0;
++  prg_bank[1] = 0;
++  chr_bank[0] = 0;
++  chr_bank[1] = 0;
++  chr_bank[2] = 0;
++  chr_bank[3] = 0;
++  chr_bank[4] = 0;
++  chr_bank[5] = 0;
++}
++
++void serialize(serializer& s) {
++  s.integer(bank_select);
++  s.array(prg_bank);
++  s.array(chr_bank);
++}
++
++Namco108(Board& board, Markup::Node& cartridge) : Chip(board) {
++  string type = cartridge["chip/type"].data;
++
++  if(type.match("*108*")) revision = Revision::Namco108;
++  if(type.match("*109*")) revision = Revision::Namco109;
++  if(type.match("*118*")) revision = Revision::Namco118;
++  if(type.match("*119*")) revision = Revision::Namco119;
++}
++
++};
+diff --git a/fc/cartridge/markup.cpp b/fc/cartridge/markup.cpp
+new file mode 100644
+index 0000000..4ddab84
+--- /dev/null
++++ b/fc/cartridge/markup.cpp
+@@ -0,0 +1,46 @@
++#ifdef CARTRIDGE_CPP
++
++void Cartridge::parse_markup(const char* markup) {
++  auto document = Markup::Document(markup);
++  information.title.cartridge = document["information/title"].text();
++
++  auto cartridge = document["cartridge"];
++  region = cartridge["region"].data != "PAL" ? Region::NTSC : Region::PAL;
++  if(system.revision == System::Revision::VSSystem) {
++    vsarcadeboard.swap_controllers = cartridge["vs/controller[0]/port"].integer() == 2;
++    //string device1 = cartridge["vs/controller(port=1)/device"].text();
++    //string device2 = cartridge["vs/controller(port=2)/device"].text();
++    //if(device1 == "joypad") {
++    //  input.connect(vsarcadeboard.swap_controllers, Input::Device::Joypad);
++    //} else if(device1 == "none") {
++    //  input.connect(vsarcadeboard.swap_controllers, Input::Device::None);
++    //}
++    //if(device2 == "joypad") {
++    //  input.connect(!vsarcadeboard.swap_controllers, Input::Device::Joypad);
++    //} else if(device2 == "beamgun") {
++    //  input.connect(!vsarcadeboard.swap_controllers, Input::Device::BeamGun);
++    //} else if(device2 == "none") {
++    //  input.connect(!vsarcadeboard.swap_controllers, Input::Device::None);
++    //}
++    vsarcadeboard.set_dip(interface->dipSettings(cartridge["vs"]));
++    string ppu_revision = cartridge["vs/ppu/revision"].data;
++    if(ppu_revision == "RP2C02C")     ppu.revision = PPU::Revision::RP2C02C;
++    if(ppu_revision == "RP2C02G")     ppu.revision = PPU::Revision::RP2C02G;
++    if(ppu_revision == "RP2C03B")     ppu.revision = PPU::Revision::RP2C03B;
++    if(ppu_revision == "RP2C03G")     ppu.revision = PPU::Revision::RP2C03G;
++    if(ppu_revision == "RP2C04-0001") ppu.revision = PPU::Revision::RP2C04_0001;
++    if(ppu_revision == "RP2C04-0002") ppu.revision = PPU::Revision::RP2C04_0002;
++    if(ppu_revision == "RP2C04-0003") ppu.revision = PPU::Revision::RP2C04_0003;
++    if(ppu_revision == "RP2C04-0004") ppu.revision = PPU::Revision::RP2C04_0004;
++    if(ppu_revision == "RC2C03B")     ppu.revision = PPU::Revision::RC2C03B;
++    if(ppu_revision == "RC2C03C")     ppu.revision = PPU::Revision::RC2C03C;
++    if(ppu_revision == "RC2C05-01")   ppu.revision = PPU::Revision::RC2C05_01;
++    if(ppu_revision == "RC2C05-02")   ppu.revision = PPU::Revision::RC2C05_02;
++    if(ppu_revision == "RC2C05-03")   ppu.revision = PPU::Revision::RC2C05_03;
++    if(ppu_revision == "RC2C05-04")   ppu.revision = PPU::Revision::RC2C05_04;
++    if(ppu_revision == "RC2C05-05")   ppu.revision = PPU::Revision::RC2C05_05;
++  }
++  Board::load(cartridge);  //this call will set Cartridge::board if successful
++}
++
++#endif
+diff --git a/fc/cheat.cpp b/fc/cheat.cpp
+new file mode 100644
+index 0000000..7385455
+--- /dev/null
++++ b/fc/cheat.cpp
+@@ -0,0 +1,28 @@
++#include <fc/fc.hpp>
++
++namespace Famicom {
++
++Cheat cheat;
++
++void Cheat::reset() {
++  codes.reset();
++}
++
++void Cheat::append(unsigned addr, unsigned data) {
++  codes.append({addr, Unused, data});
++}
++
++void Cheat::append(unsigned addr, unsigned comp, unsigned data) {
++  codes.append({addr, comp, data});
++}
++
++optional<unsigned> Cheat::find(unsigned addr, unsigned comp) {
++  for(auto& code : codes) {
++    if(code.addr == addr && (code.comp == Unused || code.comp == comp)) {
++      return {true, code.data};
++    }
++  }
++  return false;
++}
++
++}
+diff --git a/fc/controller/beamgun/beamgun.cpp b/fc/controller/beamgun/beamgun.cpp
+new file mode 100644
+index 0000000..b5f579d
+--- /dev/null
++++ b/fc/controller/beamgun/beamgun.cpp
+@@ -0,0 +1,76 @@
++#ifdef CONTROLLER_CPP
++
++void BeamGun::enter() {
++  unsigned prev = 0;
++  while(true) {
++    unsigned next = ppu.status.ly * 341 + ppu.status.lx;
++
++    if(light > 0) light -= 1;
++
++    if(!offscreen) {
++      unsigned target = y * 341 + x + 3;
++      if(next >= target && prev < target) {
++        //CRT raster detected
++        //light remains in the gun for 10-25 scanlines
++        if(read_light()) light = 341 * 16;
++      }
++    }
++
++    if(next < prev) {
++      if(triggertime > 0) triggertime -= 1;
++      //Vcounter wrapped back to zero; update cursor coordinates for start of new frame
++      int nx = interface->inputPoll(port, (unsigned)Input::Device::BeamGun, (unsigned)Input::BeamGunID::X);
++      int ny = interface->inputPoll(port, (unsigned)Input::Device::BeamGun, (unsigned)Input::BeamGunID::Y);
++      nx += x;
++      ny += y;
++      x = max(-16, min(256 + 16, nx));
++      y = max(-16, min(240 + 16, ny));
++      offscreen = (x < 0 || y < 0 || x >= 256 || y >= 240);
++    }
++
++    prev = next;
++    step(2);
++  }
++}
++
++uint5 BeamGun::data() {
++  bool newtrigger = interface->inputPoll(port, (unsigned)Input::Device::BeamGun, (unsigned)Input::BeamGunID::Trigger);
++  if(newtrigger && !triggerlock) {
++    triggertime = 2;
++    triggerlock = true;
++  } else if(!newtrigger) {
++    triggerlock = false;
++  }
++
++  return ((triggertime > 0) << 4) | ((light == 0) << 3);
++}
++
++uint2 BeamGun::data1() {
++  return 0;
++}
++
++uint5 BeamGun::data2() {
++  return data();
++}
++
++bool BeamGun::read_light() {
++  if(offscreen) return false;
++  uint32 color = ppu.buffer[y * 256 + x];
++  return ((color & 0x20) && ((color & 0x0F) < 0x0D));
++}
++
++void BeamGun::latch(bool data) {
++  if(latched == data) return;
++  latched = data;
++}
++
++BeamGun::BeamGun(unsigned port) : Controller(port) {
++  create(Controller::Enter, system.cpu_frequency());
++  latched = 0;
++
++  //center cursor onscreen
++  x = 256 / 2;
++  y = 240 / 2;
++}
++
++#endif
+diff --git a/fc/controller/beamgun/beamgun.hpp b/fc/controller/beamgun/beamgun.hpp
+new file mode 100644
+index 0000000..f1f8f84
+--- /dev/null
++++ b/fc/controller/beamgun/beamgun.hpp
+@@ -0,0 +1,20 @@
++struct BeamGun : Controller {
++  void enter();
++  uint5 data();
++  uint2 data1();
++  uint5 data2();
++  bool read_light();
++  void latch(bool data);
++  BeamGun(unsigned port);
++
++//private:
++  bool latched;
++
++  signed x, y;
++  unsigned light;
++  unsigned triggertime;
++
++  bool offscreen;
++
++  bool triggerlock;
++};
+diff --git a/fc/controller/controller.cpp b/fc/controller/controller.cpp
+new file mode 100644
+index 0000000..fae691a
+--- /dev/null
++++ b/fc/controller/controller.cpp
+@@ -0,0 +1,41 @@
++#include <fc/fc.hpp>
++
++#define CONTROLLER_CPP
++namespace Famicom {
++
++#include "gamepad/gamepad.cpp"
++#include "fourplayers/fourplayers.cpp"
++#include "fourscore/fourscore.cpp"
++#include "beamgun/beamgun.cpp"
++#include "vsbeamgun/vsbeamgun.cpp"
++#include "familytrainer/familytrainer.cpp"
++#include "vspanel/vspanel.cpp"
++
++void Controller::Enter() {
++  if(co_active() == input.port1->thread) input.port1->enter();
++  if(co_active() == input.port2->thread) input.port2->enter();
++  if(co_active() == input.expansion->thread) input.expansion->enter();
++}
++
++void Controller::enter() {
++  while(true) step(1);
++}
++
++void Controller::step(unsigned clocks) {
++  clock += clocks * (uint64)cpu.frequency;
++  synchronize_cpu();
++}
++
++void Controller::synchronize_cpu() {
++  if(CPU::Threaded == true) {
++    if(clock >= 0 && scheduler.sync != Scheduler::SynchronizeMode::All) co_switch(cpu.thread);
++  } else {
++    while(clock >= 0) cpu.enter();
++  }
++}
++
++Controller::Controller(unsigned port) : port(port) {
++  if(!thread) create(Controller::Enter, 1);
++}
++
++}
+diff --git a/fc/controller/controller.hpp b/fc/controller/controller.hpp
+new file mode 100644
+index 0000000..83afa9d
+--- /dev/null
++++ b/fc/controller/controller.hpp
+@@ -0,0 +1,61 @@
++// NES controller port pinout:
++// ┌────
++// │(7)  \
++// │(2)(1)│
++// │(3)(5)│
++// │(4)(6)│
++// └──────┘
++// pin    name     port1                            port2
++//  1:    +5v
++//  2:    clock    $4016 read                       $4017 read
++//  3:    latch    $4016.d0 write                   $4016.d0 write
++//  4:    data0    $4016.d0 read                    $4017.d0 read
++//  5:    data3    $4016.d3 read                    $4017.d3 read
++//  6:    data4    $4016.d4 read                    $4017.d4 read
++//  7:    gnd
++
++// Famicom expansion port pinout:
++// /--------------------------------\
++// \(08)(07)(06)(05)(04)(03)(02)(01)/
++//  \ (15)(14)(13)(12)(11)(10)(09) /
++//   \----------------------------/
++// pin    name     register
++// 01:    gnd
++// 02:    sound
++// 03:    irq
++// 04:    data2.4  $4017.d4 read
++// 05:    data2.3  $4017.d3 read
++// 06:    data2.2  $4017.d2 read
++// 07:    data2.1  $4017.d1 read
++// 08:    data2.0  $4017.d0 read
++// 09:    /oe 2
++// 10:    out 2    $4016.d2 write
++// 11:    out 1    $4016.d1 write
++// 12:    latch    $4016.d0 write
++// 13:    data1.1  $4016.d1 read
++// 14:    /oe 1
++// 15:    +5v
++
++struct Controller : Thread {
++  enum : unsigned { Port1 = 0, Port2 = 1, ExpansionPort = 2 };
++  const unsigned port;
++
++  static void Enter();
++  virtual void enter();
++  void step(unsigned clocks);
++  void synchronize_cpu();
++
++  virtual uint5 data() { return 0; }
++  virtual uint2 data1() { return 0; }
++  virtual uint5 data2() { return 0; }
++  virtual void latch(bool data) {}
++  Controller(unsigned port);
++};
++
++#include "gamepad/gamepad.hpp"
++#include "fourplayers/fourplayers.hpp"
++#include "fourscore/fourscore.hpp"
++#include "beamgun/beamgun.hpp"
++#include "vsbeamgun/vsbeamgun.hpp"
++#include "familytrainer/familytrainer.hpp"
++#include "vspanel/vspanel.hpp"
+diff --git a/fc/controller/familytrainer/familytrainer.cpp b/fc/controller/familytrainer/familytrainer.cpp
+new file mode 100644
+index 0000000..9ad8282
+--- /dev/null
++++ b/fc/controller/familytrainer/familytrainer.cpp
+@@ -0,0 +1,57 @@
++#ifdef CONTROLLER_CPP
++
++uint5 FamilyTrainer::data() {
++  if(counter >= 8) return 0x18;
++  if(latched == 1) return (b2 << 3) | (b4 << 4);
++
++  switch(counter++) {
++  case  0: return (b2  << 3) | (b4  << 4);
++  case  1: return (b1  << 3) | (b3  << 4);
++  case  2: return (b5  << 3) | (b12 << 4);
++  case  3: return (b9  << 3) | (b8  << 4);
++  case  4: return (b6  << 3) | 0x10;
++  case  5: return (b10 << 3) | 0x10;
++  case  6: return (b11 << 3) | 0x10;
++  case  7: return (b7  << 3) | 0x10;
++  }
++}
++
++uint2 FamilyTrainer::data1() {
++  return 0;
++}
++
++uint5 FamilyTrainer::data2() {
++  return data();
++}
++
++void FamilyTrainer::latch(bool data) {
++  if(latched == data) return;
++  latched = data;
++  counter = 0;
++
++  if(latched == 0) {
++    b1  = interface->inputPoll(port, (unsigned)Input::Device::FamilyTrainer,  0);
++    b2  = interface->inputPoll(port, (unsigned)Input::Device::FamilyTrainer,  1);
++    b3  = interface->inputPoll(port, (unsigned)Input::Device::FamilyTrainer,  2);
++    b4  = interface->inputPoll(port, (unsigned)Input::Device::FamilyTrainer,  3);
++    b5  = interface->inputPoll(port, (unsigned)Input::Device::FamilyTrainer,  4);
++    b6  = interface->inputPoll(port, (unsigned)Input::Device::FamilyTrainer,  5);
++    b7  = interface->inputPoll(port, (unsigned)Input::Device::FamilyTrainer,  6);
++    b8  = interface->inputPoll(port, (unsigned)Input::Device::FamilyTrainer,  7);
++    b9  = interface->inputPoll(port, (unsigned)Input::Device::FamilyTrainer,  8);
++    b10 = interface->inputPoll(port, (unsigned)Input::Device::FamilyTrainer,  9);
++    b11 = interface->inputPoll(port, (unsigned)Input::Device::FamilyTrainer, 10);
++    b12 = interface->inputPoll(port, (unsigned)Input::Device::FamilyTrainer, 11);
++  }
++}
++
++FamilyTrainer::FamilyTrainer(unsigned port) : Controller(port) {
++  latched = 0;
++  counter = 0;
++
++  b1 = b2 = b3 = b4 = 0;
++  b5 = b6 = b7 = b8 = 0;
++  b9 = b10 = b11 = b12 = 0;
++}
++
++#endif
+diff --git a/fc/controller/familytrainer/familytrainer.hpp b/fc/controller/familytrainer/familytrainer.hpp
+new file mode 100644
+index 0000000..f6389f9
+--- /dev/null
++++ b/fc/controller/familytrainer/familytrainer.hpp
+@@ -0,0 +1,15 @@
++struct FamilyTrainer : Controller {
++  uint5 data();
++  uint2 data1();
++  uint5 data2();
++  void latch(bool data);
++  FamilyTrainer(unsigned port);
++
++private:
++  bool latched;
++  unsigned counter;
++
++  bool b1, b2, b3, b4;
++  bool b5, b6, b7, b8;
++  bool b9, b10, b11, b12;
++};
+diff --git a/fc/controller/fourplayers/fourplayers.cpp b/fc/controller/fourplayers/fourplayers.cpp
+new file mode 100644
+index 0000000..10a97a0
+--- /dev/null
++++ b/fc/controller/fourplayers/fourplayers.cpp
+@@ -0,0 +1,30 @@
++#ifdef CONTROLLER_CPP
++
++uint2 FourPlayers::data1() {
++  if(counter1 >= 8) return 2;
++  if(latched) return interface->inputPoll(port, (unsigned)Input::Device::FourPlayers, 0) << 1;
++
++  return interface->inputPoll(port, (unsigned)Input::Device::FourPlayers, counter1++) << 1;
++}
++
++uint5 FourPlayers::data2() {
++  if(counter2 >= 8) return 2;
++  if(latched) return interface->inputPoll(port, (unsigned)Input::Device::FourPlayers, 8) << 1;
++
++  return interface->inputPoll(port, (unsigned)Input::Device::FourPlayers, (counter2++) + 8) << 1;
++}
++
++void FourPlayers::latch(bool data) {
++  if(latched == data) return;
++  latched = data;
++  counter1 = 0;
++  counter2 = 0;
++}
++
++FourPlayers::FourPlayers(unsigned port) : Controller(port) {
++  latched = 0;
++  counter1 = 0;
++  counter2 = 0;
++}
++
++#endif
+diff --git a/fc/controller/fourplayers/fourplayers.hpp b/fc/controller/fourplayers/fourplayers.hpp
+new file mode 100644
+index 0000000..2a9ab47
+--- /dev/null
++++ b/fc/controller/fourplayers/fourplayers.hpp
+@@ -0,0 +1,11 @@
++struct FourPlayers : Controller {
++  uint2 data1();
++  uint5 data2();
++  void latch(bool data);
++  FourPlayers(unsigned port);
++
++private:
++  bool latched;
++  unsigned counter1;
++  unsigned counter2;
++};
+diff --git a/fc/controller/fourscore/fourscore.cpp b/fc/controller/fourscore/fourscore.cpp
+new file mode 100644
+index 0000000..3b33ee5
+--- /dev/null
++++ b/fc/controller/fourscore/fourscore.cpp
+@@ -0,0 +1,26 @@
++#ifdef CONTROLLER_CPP
++
++uint5 FourScore::data() {
++  if(counter >= 24) return 1;
++  if(latched) return interface->inputPoll(port, (unsigned)Input::Device::FourScore, 0);
++  uint5 data = 0;
++
++  if(counter >= 16) data = counter == (19 - port);
++  else data = interface->inputPoll(port, (unsigned)Input::Device::FourScore, counter);
++  counter++;
++
++  return data;
++}
++
++void FourScore::latch(bool data) {
++  if(latched == data) return;
++  latched = data;
++  counter = 0;
++}
++
++FourScore::FourScore(unsigned port) : Controller(port) {
++  latched = 0;
++  counter = 0;
++}
++
++#endif
+diff --git a/fc/controller/fourscore/fourscore.hpp b/fc/controller/fourscore/fourscore.hpp
+new file mode 100644
+index 0000000..86e7680
+--- /dev/null
++++ b/fc/controller/fourscore/fourscore.hpp
+@@ -0,0 +1,9 @@
++struct FourScore : Controller {
++  uint5 data();
++  void latch(bool data);
++  FourScore(unsigned port);
++
++private:
++  bool latched;
++  unsigned counter;
++};
+diff --git a/fc/controller/gamepad/gamepad.cpp b/fc/controller/gamepad/gamepad.cpp
+new file mode 100644
+index 0000000..97e6b90
+--- /dev/null
++++ b/fc/controller/gamepad/gamepad.cpp
+@@ -0,0 +1,59 @@
++#ifdef CONTROLLER_CPP
++
++uint5 Gamepad::data() {
++  if(counter >= 8) return 1;
++  if(latched == 1) return interface->inputPoll(port, (unsigned)Input::Device::Joypad, (unsigned)Input::JoypadID::A);
++
++  //note: D-pad physically prevents up+down and left+right from being pressed at the same time
++  switch(counter++) {
++  case 0: return a;
++  case 1: return b;
++  case 2: return select;
++  case 3: return start;
++  case 4: return up & !down;
++  case 5: return down & !up;
++  case 6: return left & !right;
++  case 7: return right & !left;
++  }
++}
++
++uint2 Gamepad::data1() {
++  return ((data() << 1) & 0x02);
++}
++
++uint5 Gamepad::data2() {
++  return 0;
++}
++
++void Gamepad::latch(bool data) {
++  if(latched == data) return;
++  latched = data;
++  counter = 0;
++
++  if(latched == 0) {
++    unsigned id = (unsigned)Input::Device::Joypad;
++    a      = interface->inputPoll(port, id,  0);
++    b      = interface->inputPoll(port, id,  1);
++    if(!system.vs()) {
++      select = interface->inputPoll(port, id,  2);
++      start  = interface->inputPoll(port, id,  3);
++    } else {
++      select = 0;
++      start  = 0;
++    }
++    up     = interface->inputPoll(port, id,  4);
++    down   = interface->inputPoll(port, id,  5);
++    left   = interface->inputPoll(port, id,  6);
++    right  = interface->inputPoll(port, id,  7);
++  }
++}
++
++Gamepad::Gamepad(unsigned port) : Controller(port) {
++  latched = 0;
++  counter = 0;
++
++  a = b = select = start = 0;
++  up = down = left = right = 0;
++}
++
++#endif
+diff --git a/fc/controller/gamepad/gamepad.hpp b/fc/controller/gamepad/gamepad.hpp
+new file mode 100644
+index 0000000..fe77970
+--- /dev/null
++++ b/fc/controller/gamepad/gamepad.hpp
+@@ -0,0 +1,14 @@
++struct Gamepad : Controller {
++  uint5 data();
++  uint2 data1();
++  uint5 data2();
++  void latch(bool data);
++  Gamepad(unsigned port);
++
++private:
++  bool latched;
++  unsigned counter;
++
++  bool a, b, select, start;
++  bool up, down, left, right;
++};
+diff --git a/fc/controller/mouse/mouse.cpp b/fc/controller/mouse/mouse.cpp
+new file mode 100644
+index 0000000..b592422
+--- /dev/null
++++ b/fc/controller/mouse/mouse.cpp
+@@ -0,0 +1,98 @@
++#ifdef CONTROLLER_CPP
++
++uint5 Mouse::data() {
++  if(latched == 1) {
++    speed = (speed + 1) % 3;
++    return 0;
++  }
++
++  if(counter >= 32) return 1;
++
++  switch(counter++) { default:
++  case  0: return 0;
++  case  1: return 0;
++  case  2: return 0;
++  case  3: return 0;
++  case  4: return 0;
++  case  5: return 0;
++  case  6: return 0;
++  case  7: return 0;
++
++  case  8: return r;
++  case  9: return l;
++  case 10: return (speed >> 1) & 1;
++  case 11: return (speed >> 0) & 1;
++
++  case 12: return 0;  //signature
++  case 13: return 0;  // ||
++  case 14: return 0;  // ||
++  case 15: return 1;  // ||
++
++  case 16: return dy;
++  case 17: return (y >> 6) & 1;
++  case 18: return (y >> 5) & 1;
++  case 19: return (y >> 4) & 1;
++  case 20: return (y >> 3) & 1;
++  case 21: return (y >> 2) & 1;
++  case 22: return (y >> 1) & 1;
++  case 23: return (y >> 0) & 1;
++
++  case 24: return dx;
++  case 25: return (x >> 6) & 1;
++  case 26: return (x >> 5) & 1;
++  case 27: return (x >> 4) & 1;
++  case 28: return (x >> 3) & 1;
++  case 29: return (x >> 2) & 1;
++  case 30: return (x >> 1) & 1;
++  case 31: return (x >> 0) & 1;
++  }
++}
++
++uint2 Mouse::data1() {
++  return data() << 1;
++}
++
++uint5 Mouse::data2() {
++  return 0;
++}
++
++void Mouse::latch(bool data) {
++  if(latched == data) return;
++  latched = data;
++  counter = 0;
++
++  x = interface->inputPoll(port, (unsigned)Input::Device::Mouse, 0);  //-n = left, 0 = center, +n = right
++  y = interface->inputPoll(port, (unsigned)Input::Device::Mouse, 1);  //-n = up,   0 = center, +n = down
++  l = interface->inputPoll(port, (unsigned)Input::Device::Mouse, 2);
++  r = interface->inputPoll(port, (unsigned)Input::Device::Mouse, 3);
++
++  dx = x < 0;  //0 = right, 1 = left
++  dy = y < 0;  //0 = down,  1 = up
++
++  if(x < 0) x = -x;  //abs(position_x)
++  if(y < 0) y = -y;  //abs(position_y)
++
++  double multiplier = 1.0;
++  if(speed == 1) multiplier = 1.5;
++  if(speed == 2) multiplier = 2.0;
++  x = (double)x * multiplier;
++  y = (double)y * multiplier;
++
++  x = min(127, x);
++  y = min(127, y);
++}
++
++Mouse::Mouse(unsigned port) : Controller(port) {
++  latched = 0;
++  counter = 0;
++
++  speed = 0;
++  x = 0;
++  y = 0;
++  dx = 0;
++  dy = 0;
++  l = 0;
++  r = 0;
++}
++
++#endif
+diff --git a/fc/controller/mouse/mouse.hpp b/fc/controller/mouse/mouse.hpp
+new file mode 100644
+index 0000000..7efd077
+--- /dev/null
++++ b/fc/controller/mouse/mouse.hpp
+@@ -0,0 +1,19 @@
++struct Mouse : Controller {
++  uint5 data();
++  uint2 data1();
++  uint5 data2();
++  void latch(bool data);
++  Mouse(unsigned port);
++
++private:
++  bool latched;
++  unsigned counter;
++
++  unsigned speed;  //0 = slow, 1 = normal, 2 = fast
++  signed x;        //x-coordinate
++  signed y;        //y-coordinate
++  bool dx;         //x-direction
++  bool dy;         //y-direction
++  bool l;          //left button
++  bool r;          //right button
++};
+diff --git a/fc/controller/sfcgamepad/sfcgamepad.cpp b/fc/controller/sfcgamepad/sfcgamepad.cpp
+new file mode 100644
+index 0000000..279ca10
+--- /dev/null
++++ b/fc/controller/sfcgamepad/sfcgamepad.cpp
+@@ -0,0 +1,65 @@
++#ifdef CONTROLLER_CPP
++
++uint5 SFCGamepad::data() {
++  if(counter >= 16) return 1;
++  if(latched == 1) return interface->inputPoll(port, (unsigned)Input::Device::SFCJoypad, (unsigned)Input::JoypadID::A);
++
++  //note: D-pad physically prevents up+down and left+right from being pressed at the same time
++  switch(counter++) {
++  case  0: return b;
++  case  1: return y;
++  case  2: return select;
++  case  3: return start;
++  case  4: return up & !down;
++  case  5: return down & !up;
++  case  6: return left & !right;
++  case  7: return right & !left;
++  case  8: return a;
++  case  9: return x;
++  case 10: return l;
++  case 11: return r;
++  }
++
++  return 0;  //12-15: signature
++}
++
++uint2 SFCGamepad::data1() {
++  return ((data() << 1) & 0x02);
++}
++
++uint5 SFCGamepad::data2() {
++  return 0;
++}
++
++void SFCGamepad::latch(bool data) {
++  if(latched == data) return;
++  latched = data;
++  counter = 0;
++
++  if(latched == 0) {
++    unsigned id = (unsigned)Input::Device::SFCJoypad;
++    b      = interface->inputPoll(port, id,  0);
++    y      = interface->inputPoll(port, id,  1);
++    select = interface->inputPoll(port, id,  2);
++    start  = interface->inputPoll(port, id,  3);
++    up     = interface->inputPoll(port, id,  4);
++    down   = interface->inputPoll(port, id,  5);
++    left   = interface->inputPoll(port, id,  6);
++    right  = interface->inputPoll(port, id,  7);
++    a      = interface->inputPoll(port, id,  8);
++    x      = interface->inputPoll(port, id,  9);
++    l      = interface->inputPoll(port, id, 10);
++    r      = interface->inputPoll(port, id, 11);
++  }
++}
++
++SFCGamepad::SFCGamepad(unsigned port) : Controller(port) {
++  latched = 0;
++  counter = 0;
++
++  b = y = select = start = 0;
++  up = down = left = right = 0;
++  a = x = l = r = 0;
++}
++
++#endif
+diff --git a/fc/controller/sfcgamepad/sfcgamepad.hpp b/fc/controller/sfcgamepad/sfcgamepad.hpp
+new file mode 100644
+index 0000000..7acc3f6
+--- /dev/null
++++ b/fc/controller/sfcgamepad/sfcgamepad.hpp
+@@ -0,0 +1,15 @@
++struct SFCGamepad : Controller {
++  uint5 data();
++  uint2 data1();
++  uint5 data2();
++  void latch(bool data);
++  SFCGamepad(unsigned port);
++
++private:
++  bool latched;
++  unsigned counter;
++
++  bool b, y, select, start;
++  bool up, down, left, right;
++  bool a, x, l, r;
++};
+diff --git a/fc/controller/vsbeamgun/vsbeamgun.cpp b/fc/controller/vsbeamgun/vsbeamgun.cpp
+new file mode 100644
+index 0000000..f0aa759
+--- /dev/null
++++ b/fc/controller/vsbeamgun/vsbeamgun.cpp
+@@ -0,0 +1,80 @@
++#ifdef CONTROLLER_CPP
++
++void VSBeamGun::enter() {
++  unsigned prev = 0;
++  while(true) {
++    unsigned next = ppu.status.ly * 341 + ppu.status.lx;
++
++    if(light > 0) light -= 1;
++
++    if(!offscreen) {
++      unsigned target = y * 341 + x + 3;
++      if(next >= target && prev < target) {
++        //CRT raster detected
++        //light remains in the gun for 10-25 scanlines
++        if(read_light()) light = 341 * 16;
++      }
++    }
++
++    if(next < prev) {
++      if(triggertime > 0) triggertime -= 1;
++      //Vcounter wrapped back to zero; update cursor coordinates for start of new frame
++      int nx = interface->inputPoll(port, (unsigned)Input::Device::BeamGun, (unsigned)Input::BeamGunID::X);
++      int ny = interface->inputPoll(port, (unsigned)Input::Device::BeamGun, (unsigned)Input::BeamGunID::Y);
++      nx += x;
++      ny += y;
++      x = max(-16, min(256 + 16, nx));
++      y = max(-16, min(240 + 16, ny));
++      offscreen = (x < 0 || y < 0 || x >= 256 || y >= 240);
++    }
++
++    prev = next;
++    step(2);
++  }
++}
++
++uint5 VSBeamGun::data() {
++  if(counter >= 8) return 1;
++  if(latched == 1) return 0;
++
++  switch(counter++) {
++  case 0: return 0;
++  case 1: return 0;
++  case 2: return 0;
++  case 3: return 0;
++  case 4: return 1; // connected
++  case 5: return 0;
++  case 6: return light == 0;
++  case 7:
++    bool newtrigger = interface->inputPoll(port, (unsigned)Input::Device::BeamGun, (unsigned)Input::BeamGunID::Trigger);
++    if(newtrigger && !triggerlock) {
++      triggertime = 2;
++      triggerlock = true;
++    } else if(!newtrigger) {
++      triggerlock = false;
++    }
++    return triggertime > 0;
++  }
++}
++
++bool VSBeamGun::read_light() {
++  if(offscreen) return false;
++  uint32 color = ppu.buffer[y * 256 + x];
++  return ((color & 0x20) && ((color & 0x0F) < 0x0D));
++}
++
++void VSBeamGun::latch(bool data) {
++  if(latched == data) return;
++  latched = data;
++}
++
++VSBeamGun::VSBeamGun(unsigned port) : Controller(port) {
++  create(Controller::Enter, system.cpu_frequency());
++  latched = 0;
++
++  //center cursor onscreen
++  x = 256 / 2;
++  y = 240 / 2;
++}
++
++#endif
+diff --git a/fc/controller/vsbeamgun/vsbeamgun.hpp b/fc/controller/vsbeamgun/vsbeamgun.hpp
+new file mode 100644
+index 0000000..595a614
+--- /dev/null
++++ b/fc/controller/vsbeamgun/vsbeamgun.hpp
+@@ -0,0 +1,19 @@
++struct VSBeamGun : Controller {
++  void enter();
++  uint5 data();
++  bool read_light();
++  void latch(bool data);
++  VSBeamGun(unsigned port);
++
++//private:
++  bool latched;
++  unsigned counter;
++
++  signed x, y;
++  unsigned light;
++  unsigned triggertime;
++
++  bool offscreen;
++
++  bool triggerlock;
++};
+diff --git a/fc/controller/vspanel/vspanel.cpp b/fc/controller/vspanel/vspanel.cpp
+new file mode 100644
+index 0000000..2e0fa57
+--- /dev/null
++++ b/fc/controller/vspanel/vspanel.cpp
+@@ -0,0 +1,54 @@
++#ifdef CONTROLLER_CPP
++
++uint5 VSPanel::data() {
++  unsigned data = 0x00;
++  if(interface->inputPoll(port, (unsigned)Input::Device::VSPanel, 4)) data |= 0x01; // service button
++  if(interface->inputPoll(port, (unsigned)Input::Device::VSPanel, 5)) data |= 0x08; // coin 1
++  if(interface->inputPoll(port, (unsigned)Input::Device::VSPanel, 6)) data |= 0x10; // coin 2
++  // data will be left-shifted twice and OR'd into $4016 in CPU
++  return data;
++}
++
++uint2 VSPanel::data1() {
++  if(counter1 >= 8) return 1;
++  if(latched == 1) return 0;
++
++  switch(counter1++) { default: return 0;
++  case 2: return b1;
++  case 3: return b3;
++  }
++}
++
++uint5 VSPanel::data2() {
++  if(counter2 >= 8) return 1;
++  if(latched == 1) return 0;
++
++  switch(counter2++) { default: return 0;
++  case 2: return b2;
++  case 3: return b4;
++  }
++}
++
++void VSPanel::latch(bool data) {
++  if(latched == data) return;
++  latched = data;
++  counter1 = 0;
++  counter2 = 0;
++
++  if(latched == 0) {
++    b1 = interface->inputPoll(port, (unsigned)Input::Device::VSPanel, 0);
++    b2 = interface->inputPoll(port, (unsigned)Input::Device::VSPanel, 1);
++    b3 = interface->inputPoll(port, (unsigned)Input::Device::VSPanel, 2);
++    b4 = interface->inputPoll(port, (unsigned)Input::Device::VSPanel, 3);
++  }
++}
++
++VSPanel::VSPanel(unsigned port) : Controller(port) {
++  latched = 0;
++  counter1 = 0;
++  counter2 = 0;
++
++  b1 = b2 = b3 = b4 = 0;
++}
++
++#endif
+diff --git a/fc/controller/vspanel/vspanel.hpp b/fc/controller/vspanel/vspanel.hpp
+new file mode 100644
+index 0000000..22d9764
+--- /dev/null
++++ b/fc/controller/vspanel/vspanel.hpp
+@@ -0,0 +1,14 @@
++struct VSPanel : Controller {
++  uint5 data();
++  uint2 data1();
++  uint5 data2();
++  void latch(bool data);
++  VSPanel(unsigned port);
++
++private:
++  bool latched;
++  unsigned counter1;
++  unsigned counter2;
++
++  bool b1, b2, b3, b4;
++};
 diff --git a/fc/cpu/cpu.cpp b/fc/cpu/cpu.cpp
 index 652e138..bcf4e96 100644
 --- a/fc/cpu/cpu.cpp
@@ -2739,6 +6331,104 @@ index 8654710..0000000
 -  status.rdy_addr_valid = valid;
 -  status.rdy_addr_value = value;
 -}
+diff --git a/fc/cpu/timing/timing.cpp b/fc/cpu/timing/timing.cpp
+new file mode 100644
+index 0000000..cb57830
+--- /dev/null
++++ b/fc/cpu/timing/timing.cpp
+@@ -0,0 +1,72 @@
++#ifdef CPU_CPP
++
++void CPU::add_clocks(unsigned clocks) {
++  step(clocks);
++}
++
++uint8 CPU::op_read(uint16 addr) {
++  if(status.oam_dma_pending) {
++    status.oam_dma_pending = false;
++    op_read(addr);
++    oam_dma();
++  }
++
++  while(status.rdy_line == 0) {
++    regs.mdr = bus.read(status.rdy_addr_valid ? status.rdy_addr_value : addr);
++    add_clocks(system.region() == System::Region::NTSC ? 12 : 16);
++  }
++
++  regs.mdr = bus.read(addr);
++  add_clocks(system.region() == System::Region::NTSC ? 12 : 16);
++  return regs.mdr;
++}
++
++void CPU::op_write(uint16 addr, uint8 data) {
++  bus.write(addr, regs.mdr = data);
++  add_clocks(system.region() == System::Region::NTSC ? 12 : 16);
++}
++
++void CPU::last_cycle() {
++  status.interrupt_pending = ((status.irq_line | status.irq_apu_line) & ~regs.p.i) | status.nmi_pending;
++}
++
++void CPU::nmi(uint16 &vector) {
++  if(status.nmi_pending) {
++    status.nmi_pending = false;
++    vector = 0xfffa;
++  }
++}
++
++void CPU::oam_dma() {
++  for(unsigned n = 0; n < 256; n++) {
++    uint8 data = op_read((status.oam_dma_page << 8) + n);
++    op_write(0x2004, data);
++  }
++}
++
++void CPU::set_nmi_line(bool line) {
++  //edge-sensitive (0->1)
++  if(!status.nmi_line && line) status.nmi_pending = true;
++  status.nmi_line = line;
++}
++
++void CPU::set_irq_line(bool line) {
++  //level-sensitive
++  status.irq_line = line;
++}
++
++void CPU::set_irq_apu_line(bool line) {
++  //level-sensitive
++  status.irq_apu_line = line;
++}
++
++void CPU::set_rdy_line(bool line) {
++  status.rdy_line = line;
++}
++
++void CPU::set_rdy_addr(bool valid, uint16 value) {
++  status.rdy_addr_valid = valid;
++  status.rdy_addr_value = value;
++}
++
++#endif
+diff --git a/fc/cpu/timing/timing.hpp b/fc/cpu/timing/timing.hpp
+new file mode 100644
+index 0000000..4317e6c
+--- /dev/null
++++ b/fc/cpu/timing/timing.hpp
+@@ -0,0 +1,14 @@
++void add_clocks(unsigned clocks);
++uint8 op_read(uint16 addr);
++void op_write(uint16 addr, uint8 data);
++void last_cycle();
++void nmi(uint16 &vector);
++
++void oam_dma();
++
++void set_nmi_line(bool);
++void set_irq_line(bool);
++void set_irq_apu_line(bool);
++
++void set_rdy_line(bool);
++void set_rdy_addr(bool valid, uint16 value = 0);
 diff --git a/fc/fc.hpp b/fc/fc.hpp
 index 3fce8b0..ad8d27e 100644
 --- a/fc/fc.hpp
@@ -3564,6 +7254,122 @@ index 518a5d4..7842e09 100644
  };
  
  extern Scheduler scheduler;
+diff --git a/fc/system/input.cpp b/fc/system/input.cpp
+new file mode 100644
+index 0000000..c9b795c
+--- /dev/null
++++ b/fc/system/input.cpp
+@@ -0,0 +1,74 @@
++#ifdef SYSTEM_CPP
++
++Input input;
++
++void Input::connect(uint2 port, Device id) {
++  Controller*& controller = (
++    port == Controller::Port1 ? port1 :
++    port == Controller::Port2 ? port2 :
++                                expansion
++  );
++  if(controller) {
++    delete controller;
++    controller = nullptr;
++  }
++
++  if(port < 2) {
++    switch(id) { default:
++    case Device::None: controller = new Controller(port); break;
++    case Device::Joypad: controller = new Gamepad(port); break;
++    case Device::FourScore: controller = new FourScore(port); break;
++    case Device::BeamGun:
++      if(!system.vs()) controller = new BeamGun(port);
++      else             controller = new VSBeamGun(port);
++      break;
++    case Device::FamilyTrainer: controller = new FamilyTrainer(port); break;
++    }
++  } else {
++    switch(id) { default:
++    case Device::None: controller = new Controller(port); break;
++    case Device::Joypad: controller = new Gamepad(port); break;
++    case Device::FourPlayers: controller = new FourPlayers(port); break;
++    case Device::BeamGun: controller = new BeamGun(port); break;
++    case Device::FamilyTrainer: controller = new FamilyTrainer(port); break;
++    case Device::VSPanel: controller = new VSPanel(port); break;
++    }
++  }
++
++  switch(port) {
++  case Controller::Port1: configuration.controller_port1 = id; break;
++  case Controller::Port2: configuration.controller_port2 = id; break;
++  case Controller::ExpansionPort: configuration.expansion_port = id; break;
++  }
++
++  /*switch(port) {
++  case Controller::Port1:
++    if(id == Device::FourScore && configuration.controller_port2 != Device::FourScore) {
++      connect(Controller::Port2, Device::FourScore);
++    } else if(id != Device::FourScore && configuration.controller_port2 == Device::FourScore) {
++      connect(Controller::Port2, Device::None);
++    }
++    break;
++  case Controller::Port2:
++    if(id == Device::FourScore && configuration.controller_port1 != Device::FourScore) {
++      connect(Controller::Port1, Device::FourScore);
++    } else if(id != Device::FourScore && configuration.controller_port1 == Device::FourScore) {
++      connect(Controller::Port1, Device::None);
++    }
++    break;
++  }*/
++}
++
++Input::Input() {
++  connect(Controller::Port1, Input::Device::Joypad);
++  connect(Controller::Port2, Input::Device::Joypad);
++  connect(Controller::ExpansionPort, Input::Device::Joypad);
++}
++
++Input::~Input() {
++  if(port1) delete port1;
++  if(port2) delete port2;
++  if(expansion) delete expansion;
++}
++
++#endif
+diff --git a/fc/system/input.hpp b/fc/system/input.hpp
+new file mode 100644
+index 0000000..0e84001
+--- /dev/null
++++ b/fc/system/input.hpp
+@@ -0,0 +1,30 @@
++struct Input {
++  enum class Device : unsigned {
++    Joypad        = 0,
++    FourPlayers   = 1,
++    FourScore     = 1,
++    BeamGun       = 2,
++    FamilyTrainer = 3,
++    VSPanel       = 4,
++    None          = 5,
++  };
++
++  enum class JoypadID : unsigned {
++    A  =  0, B    =  1, Select =  2, Start =  3,
++    Up =  4, Down =  5, Left   =  6, Right =  7,
++  };
++
++  enum class BeamGunID : unsigned {
++    X = 0, Y = 1, Trigger = 2,
++  };
++
++  Controller* port1 = nullptr;
++  Controller* port2 = nullptr;
++  Controller* expansion = nullptr;
++
++  void connect(uint2 port, Device device);
++  Input();
++  ~Input();
++};
++
++extern Input input;
 diff --git a/fc/system/serialization.cpp b/fc/system/serialization.cpp
 index 1d2c750..55d9586 100644
 --- a/fc/system/serialization.cpp
@@ -3845,6 +7651,221 @@ index 88b73c5..019142a 100644
 +};
 +
 +extern Configuration configuration;
+diff --git a/fc/system/video.cpp b/fc/system/video.cpp
+new file mode 100644
+index 0000000..5fe221a
+--- /dev/null
++++ b/fc/system/video.cpp
+@@ -0,0 +1,183 @@
++#ifdef SYSTEM_CPP
++
++Video video;
++
++void Video::generate_palette(Emulator::Interface::PaletteMode mode) {
++  unsigned emphasis;
++  unsigned luma;
++  unsigned chroma;
++  for(unsigned color = 0; color < (1 << 9); color++) {
++    if(mode == Emulator::Interface::PaletteMode::Literal) {
++      palette[color] = color;
++      continue;
++    }
++    switch(ppu.revision) { default:
++    case PPU::Revision::RP2C02C:
++    case PPU::Revision::RP2C02G:
++    case PPU::Revision::RP2C07:
++      if(mode == Emulator::Interface::PaletteMode::Standard) {
++        palette[color] = generate_color(color, 2.0, 0.0, 1.0, 1.0, 2.2);
++      } else if(mode == Emulator::Interface::PaletteMode::Channel) {
++        emphasis = image::normalize((color >> 6) &  7, 3, 16);
++        luma     = image::normalize((color >> 4) &  3, 2, 16);
++        chroma   = image::normalize((color >> 0) & 15, 4, 16);
++        palette[color] = interface->videoColor(color, 0, emphasis, luma, chroma);
++      } else if(mode == Emulator::Interface::PaletteMode::Emulation) {
++        palette[color] = generate_color(color, 2.0, 0.0, 1.0, 1.0, 1.8);
++      }
++      break;
++    case PPU::Revision::RP2C03B:
++    case PPU::Revision::RP2C03G:
++    case PPU::Revision::RC2C03B:
++    case PPU::Revision::RC2C03C:
++    case PPU::Revision::RC2C05_01:
++    case PPU::Revision::RC2C05_02:
++    case PPU::Revision::RC2C05_03:
++    case PPU::Revision::RC2C05_04:
++    case PPU::Revision::RC2C05_05:
++      palette[color] = retrieve_color(PPU::RP2C03[color & 63], color);
++      break;
++    case PPU::Revision::RP2C04_0001:
++      palette[color] = retrieve_color(PPU::RP2C04_0001[color & 63], color);
++      break;
++    case PPU::Revision::RP2C04_0002:
++      palette[color] = retrieve_color(PPU::RP2C04_0002[color & 63], color);
++      break;
++    case PPU::Revision::RP2C04_0003:
++      palette[color] = retrieve_color(PPU::RP2C04_0003[color & 63], color);
++      break;
++    case PPU::Revision::RP2C04_0004:
++      palette[color] = retrieve_color(PPU::RP2C04_0004[color & 63], color);
++      break;
++    } 
++  }
++}
++
++Video::Video() {
++  palette = new uint32_t[1 << 9]();
++}
++
++Video::~Video() {
++  delete[] palette;
++}
++
++//internal
++
++uint32_t Video::generate_color(
++  unsigned n, double saturation, double hue,
++  double contrast, double brightness, double gamma
++) {
++  signed color = (n & 0x0f), level = color < 0xe ? (n >> 4) & 3 : 1;
++
++  static const double black = 0.518, white = 1.962, attenuation = 0.746;
++  static const double levels[8] = {
++    0.350, 0.518, 0.962, 1.550,
++    1.094, 1.506, 1.962, 1.962,
++  };
++
++  double lo_and_hi[2] = {
++    levels[level + 4 * (color == 0x0)],
++    levels[level + 4 * (color <  0xd)],
++  };
++
++  double y = 0.0, i = 0.0, q = 0.0;
++  auto wave = [](signed p, signed color) { return (color + p + 8) % 12 < 6; };
++  for(signed p = 0; p < 12; p++) {
++    double spot = lo_and_hi[wave(p, color)];
++
++    if(((n & 0x040) && wave(p, 12))
++    || ((n & 0x080) && wave(p,  4))
++    || ((n & 0x100) && wave(p,  8))
++    ) spot *= attenuation;
++
++    double v = (spot - black) / (white - black);
++
++    v = (v - 0.5) * contrast + 0.5;
++    v *= brightness / 12.0;
++
++    y += v;
++    i += v * std::cos((3.141592653 / 6.0) * (p + hue));
++    q += v * std::sin((3.141592653 / 6.0) * (p + hue));
++  }
++
++  i *= saturation;
++  q *= saturation;
++
++  auto gammaAdjust = [=](double f) { return f < 0.0 ? 0.0 : std::pow(f, 2.2 / gamma); };
++  unsigned r = 65535.0 * gammaAdjust(y +  0.946882 * i +  0.623557 * q);
++  unsigned g = 65535.0 * gammaAdjust(y + -0.274788 * i + -0.635691 * q);
++  unsigned b = 65535.0 * gammaAdjust(y + -1.108545 * i +  1.709007 * q);
++
++  return interface->videoColor(n, 0, uclamp<16>(r), uclamp<16>(g), uclamp<16>(b));
++}
++
++uint32_t Video::retrieve_color(uint9_t palette_index, unsigned color) {
++  unsigned em_r = ((color >> 6) & 1) * 7;
++  unsigned em_g = ((color >> 7) & 1) * 7;
++  unsigned em_b = ((color >> 8) & 1) * 7;
++  return interface->videoColor(color, 0,
++    uclamp<16>((((palette_index >> 6) | em_r) & 7) * 9362.25),
++    uclamp<16>((((palette_index >> 3) | em_g) & 7) * 9362.25),
++    uclamp<16>((((palette_index >> 0) | em_b) & 7) * 9362.25)
++  );
++}
++
++const uint8_t Video::cursor[15 * 15] = {
++  0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,
++  0,0,0,0,1,1,2,2,2,1,1,0,0,0,0,
++  0,0,0,1,2,2,1,2,1,2,2,1,0,0,0,
++  0,0,1,2,1,1,0,1,0,1,1,2,1,0,0,
++  0,1,2,1,0,0,0,1,0,0,0,1,2,1,0,
++  0,1,2,1,0,0,1,2,1,0,0,1,2,1,0,
++  1,2,1,0,0,1,1,2,1,1,0,0,1,2,1,
++  1,2,2,1,1,2,2,2,2,2,1,1,2,2,1,
++  1,2,1,0,0,1,1,2,1,1,0,0,1,2,1,
++  0,1,2,1,0,0,1,2,1,0,0,1,2,1,0,
++  0,1,2,1,0,0,0,1,0,0,0,1,2,1,0,
++  0,0,1,2,1,1,0,1,0,1,1,2,1,0,0,
++  0,0,0,1,2,2,1,2,1,2,2,1,0,0,0,
++  0,0,0,0,1,1,2,2,2,1,1,0,0,0,0,
++  0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,
++};
++
++void Video::draw_cursor(uint16_t color, int x, int y) {
++  uint32_t* data = (uint32_t*)ppu.buffer;
++
++  for(int cy = 0; cy < 15; cy++) {
++    int vy = y + cy - 7;
++    if(vy <= 0 || vy >= 240) continue;  //do not draw offscreen
++
++    for(int cx = 0; cx < 15; cx++) {
++      int vx = x + cx - 7;
++      if(vx < 0 || vx >= 256) continue;  //do not draw offscreen
++      uint8_t pixel = cursor[cy * 15 + cx];
++      if(pixel == 0) continue;
++      uint32_t pixelcolor = (pixel == 1) ? 0x0f : color;
++
++      *((uint32_t*)data + vy * 256 + vx) = pixelcolor;
++    }
++  }
++}
++
++void Video::update() {
++  if(configuration.controller_port2 == Input::Device::BeamGun) {
++    BeamGun &device = (BeamGun&)*input.port2;
++    draw_cursor(0x27, device.x, device.y);
++  }
++  if(configuration.expansion_port == Input::Device::BeamGun) {
++    BeamGun &device = (BeamGun&)*input.expansion;
++    draw_cursor(0x2D, device.x, device.y);
++  }
++
++  interface->videoRefresh(video.palette, ppu.buffer, 4 * 256, 256, 240);
++}
++
++void Video::scanline() {
++  unsigned y = ppu.status.ly;
++  if(y >= 240) return;
++}
++
++void Video::init() {
++}
++
++#endif
+diff --git a/fc/system/video.hpp b/fc/system/video.hpp
+new file mode 100644
+index 0000000..8440946
+--- /dev/null
++++ b/fc/system/video.hpp
+@@ -0,0 +1,20 @@
++struct Video {
++  uint32_t* palette;
++  void generate_palette(Emulator::Interface::PaletteMode mode);
++  Video();
++  ~Video();
++
++private:
++  void update();
++  void scanline();
++  void init();
++
++  uint32_t generate_color(unsigned, double, double, double, double, double);
++  uint32_t retrieve_color(uint9_t, unsigned);
++  static const uint8_t cursor[15 * 15];
++  void draw_cursor(uint16_t color, int x, int y);
++
++  friend class System;
++};
++
++extern Video video;
 diff --git a/fc/video/video.cpp b/fc/video/video.cpp
 deleted file mode 100644
 index bdb476a..0000000
@@ -4735,6 +8756,15 @@ index 68ee7a8..5ff3a40 100644
  
  protected:
    uint8 op_adc(uint8, uint8);
+diff --git a/profile/PlayChoice-10.sys/manifest.bml b/profile/PlayChoice-10.sys/manifest.bml
+new file mode 100644
+index 0000000..7295b84
+--- /dev/null
++++ b/profile/PlayChoice-10.sys/manifest.bml
+@@ -0,0 +1,3 @@
++system name:PlayChoice-10
++  pc10
++    rom name=bios-dual.rom size=16384
 diff --git a/ruby/input/shared/rawinput.cpp b/ruby/input/shared/rawinput.cpp
 index 8e7a9cd..063384e 100644
 --- a/ruby/input/shared/rawinput.cpp
@@ -5541,6 +9571,20 @@ index f6cd80b..61eb821 100644
  
    void serialize(serializer&);
    PPU();
+diff --git a/sfc/profile-accuracyfast.hpp b/sfc/profile-accuracyfast.hpp
+new file mode 100644
+index 0000000..bee7493
+--- /dev/null
++++ b/sfc/profile-accuracyfast.hpp
+@@ -0,0 +1,8 @@
++#if defined(DEBUGGER)
++  #error "bsnes: debugger not supported with accuracyfast profile."
++#endif
++
++#include <sfc/cpu/cpu.hpp>
++#include <sfc/smp/smp.hpp>
++#include <sfc/alt/dsp/dsp.hpp>
++#include <sfc/ppu/ppu.hpp>
 diff --git a/sfc/sfc.hpp b/sfc/sfc.hpp
 index a9d4b51..ca32458 100644
 --- a/sfc/sfc.hpp
@@ -5838,7 +9882,7 @@ index ae2238b..15128df 100644
    void power();
    void reset();
 diff --git a/target-higan/Makefile b/target-higan/Makefile
-index 6e726ce..85d2baf 100644
+index 6e726ce..2bdba4e 100644
 --- a/target-higan/Makefile
 +++ b/target-higan/Makefile
 @@ -1,4 +1,11 @@
@@ -5854,7 +9898,7 @@ index 6e726ce..85d2baf 100644
  
  processors := arm gsu hg51b lr35902 r6502 r65816 spc700 upd96050
  include processor/Makefile
-@@ -89,29 +96,25 @@ resource:
+@@ -89,29 +96,28 @@ resource:
  	sourcery $(ui)/resource/resource.bml $(ui)/resource/resource.cpp $(ui)/resource/resource.hpp
  
  install:
@@ -5867,7 +9911,7 @@ index 6e726ce..85d2baf 100644
 -	cp -R profile/* /Library/Application\ Support/$(name)
 -	cp data/cheats.bml /Library/Application\ Support/$(name)/cheats.bml
 -	chmod -R 777 /Library/Application\ Support/$(name)
-+	mkdir -p $(DESTDIR)Library/Application\ Support/$(name)
++	install -d $(DESTDIR)Library/Application\ Support/$(name)
 +	cp -R profile/* $(DESTDIR)Library/Application\ Support/$(name)
 +	cp data/cheats.bml $(DESTDIR)Library/Application\ Support/$(name)/cheats.bml
 +	chmod -R 777 $(DESTDIR)Library/Application\ Support/$(name)
@@ -5879,10 +9923,13 @@ index 6e726ce..85d2baf 100644
 -	cp -R profile/* /usr/share/$(name)
 -	cp data/cheats.bml /usr/share/$(name)/cheats.bml
 -	chmod -R 777 /usr/share/$(name)
++	install -d $(DESTDIR)$(prefix)/bin/
 +	cp out/$(name) $(DESTDIR)$(prefix)/bin/$(name)
++	install -d $(DESTDIR)$(prefix)/share/pixmaps/
 +	cp data/$(name).png $(DESTDIR)$(prefix)/share/pixmaps/$(name).png
++	install -d $(DESTDIR)$(prefix)/share/applications/
 +	cp data/$(name).desktop $(DESTDIR)$(prefix)/share/applications/$(name).desktop
-+	mkdir -p $(DESTDIR)usr/share/$(name)
++	install -d $(DESTDIR)usr/share/$(name)
 +	cp -R profile/* $(DESTDIR)usr/share/$(name)
 +	cp data/cheats.bml $(DESTDIR)usr/share/$(name)/cheats.bml
 +	chmod -R 777 $(DESTDIR)usr/share/$(name)
@@ -5981,7 +10028,7 @@ index 5b3fb92..245a86f 100644
  
    void saveState(unsigned slot);
 diff --git a/target-loki/Makefile b/target-loki/Makefile
-index 28b9d9b..c9f1381 100644
+index 28b9d9b..2d3d201 100644
 --- a/target-loki/Makefile
 +++ b/target-loki/Makefile
 @@ -1,4 +1,10 @@
@@ -5996,7 +10043,7 @@ index 28b9d9b..c9f1381 100644
  
  processors := arm gsu hg51b lr35902 r65816 spc700 upd96050
  include processor/Makefile
-@@ -72,25 +78,21 @@ resource:
+@@ -72,25 +78,22 @@ resource:
  	sourcery $(ui)/resource/resource.bml $(ui)/resource/resource.cpp $(ui)/resource/resource.hpp
  
  install:
@@ -6008,7 +10055,7 @@ index 28b9d9b..c9f1381 100644
 -	mkdir -p /Library/Application\ Support/$(name)
 -	cp -R profile/* /Library/Application\ Support/$(name)
 -	chmod -R 777 /Library/Application\ Support/$(name)
-+	mkdir -p $(DESTDIR)Library/Application\ Support/$(name)
++	install -d $(DESTDIR)Library/Application\ Support/$(name)
 +	cp -R profile/* $(DESTDIR)Library/Application\ Support/$(name)
 +	chmod -R 777 $(DESTDIR)Library/Application\ Support/$(name)
  else
@@ -6016,8 +10063,9 @@ index 28b9d9b..c9f1381 100644
 -	mkdir -p /usr/share/$(name)
 -	cp -R profile/* /usr/share/$(name)
 -	chmod -R 777 /usr/share/$(name)
++	install -d $(DESTDIR)$(prefix)/bin/
 +	cp out/$(name) $(DESTDIR)$(prefix)/bin/$(name)
-+	mkdir -p $(DESTDIR)usr/share/$(name)
++	install -d $(DESTDIR)usr/share/$(name)
 +	cp -R profile/* $(DESTDIR)usr/share/$(name)
 +	chmod -R 777 $(DESTDIR)usr/share/$(name)
  endif
