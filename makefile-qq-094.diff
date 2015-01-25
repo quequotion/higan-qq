@@ -76,9 +76,9 @@ index 1222d8c..3daf9b3 100644
 +	cp data/higan.png $(DESTDIR)$(prefix)/share/pixmaps/$(name).png
 +	install -d $(DESTDIR)$(prefix)/share/applications/
 +	cp data/higan.desktop $(DESTDIR)$(prefix)/share/applications/$(name).desktop
-+	install -d $(DESTDIR)usr/share/$(name)
-+	cp -R profile/* $(DESTDIR)usr/share/$(name)
-+	cp data/cheats.bml $(DESTDIR)usr/share/$(name)/cheats.bml
++	install -d $(DESTDIR)/usr/share/$(name)
++	cp -R profile/* $(DESTDIR)/usr/share/$(name)
++	cp data/cheats.bml $(DESTDIR)/usr/share/$(name)/cheats.bml
 +	#chmod -R 777 $(DESTDIR)usr/share/$(name)
  endif
  
@@ -128,9 +128,9 @@ index 1222d8c..3daf9b3 100644
 -	chmod -R 777 /usr/share/$(name)
 +	install -d $(DESTDIR)$(prefix)/bin/
 +	cp out/$(name) $(DESTDIR)$(prefix)/bin/$(name)
-+	install -d $(DESTDIR)usr/share/$(name)
-+	cp -R profile/* $(DESTDIR)usr/share/$(name)
-+	#chmod -R 777 $(DESTDIR)usr/share/$(name)
++	install -d $(DESTDIR)/usr/share/$(name)
++	cp -R profile/* $(DESTDIR)/usr/share/$(name)
++	#chmod -R 777 $(DESTDIR)/usr/share/$(name)
  endif
  
  uninstall:
@@ -171,17 +171,17 @@ index 7eb377b..b2ba0ce 100644
 -	sudo cp libananke.dylib $(path)/libananke.1.dylib
 -	sudo ln -s $(path)/libananke.1.dylib $(path)/libananke.dylib
 +	#if [ ! -d ~/Library/Application\ Support/ananke ]; then install -d ~/Library/Application\ Support/ananke; fi
-+	install -d $(DESTDIR)$(path)
++	install -d $(DESTDIR)$(path)/
 +	cp libananke.dylib $(DESTDIR)$(prefix)/libananke.1.dylib
-+	ln -s $(path)/libananke.1.dylib $(DESTDIR)$(prefix)/libananke.dylib
++	ln -s $(prefix)/libananke.1.dylib $(DESTDIR)$(prefix)/libananke.dylib
  else
 -	if [ ! -d ~/.config/ananke ]; then mkdir ~/.config/ananke; fi
 -	sudo cp libananke.so $(path)/libananke.so.1
 -	sudo ln -s $(path)/libananke.so.1 $(path)/libananke.so
 +	#if [ ! -d ~/.config/ananke ]; then install -d ~/.config/ananke; fi
-+	install -d $(DESTDIR)$(prefix)
++	install -d $(DESTDIR)$(prefix)/
 +	cp libananke.so $(DESTDIR)$(prefix)/libananke.so.1
-+	ln -s $(DESTDIR)$(path)/libananke.so.1 $(DESTDIR)$(prefix)/libananke.so
++	ln -s $(DESTDIR)$(prefix)/libananke.so.1 $(DESTDIR)$(prefix)/libananke.so
  endif
  
  uninstall:
@@ -189,13 +189,13 @@ index 7eb377b..b2ba0ce 100644
  else ifeq ($(platform),macosx)
 -	if [ -f $(path)/libananke.dylib ]; then sudo rm $(path)/libananke.dylib; fi
 -	if [ -f $(path)/libananke.1.dylib ]; then sudo rm $(path)/libananke.1.dylib; fi
-+	if [ -f $(DESTDIR)$(path)/libananke.dylib ]; then rm $(DESTDIR)$(prefix)/libananke.dylib; fi
-+	if [ -f $(DESTDIR)$(path)/libananke.1.dylib ]; then rm $(DESTDIR)$(prefix)/libananke.1.dylib; fi
++	if [ -f $(DESTDIR)$(prefix)/libananke.dylib ]; then rm $(DESTDIR)$(prefix)/libananke.dylib; fi
++	if [ -f $(DESTDIR)$(prefix)/libananke.1.dylib ]; then rm $(DESTDIR)$(prefix)/libananke.1.dylib; fi
  else
 -	if [ -f $(path)/libananke.so ]; then sudo rm $(path)/libananke.so; fi
 -	if [ -f $(path)/libananke.so.1 ]; then sudo rm $(path)/libananke.so.1; fi
-+	if [ -f $(DESTDIR)$(path)/libananke.so ]; then rm $(DESTDIR)$(prefix)/libananke.so; fi
-+	if [ -f $(DESTDIR)$(path)/libananke.so.1 ]; then rm $(DESTDIR)$(prefix)/libananke.so.1; fi
++	if [ -f $(DESTDIR)$(prefix)/libananke.so ]; then rm $(DESTDIR)$(prefix)/libananke.so; fi
++	if [ -f $(DESTDIR)$(prefix)/libananke.so.1 ]; then rm $(DESTDIR)$(prefix)/libananke.so.1; fi
  endif
  
  force:
