@@ -105,7 +105,7 @@ index e2fe173..734d976 100644
  }
  
 +void Utility::savemempak() {
-+  system().unload();
++  system().savemempak();
 +}
 +
  void Utility::unload() {
