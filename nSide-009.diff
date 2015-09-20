@@ -22682,17 +22682,6 @@ diff -Nru higan/shaders/Scanline.shader/manifest.bml higan/shaders/Scanline.shad
 +
 +program
    fragment: scanline.fs
-diff -Nru higan/target-tomoko/GNUmakefile higan/target-tomoko/GNUmakefile
---- higan/target-tomoko/GNUmakefile	2015-09-16 02:20:06.422574585 +0900
-+++ higan/target-tomoko/GNUmakefile	2015-09-16 14:06:40.928923131 +0900
-@@ -1,4 +1,6 @@
--name := tomoko
-+ifndef name
-+  name := tomoko
-+endif
- 
- processors := arm gsu hg51b lr35902 r6502 r65816 spc700 upd96050
- include processor/GNUmakefile
 diff -Nru higan/target-tomoko/presentation/presentation.cpp higan/target-tomoko/presentation/presentation.cpp
 --- higan/target-tomoko/presentation/presentation.cpp	2015-09-16 02:20:06.422574585 +0900
 +++ higan/target-tomoko/presentation/presentation.cpp	2015-09-16 14:06:40.927923131 +0900
