@@ -1,0 +1,58 @@
+diff --git a/emulator/emulator.hpp b/emulator/emulator.hpp
+index bab451f..cd2a378 100644
+--- a/emulator/emulator.hpp
++++ b/emulator/emulator.hpp
+@@ -15,6 +15,8 @@ namespace Emulator {
+ 
+   #if defined(PROFILE_ACCURACY)
+   static const string Profile = "Accuracy";
++  #elif defined(PROFILE_ACCURACYFAST)
++  static const string Profile = "Accuracyfast";
+   #elif defined(PROFILE_BALANCED)
+   static const string Profile = "Balanced";
+   #elif defined(PROFILE_PERFORMANCE)
+diff --git a/sfc/GNUmakefile b/sfc/GNUmakefile
+index f18b65a..fc1c0d9 100644
+--- a/sfc/GNUmakefile
++++ b/sfc/GNUmakefile
+@@ -17,6 +17,12 @@ ifeq ($(profile),accuracy)
+   sfcsmp := $(sfc)/smp
+   sfcdsp := $(sfc)/dsp
+   sfcppu := $(sfc)/ppu
++else ifeq ($(profile),accuracyfast)
++  flags += -DPROFILE_ACCURACYFAST
++  sfccpu := $(sfc)/cpu
++  sfcsmp := $(sfc)/smp
++  sfcdsp := $(sfc)/alt/dsp
++  sfcppu := $(sfc)/ppu
+ else ifeq ($(profile),balanced)
+   flags += -DPROFILE_BALANCED
+   sfccpu := $(sfc)/cpu
+diff --git a/sfc/profile-accuracyfast.hpp b/sfc/profile-accuracyfast.hpp
+new file mode 100644
+index 0000000..bee7493
+--- /dev/null
++++ b/sfc/profile-accuracyfast.hpp
+@@ -0,0 +1,8 @@
++#if defined(DEBUGGER)
++  #error "bsnes: debugger not supported with accuracyfast profile."
++#endif
++
++#include <sfc/cpu/cpu.hpp>
++#include <sfc/smp/smp.hpp>
++#include <sfc/alt/dsp/dsp.hpp>
++#include <sfc/ppu/ppu.hpp>
+diff --git a/sfc/sfc.hpp b/sfc/sfc.hpp
+index 1a1fdad..b5253aa 100644
+--- a/sfc/sfc.hpp
++++ b/sfc/sfc.hpp
+@@ -57,6 +57,8 @@ namespace SuperFamicom {
+ 
+   #if defined(PROFILE_ACCURACY)
+   #include "profile-accuracy.hpp"
++  #elif defined(PROFILE_ACCURACYFAST)
++  #include "profile-accuracyfast.hpp"
+   #elif defined(PROFILE_BALANCED)
+   #include "profile-balanced.hpp"
+   #elif defined(PROFILE_PERFORMANCE)
+
