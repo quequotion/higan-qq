@@ -2497,7 +2497,7 @@ Binary files higan/target-ethos/resource/video.png and higan/target-ethos/resour
 diff -Nru higan/target-ethos/settings/advanced.cpp higan/target-ethos/settings/advanced.cpp
 --- higan/target-ethos/settings/advanced.cpp	1970-01-01 09:00:00.000000000 +0900
 +++ higan/target-ethos/settings/advanced.cpp	2015-09-16 14:06:03.420919283 +0900
-@@ -0,0 +1,88 @@
+@@ -0,0 +1,86 @@
 +AdvancedSettings* advancedSettings = nullptr;
 +
 +AdvancedSettings::AdvancedSettings() {
@@ -2518,14 +2518,12 @@ diff -Nru higan/target-ethos/settings/advanced.cpp higan/target-ethos/settings/a
 +  infoLabel.setFont(program->boldFont);
 +  infoLabel.setText({
 +    "ethos v", Emulator::Version, "\n",
-+    "Based on ", Emulator::OriginalName, " v", Emulator::FromVersion, "\n",
 +    #if defined(PROFILE_ACCURACY) or defined(PROFILE_BALANCED) or defined(PROFILE_PERFORMANCE)
 +    "  ", Emulator::Profile, " Profile\n",
 +    #endif
-+    "  Original Author: ", Emulator::Author, "\n",
-+    "  Contributors: ", Emulator::Contributors, "\n",
++    "  Author: ", Emulator::Author, "\n",
 +    "  License: ", Emulator::License, "\n",
-+    "  Website of ", Emulator::OriginalName, ": ", Emulator::Website
++    "  Website: ", Emulator::Website
 +  });
 +
 +  //lstring list;
