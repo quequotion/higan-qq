@@ -41,8 +41,8 @@ index 64c245f..b7923e9 100644
 +  BSXF.close();
 +  uint16 Signal_Nb=regs.r2188^(regs.r2189*256);
 +  string filenm;
-+  filenm.reserve(nall::configpath().length()+21+4+3);//configpath + bsxdat path + channel + program
-+  sprintf(filenm.data(), "%shigan/bsxdat/BSX%04.4hX-%d.bin", (const char*)nall::configpath(), Signal_Nb, filenumber);
++  filenm.reserve(nall::configpath().length()+21+4+3); //configpath + bsxdat path + channel + program
++  sprintf(filenm.get(), "%shigan/bsxdat/BSX%04.4hX-%d.bin", (const char*)nall::configpath(), Signal_Nb, filenumber);
 +  BSXF.open(filenm.data(), file::mode::read);
 +  if(BSXF.size()!= -1) {
 +    regs.BSX_access=true;
@@ -62,7 +62,7 @@ index 64c245f..b7923e9 100644
 +  uint16 Signal_Nb=regs.r218e^(regs.r218f*256);
 +  string filenm;
 +  filenm.reserve(nall::configpath().length()+21+4+3); //configpath + bsxdat path + channel + program
-+  sprintf(filenm.data(), "%shigan/bsxdat/BSX%04.4hX-%d.bin", (const char*)nall::configpath(), Signal_Nb, filenumber);
++  sprintf(filenm.get(), "%shigan/bsxdat/BSX%04.4hX-%d.bin", (const char*)nall::configpath(), Signal_Nb, filenumber);
 +  BSXF2.open(filenm.data(), file::mode::read);
 +  if(BSXF2.size()!= -1) {
 +    regs.BSX2_access=true;
@@ -581,7 +581,7 @@ index f74d54b..4724783 100644
  }
  
 +auto SatellaviewCartridge::savemempak() -> void {
-+  if(cartridge.has_bs_slot()) {
++  if(cartridge.hasSatellaviewSlot()) {
 +    if(memory.size() >= 1) {
 +      file MEMPAK;
 +      string mempakpath = {nall::configpath(), "higan/bsxmem/"}; //TODO: user configurable path
@@ -589,7 +589,7 @@ index f74d54b..4724783 100644
 +      string filenm; //char filenm [25];
 +      filenm.reserve(mempakpath.length()+9); //mempakpath + filename
 +      bool writeisdone = false;
-+      sprintf(filenm.data(), "%smempak.bs", (const char*)mempakpath.data()); //TODO: user configurable name; foltainer?
++      sprintf(filenm.get(), "%smempak.bs", (const char*)mempakpath.data()); //TODO: user configurable name; foltainer?
 +      if (MEMPAK.open(filenm, file::mode::write)) {
 +        int x;
 +        for (x=0; x <= memory.size()-1; x++) {
