@@ -1,0 +1,138 @@
+diff --git a/GNUmakefile b/GNUmakefile
+index 232b7fc..4280a4a 100644
+--- a/GNUmakefile
++++ b/GNUmakefile
+@@ -5,8 +5,18 @@ sfc := sfc
+ gb  := gb
+ gba := gba
+ 
+-profile := accuracy
+-target := tomoko
++ifndef profile
++  profile := accuracy
++endif
++ifndef target
++  target := tomoko
++endif
++
++ifeq ($(target),loki)
++  options += debugger
++else ifeq ($(target),laevateinn)
++  options += debugger
++endif
+ 
+ # arch := x86
+ # console := true
+@@ -23,7 +33,8 @@ ifeq ($(pgo),instrument)
+   flags += -fprofile-generate
+   link += -lgcov
+ else ifeq ($(pgo),optimize)
+-  flags += -fprofile-use
++  flags += -fprofile-use -fprofile-correction
++  link += -lgcov
+ endif
+ 
+ # platform
+diff --git a/icarus/GNUmakefile b/icarus/GNUmakefile
+index bfb434f..ce6e344 100644
+--- a/icarus/GNUmakefile
++++ b/icarus/GNUmakefile
+@@ -1,13 +1,21 @@
+ include ../nall/GNUmakefile
+ include ../hiro/GNUmakefile
+ 
++ifndef name
++  name := icarus
++endif
++
++ifndef DESTDIR
++  DESTDIR := /
++endif
++
+ flags += -O3 -I..
+ link +=
+ objects := obj/hiro.o obj/icarus.o
+ objects += $(if $(call streq,$(platform),windows),obj/resource.o)
+ 
+ all: $(objects)
+-	$(compiler) -o icarus $(objects) $(link) $(hirolink)
++	$(compiler) -o $(name) $(objects) $(link) $(hirolink)
+ 
+ obj/hiro.o: ../hiro/hiro.cpp
+ 	$(compiler) $(hiroflags) -o obj/hiro.o -c ../hiro/hiro.cpp
+@@ -19,11 +27,11 @@ obj/resource.o:
+ 	windres ../hiro/windows/hiro.rc obj/resource.o
+ 
+ clean:
+-	if [ -f ./icarus ]; then rm ./icarus; fi
++	if [ -f ./$(name) ]; then rm ./$(name); fi
+ 	$(call delete,obj/*.o)
+ 
+ install:
+-	if [ -f ./icarus ]; then cp ./icarus $(prefix)/bin/icarus; fi
++	if [ -f ./$(name) ]; then cp ./$(name) $(DESTDIR)$(prefix)/bin/$(name); fi
+ 
+ uninstall:
+-	if [ -f $(prefix)/bin/icarus ]; then rm $(prefix)/bin/icarus; fi
++	if [ -f $(DESTDIR)$(prefix)/bin/$(name) ]; then rm $(DESTDIR)$(prefix)/bin/$(name); fi
+diff --git a/nall/GNUmakefile b/nall/GNUmakefile
+index 1d836fc..790ff34 100644
+--- a/nall/GNUmakefile
++++ b/nall/GNUmakefile
+@@ -51,9 +51,9 @@ ifeq ($(compiler),)
+   else ifeq ($(platform),macosx)
+     compiler := clang++
+   else ifeq ($(platform),linux)
+-    compiler := g++-4.9
++    compiler := g++
+   else ifeq ($(platform),bsd)
+-    compiler := g++49
++    compiler := g++
+   else
+     compiler := g++
+   endif
+diff --git a/target-tomoko/GNUmakefile b/target-tomoko/GNUmakefile
+index 6dc8442..8bbb03b 100644
+--- a/target-tomoko/GNUmakefile
++++ b/target-tomoko/GNUmakefile
+@@ -1,4 +1,10 @@
+-name := tomoko
++ifndef name
++  name := tomoko
++endif
++
++ifndef DESTDIR
++  DESTDIR := /
++endif
+ 
+ processors := arm gsu hg51b lr35902 r6502 r65816 spc700 upd96050
+ include processor/GNUmakefile
+@@ -72,13 +78,13 @@ ifeq ($(shell id -un),root)
+ else ifeq ($(platform),windows)
+ else ifeq ($(platform),macosx)
+ else
+-	mkdir -p $(prefix)/bin/
+-	mkdir -p $(prefix)/share/icons/
+-	mkdir -p $(prefix)/$(name)/
++	mkdir -p $(DESTDIR)$(prefix)/bin/
++	mkdir -p $(DESTDIR)$(prefix)/share/icons/
++	mkdir -p $(DESTDIR)$(prefix)/$(name)/
+ 	mkdir -p ~/Emulation/System/
+-	cp out/$(name) $(prefix)/bin/$(name)
+-	cp data/higan.png $(prefix)/share/icons/$(name).png
+-	cp data/cheats.bml $(prefix)/$(name)/cheats.bml
++	cp out/$(name) $(DESTDIR)$(prefix)/bin/$(name)
++	cp data/higan.png $(DESTDIR)$(prefix)/share/icons/$(name).png
++	cp data/cheats.bml $(DESTDIR)$(prefix)/$(name)/cheats.bml
+ 	cp -R profile/* ~/Emulation/System/
+ endif
+ 
+@@ -88,6 +94,6 @@ ifeq ($(shell id -un),root)
+ else ifeq ($(platform),windows)
+ else ifeq ($(platform),macosx)
+ else
+-	if [ -f $(prefix)/bin/$(name) ]; then rm $(prefix)/bin/$(name); fi
+-	if [ -f $(prefix)/share/icons/$(name).png ]; then rm $(prefix)/share/icons/$(name).png; fi
++	if [ -f $(DESTDIR)$(prefix)/bin/$(name) ]; then rm $(DESTDIR)$(prefix)/bin/$(name); fi
++	if [ -f $(DESTDIR)$(prefix)/share/icons/$(name).png ]; then rm $(DESTDIR)$(prefix)/share/icons/$(name).png; fi
+ endif
