@@ -9,7 +9,7 @@ index 232b7fc..4280a4a 100644
 -profile := accuracy
 -target := tomoko
 +ifndef profile
-+  profile := accuracy
++  profile := accuracyfast
 +endif
 +ifndef target
 +  target := tomoko
