@@ -1,0 +1,211 @@
+diff --git a/target-nSide-t/configuration/configuration.cpp b/target-nSide-t/configuration/configuration.cpp
+index 38391d5..1d21878 100644
+--- a/target-nSide-t/configuration/configuration.cpp
++++ b/target-nSide-t/configuration/configuration.cpp
+@@ -14,7 +14,7 @@ ConfigurationManager::ConfigurationManager() {
+   video.append(video.synchronize, "Synchronize");
+   video.append(video.scale, "Scale");
+   video.append(video.aspectCorrection, "AspectCorrection");
+-  video.append(video.filter, "Filter");
++  video.append(video.shader, "Shader");
+   video.append(video.colorEmulation, "ColorEmulation");
+   video.append(video.saturation, "Saturation");
+   video.append(video.gamma, "Gamma");
+diff --git a/target-nSide-t/configuration/configuration.hpp b/target-nSide-t/configuration/configuration.hpp
+index 9a1c66c..27479c6 100644
+--- a/target-nSide-t/configuration/configuration.hpp
++++ b/target-nSide-t/configuration/configuration.hpp
+@@ -13,9 +13,9 @@ struct ConfigurationManager : Configuration::Document {
+   struct Video : Configuration::Node {
+     string driver;
+     bool synchronize = false;
+-    string scale = "Normal";
++    string scale = "Small";
+     bool aspectCorrection = true;
+-    string filter = "Blur";
++    string shader = "Blur";
+     bool colorEmulation = true;
+     unsigned saturation = 100;
+     unsigned gamma = 100;
+diff --git a/target-nSide-t/presentation/presentation.cpp b/target-nSide-t/presentation/presentation.cpp
+index afdeb4c..a5dcccd 100644
+--- a/target-nSide-t/presentation/presentation.cpp
++++ b/target-nSide-t/presentation/presentation.cpp
+@@ -31,9 +31,14 @@ Presentation::Presentation() {
+ 
+   settingsMenu.setText("Settings");
+   videoScaleMenu.setText("Video Scale");
++  if(config->video.scale == "Tiny") videoScaleTiny.setChecked();
+   if(config->video.scale == "Small") videoScaleSmall.setChecked();
+   if(config->video.scale == "Normal") videoScaleNormal.setChecked();
+   if(config->video.scale == "Large") videoScaleLarge.setChecked();
++  videoScaleTiny.setText("Tiny").onActivate([&] {
++    config->video.scale = "Tiny";
++    resizeViewport();
++  });
+   videoScaleSmall.setText("Small").onActivate([&] {
+     config->video.scale = "Small";
+     resizeViewport();
+@@ -50,11 +55,22 @@ Presentation::Presentation() {
+     config->video.aspectCorrection = aspectCorrection.checked();
+     resizeViewport();
+   });
+-  videoFilterMenu.setText("Video Filter");
+-  if(config->video.filter == "None") videoFilterNone.setChecked();
+-  if(config->video.filter == "Blur") videoFilterBlur.setChecked();
+-  videoFilterNone.setText("None").onActivate([&] { config->video.filter = "None"; program->updateVideoFilter(); });
+-  videoFilterBlur.setText("Blur").onActivate([&] { config->video.filter = "Blur"; program->updateVideoFilter(); });
++  videoShaderMenu.setText("Video Shader");
++  if(config->video.shader == "None") videoShaderNone.setChecked();
++  if(config->video.shader == "Blur") videoShaderBlur.setChecked();
++  if(config->video.shader == "Display Emulation") videoShaderEmulation.setChecked();
++  videoShaderNone.setText("None").onActivate([&] {
++    config->video.shader = "None";
++    program->updateVideoShader();
++  });
++  videoShaderBlur.setText("Blur").onActivate([&] {
++    config->video.shader = "Blur";
++    program->updateVideoShader();
++  });
++  videoShaderEmulation.setText("Display Emulation").onActivate([&] {
++    config->video.shader = "Display Emulation";
++    program->updateVideoShader();
++  });
+   colorEmulation.setText("Color Emulation").setChecked(config->video.colorEmulation).onToggle([&] {
+     config->video.colorEmulation = colorEmulation.checked();
+     program->updateVideoPalette();
+@@ -137,8 +153,9 @@ auto Presentation::updateEmulator() -> void {
+ 
+ auto Presentation::resizeViewport() -> void {
+   signed scale = 1;
+-  if(config->video.scale == "Small" ) scale = 1;
+-  if(config->video.scale == "Normal") scale = 2;
++  if(config->video.scale == "Tiny"  ) scale = 1;
++  if(config->video.scale == "Small" ) scale = 2;
++  if(config->video.scale == "Normal") scale = 3;
+   if(config->video.scale == "Large" ) scale = 4;
+ 
+   signed width  = 256;
+diff --git a/target-nSide-t/presentation/presentation.hpp b/target-nSide-t/presentation/presentation.hpp
+index ea5d407..d2840dd 100644
+--- a/target-nSide-t/presentation/presentation.hpp
++++ b/target-nSide-t/presentation/presentation.hpp
+@@ -18,19 +18,22 @@ struct Presentation : Window {
+       MenuItem unloadSystem{&systemMenu};
+     Menu settingsMenu{&menuBar};
+       Menu videoScaleMenu{&settingsMenu};
++        MenuRadioItem videoScaleTiny{&videoScaleMenu};
+         MenuRadioItem videoScaleSmall{&videoScaleMenu};
+         MenuRadioItem videoScaleNormal{&videoScaleMenu};
+         MenuRadioItem videoScaleLarge{&videoScaleMenu};
+-          Group videoScales{&videoScaleSmall, &videoScaleNormal, &videoScaleLarge};
++          Group videoScales{&videoScaleTiny, &videoScaleSmall, &videoScaleNormal, &videoScaleLarge};
+         MenuSeparator videoScaleSeparator{&videoScaleMenu};
+         MenuCheckItem aspectCorrection{&videoScaleMenu};
+-      Menu videoFilterMenu{&settingsMenu};
+-        MenuRadioItem videoFilterNone{&videoFilterMenu};
+-        MenuRadioItem videoFilterBlur{&videoFilterMenu};
+-          Group videoFilters{&videoFilterNone, &videoFilterBlur};
+-        MenuSeparator videoFilterSeparator{&videoFilterMenu};
+-        MenuCheckItem colorEmulation{&videoFilterMenu};
+-        MenuCheckItem maskOverscan{&videoFilterMenu};
++      Menu videoShaderMenu{&settingsMenu};
++        MenuRadioItem videoShaderNone{&videoShaderMenu};
++        MenuRadioItem videoShaderBlur{&videoShaderMenu};
++        MenuRadioItem videoShaderEmulation{&videoShaderMenu};
++          Group videoDefaultShaders{&videoShaderNone, &videoShaderBlur, &videoShaderEmulation};
++          Group videoShaders{};
++        MenuSeparator videoShaderSeparator{&videoShaderMenu};
++        MenuCheckItem colorEmulation{&videoShaderMenu};
++        MenuCheckItem maskOverscan{&videoShaderMenu};
+       MenuSeparator settingsMenuSeparator1{&settingsMenu};
+       MenuCheckItem synchronizeVideo{&settingsMenu};
+       MenuCheckItem synchronizeAudio{&settingsMenu};
+diff --git a/target-nSide-t/program/program.cpp b/target-nSide-t/program/program.cpp
+index a2387b5..e650da1 100644
+--- a/target-nSide-t/program/program.cpp
++++ b/target-nSide-t/program/program.cpp
+@@ -67,7 +67,7 @@ Program::Program(lstring args) {
+ 
+   presentation->drawSplashScreen();
+ 
+-  updateVideoFilter();
++  updateVideoShader();
+ 
+   if(args.size() == 2 && directory::exists(args[1])) {
+     loadMedia(args[1]);
+diff --git a/target-nSide-t/program/program.hpp b/target-nSide-t/program/program.hpp
+index 39596f0..bf351ad 100644
+--- a/target-nSide-t/program/program.hpp
++++ b/target-nSide-t/program/program.hpp
+@@ -32,7 +32,7 @@ struct Program : Emulator::Interface::Bind {
+   auto softReset() -> void;
+   auto showMessage(const string& text) -> void;
+   auto updateStatusText() -> void;
+-  auto updateVideoFilter() -> void;
++  auto updateVideoShader() -> void;
+   auto updateVideoPalette() -> void;
+   auto updateAudio() -> void;
+   auto updateDSP() -> void;
+diff --git a/target-nSide-t/program/utility.cpp b/target-nSide-t/program/utility.cpp
+index 0e2bc38..8e013e8 100644
+--- a/target-nSide-t/program/utility.cpp
++++ b/target-nSide-t/program/utility.cpp
+@@ -35,17 +35,49 @@ auto Program::updateStatusText() -> void {
+   }
+ }
+ 
+-auto Program::updateVideoFilter() -> void {
+-  if(config->video.filter == "None") video->set(Video::Filter, Video::FilterNearest);
+-  if(config->video.filter == "Blur") video->set(Video::Filter, Video::FilterLinear);
++auto Program::updateVideoShader() -> void {
++  //if(config->video.filter == "None") video->set(Video::Filter, Video::FilterNearest);
++  //if(config->video.filter == "Blur") video->set(Video::Filter, Video::FilterLinear);
++  if(config->video.shader == "None") {
++    video->set(Video::Shader, (string)"");
++    video->set(Video::Filter, Video::FilterNearest);
++  } else if(config->video.shader == "Blur") {
++    video->set(Video::Shader, (string)"");
++    video->set(Video::Filter, Video::FilterLinear);
++  } else if(config->video.shader == "Display Emulation" && config->video.driver != "OpenGL") {
++    video->set(Video::Shader, (string)"");
++    video->set(Video::Filter, Video::FilterLinear);
++  } else if(config->video.shader == "Display Emulation") {
++    if(emulator) {
++      string pathname = locate({configpath(), "nSide-t/"}, "Video Shaders/");
++      pathname.append("Display Emulation/");
++      pathname.append(presentation->systemMenu.text(), ".shader/");
++      if(directory::exists(pathname)) {
++        video->set(Video::Shader, pathname);
++      } else {
++        video->set(Video::Shader, (string)"");
++        video->set(Video::Filter, Video::FilterLinear);
++      }
++    } else {
++      video->set(Video::Shader, (string)"");
++      video->set(Video::Filter, Video::FilterLinear);
++    }
++  } else {
++    video->set(Video::Shader, config->video.shader);
++  }
++  updateVideoPalette();
+ }
+ 
+ auto Program::updateVideoPalette() -> void {
+   if(!emulator) return;
+-  emulator->paletteUpdate(config->video.colorEmulation
+-  ? Emulator::Interface::PaletteMode::Emulation
+-  : Emulator::Interface::PaletteMode::Standard
+-  );
++  if(config->video.shader == "Display Emulation" && config->video.driver == "OpenGL") {
++    emulator->paletteUpdate(Emulator::Interface::PaletteMode::Channel);
++  } else {
++    emulator->paletteUpdate(config->video.colorEmulation
++    ? Emulator::Interface::PaletteMode::Emulation
++    : Emulator::Interface::PaletteMode::Standard
++    );
++  }
+ }
+ 
+ auto Program::updateAudio() -> void {
+

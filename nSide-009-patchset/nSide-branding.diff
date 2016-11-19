@@ -1,0 +1,295 @@
+Binary files higan/ananke/resource/archive.png and higan/ananke/resource/archive.png differ
+Binary files higan/ananke/resource/file.png and higan/ananke/resource/file.png differ
+Binary files higan/ananke/resource/folder.png and higan/ananke/resource/folder.png differ
+Binary files higan/ananke/resource/home.png and higan/ananke/resource/home.png differ
+Binary files higan/ananke/resource/up.png and higan/ananke/resource/up.png differ
+Binary files higan/data/higan.ico and higan/data/higan.ico differ
+Binary files higan/data/higan.png and higan/data/higan.png differ
+diff -Nru higan/data/higan.desktop higan/data/higan.desktop
+--- higan/data/higan.desktop	2015-09-16 02:20:06.370574580 +0900
++++ higan/data/higan.desktop	2015-09-16 13:08:13.697563382 +0900
+@@ -1,8 +1,8 @@
+ [Desktop Entry]
+-Name=higan
+-Comment=Nintendo emulator
+-Exec=higan
+-Icon=higan
++Name=nSide
++Comment=NES, SNES, Game Boy, Game Boy Advance emulator
++Exec=nSide
++Icon=nSide
+ Terminal=false
+ Type=Application
+ Categories=Game;Emulator;
+--- higan/data/higan.Manifest	2015-09-16 02:20:06.370574580 +0900
++++ higan/data/higan.Manifest	2015-09-16 14:49:38.679187539 +0900
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+ <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+-  <assemblyIdentity type="win32" name="higan" version="1.0.0.0" processorArchitecture="*"/>
++  <assemblyIdentity type="win32" name="nSide" version="1.0.0.0" processorArchitecture="*"/>
+   <dependency>
+     <dependentAssembly>
+       <assemblyIdentity type="win32" name="Microsoft.Windows.Common-Controls" version="6.0.0.0" processorArchitecture="*" publicKeyToken="6595b64144ccf1df" language="*"/>
+diff -Nru higan/data/Info.plist higan/data/Info.plist
+--- higan/data/Info.plist	2015-09-16 02:20:06.356574579 +0900
++++ higan/data/Info.plist	2015-09-16 13:08:13.858563399 +0900
+@@ -3,10 +3,10 @@
+ <plist version="1.0">
+ <dict>
+   <key>CFBundleDisplayName</key>
+-  <string>higan</string>
++  <string>nSide</string>
+   <key>CFBundleExecutable</key>
+-  <string>higan</string>
++  <string>nSide</string>
+   <key>CFBundleIconFile</key>
+-  <string>higan.icns</string>
++  <string>nSide.icns</string>
+ </dict>
+ </plist>
+diff -Nru higan/emulator/emulator.hpp higan/emulator/emulator.hpp
+--- higan/emulator/emulator.hpp	2015-09-16 02:20:06.370574580 +0900
++++ higan/emulator/emulator.hpp	2015-09-16 13:08:13.697563382 +0900
+@@ -7,9 +7,12 @@
+ using namespace nall;
+ 
+ namespace Emulator {
+-  static const string Name = "higan";
+-  static const string Version = "094.41";
++  static const string Name = "nSide";
++  static const string OriginalName = "higan";
++  static const string Version = "009.03";
++  static const string FromVersion = "094.41";
+   static const string Author = "byuu";
++  static const string Contributors = "blargg, Ryphecha, FitzRoy, Jonas Quinn, Cydrak, hex_usr, and more...";
+   static const string License = "GPLv3";
+   static const string Website = "http://byuu.org/";
+ 
+diff -Nru higan/fc/fc.hpp higan/fc/fc.hpp
+--- higan/fc/fc.hpp	2015-09-16 02:20:06.372574580 +0900
++++ higan/fc/fc.hpp	2015-09-16 13:08:13.520563364 +0900
+@@ -6,16 +6,21 @@
+ 
+ namespace Famicom {
+   namespace Info {
+-    static const string Name = "bnes";
+-    static const unsigned SerializerVersion = 2;
++    static const string Name[] = "nSide-fc";
++    // If you import nSide's changes into another fork of higan, please do not
++    // import the serializer version unless you intend to import all of nSide-fc
++    // simultaneously.
++    static const unsigned SerializerVersion = 0;
+   }
+ }
+ 
+ /*
+-  bnes - Famicom emulator
++  nSide-fc - Famicom emulator
++  based on higan/bnes by byuu and Ryphecha.
+   authors: byuu, Ryphecha
++  contributors: FitzRoy, hex_usr
+   license: GPLv3
+-  project started: 2011-09-05
++  original project started: 2011-09-05
+ */
+ 
+ #include <libco/libco.h>
+diff -Nru higan/gb/gb.hpp higan/gb/gb.hpp
+--- higan/gb/gb.hpp	2015-09-16 02:20:06.375574580 +0900
++++ higan/gb/gb.hpp	2015-09-16 13:08:13.350563347 +0900
+@@ -6,16 +6,18 @@
+ 
+ namespace GameBoy {
+   namespace Info {
+-    static const string Name = "bgb";
++    static const string Name = "nSide-gb";
+     static const unsigned SerializerVersion = 4;
+   }
+ }
+ 
+ /*
+-  bgb - Game Boy, Super Game Boy, and Game Boy Color emulator
++  nSide-gb - Game Boy, Super Game Boy, and Game Boy Color emulator
++  based on higan/bgb by byuu.
+   author: byuu
++  contributors: Jonas Quinn
+   license: GPLv3
+-  project started: 2010-12-27
++  original project started: 2010-12-27
+ */
+ 
+ #include <libco/libco.h>
+diff -Nru higan/gba/gba.hpp higan/gba/gba.hpp
+--- higan/gba/gba.hpp	2015-09-17 15:00:12.791292518 +0900
++++ higan/gba/gba.hpp	2015-09-16 13:08:13.505563363 +0900
+@@ -6,17 +6,16 @@
+ 
+ namespace GameBoyAdvance {
+   namespace Info {
+-    static const string Name = "nSide-gba";
++    static const string Name = "bgba";
+     static const unsigned SerializerVersion = 2;
+   }
+ }
+ 
+ /*
+-  nSide-gba - Game Boy Advance emulator
+-  based on higan/bgba by byuu and Cydrak.
++  bgba - Game Boy Advance emulator
+   authors: byuu, Cydrak
+   license: GPLv3
+-  original project started: 2012-03-19
++  project started: 2012-03-19
+ */
+ 
+ #include <libco/libco.h>
+diff -Nru higan/sfc/sfc.hpp higan/sfc/sfc.hpp
+--- higan/sfc/sfc.hpp	2015-09-16 02:20:06.421574585 +0900
++++ higan/sfc/sfc.hpp	2015-09-16 13:08:13.248563336 +0900
+@@ -11,16 +11,45 @@
+ 
+ namespace SuperFamicom {
+   namespace Info {
+-    static const string Name = "bsnes";
++    static const string Name = "nSide-sfc";
+     static const unsigned SerializerVersion = 28;
+   }
+ }
+ 
+ /*
+-  bsnes - Super Famicom emulator
++  nSide-sfc - Super Famicom emulator
++  based on higan/bsnes by byuu.
+   author: byuu
++  contributors:
++    Andreas Naive     (S-DD1 decompression algorithm)
++    anomie
++    AWJ               (PPUcounter NTSC/PAL timing)
++    blargg            (Balanced/Performance DSP)
++    Cydrak            (ST-018 discoveries and bug fixes)
++    _Demo_
++    Derrick Sobodash
++    DMV27
++    Dr. Decapitator   (DSP-1,2,3,4, ST-010,011,018 ROM dumps)
++    FirebrandX
++    FitzRoy
++    GIGO
++    Jonas Quinn       (DSP fixes, Game Boy fixes)
++    kode54
++    krom
++    LostTemplar       (ST-018 program ROM analysis)
++    Matthew Callis
++    Nach
++    neviksti          (SPC7110 decompression algorithm)
++    Overload          (Cx4 data ROM dump)
++    RedDwarf
++    Richard Bannister
++    segher            (Cx4 reverse engineering)
++    tetsuo55
++    TRAC
++    zones
++    hex_usr           (exportMemory PPU register/expansion chip support)
+   license: GPLv3
+-  project started: 2004-10-14
++  original project started: 2004-10-14
+ */
+ 
+ #include <libco/libco.h>
+diff -Nru higan/target-tomoko/program/program.cpp higan/target-tomoko/program/program.cpp
+--- higan/target-tomoko/program/program.cpp	2015-09-16 02:20:06.423574585 +0900
++++ higan/target-tomoko/program/program.cpp	2015-09-16 14:06:40.925923130 +0900
+@@ -12,6 +12,6 @@
+ Program::Program(lstring args) {
+   program = this;
+-  directory::create({configpath(), "tomoko/"});
++  directory::create({configpath(), "nSide-t/"});
+   Application::onMain({&Program::main, this});
+   Application::Windows::onModalChange([](bool modal) { if(modal && audio) audio->clear(); });
+ 
+diff --git a/target-ethos/ethos.cpp b/../nSide/target-nSide-e/ethos.cpp
+index e4a84fe..10dc024 100644
+--- a/target-ethos/ethos.cpp
++++ b/../nSide/target-nSide-e/ethos.cpp
+@@ -57,8 +57,8 @@ Program::Program(int argc, char** argv) {
+   autopause = false;
+ 
+   basepath = nall::programpath();
+-  userpath = {nall::configpath(), "ethos/"};
+-  sharedpath = {nall::sharedpath(), "ethos/"};
++  userpath = {nall::configpath(), "nSide-e/"};
++  sharedpath = {nall::sharedpath(), "nSide-e/"};
+   directory::create(userpath);
+ 
+   bootstrap();
+@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
+   utf8_args(argc, argv);
+   #endif
+ 
+-  Application::setName("ethos");
++  Application::setName("nSide-e");
+ 
+   Application::Windows::onModalBegin = [&] {
+     audio->clear();
+@@ -166,12 +166,14 @@ int main(int argc, char** argv) {
+     .setTitle({"About ", Emulator::Name})
+     .setText({
+       Emulator::Name, " v", Emulator::Version, "\n",
++      "Based on ", Emulator::OriginalName, " v", Emulator::FromVersion, "\n",
+       #if defined(PROFILE_ACCURACY) or defined(PROFILE_BALANCED) or defined(PROFILE_PERFORMANCE)
+       Emulator::Profile, " Profile\n",
+       #endif
+       "Original Author: ", Emulator::Author, "\n",
++      "Contributors: ", Emulator::Contributors, "\n",
+       "License: ", Emulator::License, "\n",
+-      "Website: ", Emulator::Website
++      "Website of ", Emulator::OriginalName, ": ", Emulator::Website
+     })
+     .information();
+   };
+
+diff --git a/target-ethos/settings/advanced.cpp b/../nSide/target-nSide-e/settings/advanced.cpp
+index dd2c950..94893bc 100644
+--- a/target-ethos/settings/advanced.cpp
++++ b/../nSide/target-nSide-e/settings/advanced.cpp
+@@ -17,13 +17,15 @@ AdvancedSettings::AdvancedSettings() {
+   information.setText("Note: changing advanced settings requires program restart to take effect.");
+   infoLabel.setFont(program->boldFont);
+   infoLabel.setText({
+-    "ethos v", Emulator::Version, "\n",
++    "nSide-e v", Emulator::Version, "\n",
++    "Based on ", Emulator::OriginalName, " v", Emulator::FromVersion, "\n",
+     #if defined(PROFILE_ACCURACY) or defined(PROFILE_BALANCED) or defined(PROFILE_PERFORMANCE)
+     "  ", Emulator::Profile, " Profile\n",
+     #endif
+-    "  Author: ", Emulator::Author, "\n",
++    "  Original Author: ", Emulator::Author, "\n",
++    "  Contributors: ", Emulator::Contributors, "\n",
+     "  License: ", Emulator::License, "\n",
+-    "  Website: ", Emulator::Website
++    "  Website of ", Emulator::OriginalName, ": ", Emulator::Website
+   });
+ 
+   //lstring list;
+@@ -76,7 +78,7 @@ AdvancedSettings::AdvancedSettings() {
+   libraryBrowse.onActivate = [&] {
+     string path = BrowserWindow().setParent(*settings).setPath(userpath()).directory();
+     if(path.empty()) return;
+-    file::write({configpath(), "higan/library.bml"}, {"Path: ", path, "\n"});
++    file::write({configpath(), "nSide/library.bml"}, {"Path: ", path, "\n"});
+     libraryPath.setText(path);
+   };
+ 
+diff --git a/target-nSide-t/program/state.cpp b/target-nSide-t/program/state.cpp
+index ba7f9b8..16f577a 100644
+--- a/target-nSide-t/program/state.cpp
++++ b/target-nSide-t/program/state.cpp
+@@ -1,6 +1,6 @@
+ auto Program::stateName(unsigned slot, bool manager) -> string {
+   return {
+-    folderPaths[0], "higan/states/",
++    folderPaths[0], "nSide-t/states/",
+     manager ? "managed/" : "quick/",
+     "slot-", decimal(slot, 2L), ".bst"
+   };
+
