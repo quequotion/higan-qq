@@ -1,0 +1,70 @@
+diff --git a/higan/higan/gb/interface/interface.cpp b/nSide/higan/gb/interface/interface.cpp
+index 354c25f..1f122a7 100644
+--- a/higan/higan/gb/interface/interface.cpp
++++ b/nSide/higan/gb/interface/interface.cpp
+@@ -9,6 +9,7 @@ Interface::Interface() {
+   interface = this;
+   hook = nullptr;
+ 
++  information.preAlpha     = false;
+   information.manufacturer = "Nintendo";
+   information.name         = "Game Boy";
+   information.overscan     = false;
+@@ -17,10 +18,10 @@ Interface::Interface() {
+   information.capability.states = true;
+   information.capability.cheats = true;
+ 
+-  media.append({ID::GameBoy,      "Game Boy",       "gb" });
+-  media.append({ID::GameBoyColor, "Game Boy Color", "gbc"});
++  media.append({ID::GameBoy,      "Game Boy",       "gb",  Domain::Portable});
++  media.append({ID::GameBoyColor, "Game Boy Color", "gbc", Domain::Portable});
+ 
+-  Port hardwarePort{ID::Port::Hardware, "Hardware"};
++  Port hardwarePort{ID::Port::Hardware, "Hardware", Hardwired};
+ 
+   { Device device{ID::Device::Controls, "Controls"};
+     device.inputs.append({0, "Up"    });
+@@ -214,4 +215,15 @@ auto Interface::set(const string& name, const any& value) -> bool {
+   return false;
+ }
+ 
++auto Interface::exportMemory() -> void {
++  string pathname = {path(cartridge.pathID()), "debug/"};
++  directory::create(pathname);
++
++  if(auto fp = interface->open(cartridge.pathID(), "debug/work.ram", File::Write)) fp->write(cpu.wram, !system.cgb() ? 8192 : 32768);
++  if(auto fp = interface->open(cartridge.pathID(), "debug/internal.ram", File::Write)) fp->write(cpu.hram, 128);
++  if(cartridge.ram.size) if(auto fp = interface->open(cartridge.pathID(), "debug/program-save.ram", File::Write)) {
++    fp->write(cartridge.ram.data, cartridge.ram.size);
++  }
++}
++
+ }
+diff --git a/higan/higan/gb/interface/interface.hpp b/nSide/higan/gb/interface/interface.hpp
+index fce0be5..408e659 100644
+--- a/higan/higan/gb/interface/interface.hpp
++++ b/nSide/higan/gb/interface/interface.hpp
+@@ -63,6 +63,9 @@ struct Interface : Emulator::Interface {
+   auto lcdScanline() -> void;
+   auto lcdOutput(uint2 color) -> void;
+   auto joypWrite(bool p15, bool p14) -> void;
++
++  //debugger functions
++  auto exportMemory() -> void override;
+ };
+ 
+ struct Settings {
+diff --git a/higan/higan/gb/memory/memory.cpp b/nSide/higan/gb/memory/memory.cpp
+index 51ad6ad..66ca132 100644
+--- a/higan/higan/gb/memory/memory.cpp
++++ b/nSide/higan/gb/memory/memory.cpp
+@@ -39,7 +39,7 @@ auto Bus::read(uint16 addr) -> uint8 {
+   uint8 data = mmio[addr]->readIO(addr);
+ 
+   if(cheat) {
+-    if(auto result = cheat.find(addr, data)) return result();
++    if(auto result = cheat.find<1>(addr, data)) return result();
+   }
+ 
+   return data;
+

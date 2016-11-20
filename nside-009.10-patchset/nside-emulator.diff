@@ -1,0 +1,152 @@
+diff --git a/higan-hack/higan/emulator/cheat.hpp b/nSide/higan/emulator/cheat.hpp
+index 929c678..bb71eb4 100644
+--- a/higan-hack/higan/emulator/cheat.hpp
++++ b/nSide/higan/emulator/cheat.hpp
+@@ -5,6 +5,7 @@ namespace Emulator {
+ struct Cheat {
+   struct Code {
+     uint addr;
++    uint dataWidth;
+     uint data;
+     maybe<uint> comp;
+   };
+@@ -17,8 +18,8 @@ struct Cheat {
+     codes.reset();
+   }
+ 
+-  auto append(uint addr, uint data, maybe<uint> comp = nothing) -> void {
+-    codes.append({addr, data, comp});
++  auto append(uint addr, uint dataWidth, uint data, maybe<uint> comp = nothing) -> void {
++    codes.append({addr, dataWidth, data, comp});
+   }
+ 
+   auto assign(const string_vector& list) -> void {
+@@ -26,15 +27,21 @@ struct Cheat {
+     for(auto& entry : list) {
+       for(auto code : entry.split("+")) {
+         auto part = code.split("/");
+-        if(part.size() == 2) append(part[0].hex(), part[1].hex());
+-        if(part.size() == 3) append(part[0].hex(), part[2].hex(), part[1].hex());
++        //reject cheats where the data is an odd number of digits long
++        if(part[1].size() & 1) continue;
++        //reject cheats with mismatched data and comp sizes
++        if(part.size() == 3 && (part[1].size() != part[2].size())) continue;
++
++        uint dataWidth = part[1].size() >> 1;
++        if(part.size() == 2) append(part[0].hex(), dataWidth, part[1].hex());
++        if(part.size() == 3) append(part[0].hex(), dataWidth, part[2].hex(), part[1].hex());
+       }
+     }
+   }
+ 
+-  auto find(uint addr, uint comp) -> maybe<uint> {
++  template<uint dataWidth> auto find(uint addr, uint comp) -> maybe<uint> {
+     for(auto& code : codes) {
+-      if(code.addr == addr && (!code.comp || code.comp() == comp)) {
++      if(code.addr == addr && code.dataWidth == dataWidth && (!code.comp || code.comp() == comp)) {
+         return code.data;
+       }
+     }
+diff --git a/higan-hack/higan/emulator/emulator.hpp b/nSide/higan/emulator/emulator.hpp
+index d5d21a6..a82fbba 100644
+--- a/higan-hack/higan/emulator/emulator.hpp
++++ b/nSide/higan/emulator/emulator.hpp
+@@ -18,7 +18,7 @@ namespace Emulator {
+   static const string Website = "http://byuu.org/";
+ 
+   //incremented only when serialization format changes
+-  static const string SerializerVersion = "101";
++  static const string SerializerVersion = "009.10(101)";
+ 
+   namespace Constants {
+     namespace Colorburst {
+diff --git a/higan-hack/higan/emulator/interface.hpp b/nSide/higan/emulator/interface.hpp
+index f6cd076..8ad037d 100644
+--- a/higan-hack/higan/emulator/interface.hpp
++++ b/nSide/higan/emulator/interface.hpp
+@@ -4,6 +4,7 @@ namespace Emulator {
+ 
+ struct Interface {
+   struct Information {
++    bool preAlpha;
+     string manufacturer;
+     string name;
+     bool overscan;
+@@ -14,10 +15,17 @@ struct Interface {
+     } capability;
+   } information;
+ 
++  struct Domain { enum : uint {
++    Home,
++    Portable,
++    Arcade,
++  };};
++
+   struct Medium {
+     uint id;
+     string name;
+     string type;  //extension
++    uint domain;
+   };
+   vector<Medium> media;
+ 
+@@ -31,9 +39,12 @@ struct Interface {
+     vector<Input> inputs;
+   };
+ 
++  enum : bool { Hardwired, PlugAndPlay };
++
+   struct Port {
+     uint id;
+     string name;
++    bool plugAndPlay;
+     vector<Device> devices;
+   };
+   vector<Port> ports;
+@@ -46,6 +57,7 @@ struct Interface {
+     virtual auto audioSample(const double*, uint) -> void {}
+     virtual auto inputPoll(uint, uint, uint) -> int16 { return 0; }
+     virtual auto inputRumble(uint, uint, uint, bool) -> void {}
++    virtual auto deviceChanged(uint port, uint device) -> void {}
+     virtual auto dipSettings(Markup::Node) -> uint { return 0; }
+     virtual auto notify(string text) -> void { print(text, "\n"); }
+   };
+@@ -59,6 +71,7 @@ struct Interface {
+   auto audioSample(const double* samples, uint channels) -> void { return bind->audioSample(samples, channels); }
+   auto inputPoll(uint port, uint device, uint input) -> int16 { return bind->inputPoll(port, device, input); }
+   auto inputRumble(uint port, uint device, uint input, bool enable) -> void { return bind->inputRumble(port, device, input, enable); }
++  auto deviceChanged(uint port, uint device) -> void { return bind->deviceChanged(port, device); }
+   auto dipSettings(Markup::Node node) -> uint { return bind->dipSettings(node); }
+   template<typename... P> auto notify(P&&... p) -> void { return bind->notify({forward<P>(p)...}); }
+ 
+@@ -89,6 +102,7 @@ struct Interface {
+   virtual auto power() -> void {}
+   virtual auto reset() -> void {}
+   virtual auto run() -> void {}
++  virtual auto rotate() -> void {}
+ 
+   //time functions
+   virtual auto rtc() -> bool { return false; }
+@@ -108,6 +122,9 @@ struct Interface {
+ 
+   //shared functions
+   auto videoColor(uint16 r, uint16 g, uint16 b) -> uint32;
++
++  //debugger functions
++  virtual auto exportMemory() -> void {}
+ };
+ 
+ //nall/vfs shorthand constants for open(), load()
+diff --git a/higan-hack/higan/emulator/scheduler.hpp b/nSide/higan/emulator/scheduler.hpp
+index b90fbc7..aceb646 100644
+--- a/higan-hack/higan/emulator/scheduler.hpp
++++ b/nSide/higan/emulator/scheduler.hpp
+@@ -13,6 +13,7 @@ struct Scheduler {
+     Step,
+     Frame,
+     Synchronize,
++    Debugger,
+   };
+ 
+   inline auto synchronizing() const -> bool { return _mode == Mode::SynchronizeSlave; }
+

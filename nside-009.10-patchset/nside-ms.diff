@@ -1,0 +1,1239 @@
+diff --git a/higan/higan/ms/GNUmakefile b/nSide/higan/ms/GNUmakefile
+index 4ee4a38..9f09f3d 100644
+--- a/higan/higan/ms/GNUmakefile
++++ b/nSide/higan/ms/GNUmakefile
+@@ -3,11 +3,13 @@ processors += z80
+ objects += ms-interface
+ objects += ms-cpu ms-vdp ms-psg
+ objects += ms-system ms-cartridge ms-bus
++objects += ms-controller
+ 
+-obj/ms-interface.o: ms/interface/interface.cpp $(call rwildcard,ms/interface)
+-obj/ms-cpu.o:       ms/cpu/cpu.cpp $(call rwildcard,ms/cpu)
+-obj/ms-vdp.o:       ms/vdp/vdp.cpp $(call rwildcard,ms/vdp)
+-obj/ms-psg.o:       ms/psg/psg.cpp $(call rwildcard,ms/psg)
+-obj/ms-system.o:    ms/system/system.cpp $(call rwildcard,ms/system)
+-obj/ms-cartridge.o: ms/cartridge/cartridge.cpp $(call rwildcard,ms/cartridge)
+-obj/ms-bus.o:       ms/bus/bus.cpp $(call rwildcard,ms/bus)
++obj/ms-interface.o:  ms/interface/interface.cpp $(call rwildcard,ms/interface)
++obj/ms-cpu.o:        ms/cpu/cpu.cpp $(call rwildcard,ms/cpu)
++obj/ms-vdp.o:        ms/vdp/vdp.cpp $(call rwildcard,ms/vdp)
++obj/ms-psg.o:        ms/psg/psg.cpp $(call rwildcard,ms/psg)
++obj/ms-system.o:     ms/system/system.cpp $(call rwildcard,ms/system)
++obj/ms-cartridge.o:  ms/cartridge/cartridge.cpp $(call rwildcard,ms/cartridge)
++obj/ms-bus.o:        ms/bus/bus.cpp $(call rwildcard,ms/bus)
++obj/ms-controller.o: ms/controller/controller.cpp $(call rwildcard,ms/controller)
+diff --git a/higan/higan/ms/bus/bus.cpp b/nSide/higan/ms/bus/bus.cpp
+index 2ff3c58..a2eed83 100644
+--- a/higan/higan/ms/bus/bus.cpp
++++ b/nSide/higan/ms/bus/bus.cpp
+@@ -5,24 +5,225 @@ namespace MasterSystem {
+ Bus bus;
+ 
+ auto Bus::read(uint16 addr) -> uint8 {
+-  if(addr < 0xc000) return cartridge.read(addr);
+-  return ram[addr & 0x1fff];
++  if(addr < 0xc000 || disableRAM) return cartridge.read(addr);
++  return ram[addr & ramMask];
+ }
+ 
+ auto Bus::write(uint16 addr, uint8 data) -> void {
+-  if(addr < 0xc000) return cartridge.write(addr, data);
+-  ram[addr & 0x1fff] = data;
++  if(addr < 0xc000 || disableRAM) return cartridge.write(addr, data);
++  ram[addr & ramMask] = data;
+ }
+ 
+ auto Bus::in(uint8 addr) -> uint8 {
+   switch(addr) {
+-  case 0x7e: return vdp.in(addr);
+-  case 0x7f: return vdp.in(addr);
++
++  case 0x00: case 0x02: case 0x04:
++    //Gear to Gear Cable
++    if(system.model() == Model::GameGear) return 0x00;
++  case 0x06:
++  case 0x08: case 0x0a: case 0x0c: case 0x0e:
++  case 0x10: case 0x12: case 0x14: case 0x16:
++  case 0x18: case 0x1a: case 0x1c: case 0x1e:
++  case 0x20: case 0x22: case 0x24: case 0x26:
++  case 0x28: case 0x2a: case 0x2c: case 0x2e:
++  case 0x30: case 0x32: case 0x34: case 0x36:
++  case 0x38: case 0x3a: case 0x3c: case 0x3e: { //port $3e
++    uint8 data = 0x00;
++    data.bit(2) = disableIO;
++    data.bit(3) = disableBIOS;
++    data.bit(4) = disableRAM;
++    data.bit(5) = disableMyCard;
++    data.bit(6) = disableCartridge;
++    data.bit(7) = disableExpansion;
++    return data;
++  }
++
++  case 0x01: case 0x03: case 0x05:
++    //Gear to Gear Cable
++    if(system.model() == Model::GameGear) return 0x00;
++  case 0x07:
++  case 0x09: case 0x0b: case 0x0d: case 0x0f:
++  case 0x11: case 0x13: case 0x15: case 0x17:
++  case 0x19: case 0x1b: case 0x1d: case 0x1f:
++  case 0x21: case 0x23: case 0x25: case 0x27:
++  case 0x29: case 0x2b: case 0x2d: case 0x2f:
++  case 0x31: case 0x33: case 0x35: case 0x37:
++  case 0x39: case 0x3b: case 0x3d: case 0x3f: { //port $3f
++    return 0x00;
++  }
++
++  case 0x40: case 0x41: case 0x42: case 0x43:
++  case 0x44: case 0x45: case 0x46: case 0x47:
++  case 0x48: case 0x49: case 0x4a: case 0x4b:
++  case 0x4c: case 0x4d: case 0x4e: case 0x4f:
++  case 0x50: case 0x51: case 0x52: case 0x53:
++  case 0x54: case 0x55: case 0x56: case 0x57:
++  case 0x58: case 0x59: case 0x5a: case 0x5b:
++  case 0x5c: case 0x5d: case 0x5e: case 0x5f:
++  case 0x60: case 0x61: case 0x62: case 0x63:
++  case 0x64: case 0x65: case 0x66: case 0x67:
++  case 0x68: case 0x69: case 0x6a: case 0x6b:
++  case 0x6c: case 0x6d: case 0x6e: case 0x6f:
++  case 0x70: case 0x71: case 0x72: case 0x73:
++  case 0x74: case 0x75: case 0x76: case 0x77:
++  case 0x78: case 0x79: case 0x7a: case 0x7b:
++  case 0x7c: case 0x7d: case 0x7e: case 0x7f:
++  case 0x80: case 0x81: case 0x82: case 0x83:
++  case 0x84: case 0x85: case 0x86: case 0x87:
++  case 0x88: case 0x89: case 0x8a: case 0x8b:
++  case 0x8c: case 0x8d: case 0x8e: case 0x8f:
++  case 0x90: case 0x91: case 0x92: case 0x93:
++  case 0x94: case 0x95: case 0x96: case 0x97:
++  case 0x98: case 0x99: case 0x9a: case 0x9b:
++  case 0x9c: case 0x9d: case 0x9e: case 0x9f:
++  case 0xa0: case 0xa1: case 0xa2: case 0xa3:
++  case 0xa4: case 0xa5: case 0xa6: case 0xa7:
++  case 0xa8: case 0xa9: case 0xaa: case 0xab:
++  case 0xac: case 0xad: case 0xae: case 0xaf:
++  case 0xb0: case 0xb1: case 0xb2: case 0xb3:
++  case 0xb4: case 0xb5: case 0xb6: case 0xb7:
++  case 0xb8: case 0xb9: case 0xba: case 0xbb:
++  case 0xbc: case 0xbd: case 0xbe: case 0xbf: { //port $7e, $7f, $be, and $bf
++    return vdp.in(addr);
++  }
++
++  case 0xc2: case 0xc4: case 0xc6:
++  case 0xc8: case 0xca: case 0xcc: case 0xce:
++  case 0xd0: case 0xd2: case 0xd4: case 0xd6:
++  case 0xd8: case 0xda: case 0xde:
++  case 0xe0: case 0xe2: case 0xe4: case 0xe6:
++  case 0xe8: case 0xea: case 0xec: case 0xee:
++  case 0xf0: case 0xf2: case 0xf4: case 0xf6:
++  case 0xf8: case 0xfa: case 0xfc: case 0xfe:
++    if(system.model() == Model::GameGear) return 0x00;
++  case 0xc0: case 0xdc: { //port $dc
++    uint7 data0 = MasterSystem::peripherals.controllerPort1->readData();
++    uint7 data1 = MasterSystem::peripherals.controllerPort2->readData();
++    uint8 data = 0x00;
++    data.bits(0,5) = (uint)data0.bits(0,5);
++    data.bits(6,7) = (uint)data1.bits(0,1);
++    return data;
++  }
++
++  case 0xc3: case 0xc5: case 0xc7:
++  case 0xc9: case 0xcb: case 0xcd: case 0xcf:
++  case 0xd1: case 0xd3: case 0xd5: case 0xd7:
++  case 0xd9: case 0xdb: case 0xdf:
++  case 0xe1: case 0xe3: case 0xe5: case 0xe7:
++  case 0xe9: case 0xeb: case 0xed: case 0xef:
++  case 0xf1: case 0xf3: case 0xf5: case 0xf7:
++  case 0xf9: case 0xfb: case 0xfd: case 0xff:
++    if(system.model() == Model::GameGear) return 0x00;
++  case 0xc1: case 0xdd: { //port $dd
++    uint7 data0 = MasterSystem::peripherals.controllerPort1->readData();
++    uint7 data1 = MasterSystem::peripherals.controllerPort2->readData();
++    uint8 data = 0x00;
++    data.bits(0,3) = (uint)data1.bits(2,5);
++    data.bit (  4) = 1;  //reset button
++    data.bit (  5) = 1;  //cartridge CONT pin
++    data.bit (  6) = (bool)data0.bit (6);
++    data.bit (  7) = (bool)data1.bit (6);
++    return data;
++  }
++
+   }
+   return 0x00;
+ }
+ 
+ auto Bus::out(uint8 addr, uint8 data) -> void {
++  switch(addr) {
++
++  case 0x00: case 0x02: case 0x04:
++    //Gear to Gear Cable
++    if(system.model() == Model::GameGear) return;
++  case 0x06:
++  case 0x08: case 0x0a: case 0x0c: case 0x0e:
++  case 0x10: case 0x12: case 0x14: case 0x16:
++  case 0x18: case 0x1a: case 0x1c: case 0x1e:
++  case 0x20: case 0x22: case 0x24: case 0x26:
++  case 0x28: case 0x2a: case 0x2c: case 0x2e:
++  case 0x30: case 0x32: case 0x34: case 0x36:
++  case 0x38: case 0x3a: case 0x3c: case 0x3e: {  //port $3e
++    disableIO        = data.bit(2);
++    disableBIOS      = data.bit(3);
++    disableRAM       = data.bit(4);
++    disableMyCard    = data.bit(5);
++    disableCartridge = data.bit(6);
++    disableExpansion = data.bit(7);
++    break;
++  }
++
++  case 0x01: case 0x03: case 0x05:
++    //Gear to Gear Cable
++    if(system.model() == Model::GameGear) return;
++  case 0x07:
++  case 0x09: case 0x0b: case 0x0d: case 0x0f:
++  case 0x11: case 0x13: case 0x15: case 0x17:
++  case 0x19: case 0x1b: case 0x1d: case 0x1f:
++  case 0x21: case 0x23: case 0x25: case 0x27:
++  case 0x29: case 0x2b: case 0x2d: case 0x2f:
++  case 0x31: case 0x33: case 0x35: case 0x37:
++  case 0x39: case 0x3b: case 0x3d: case 0x3f: {  //port $3f
++    //Writing to TH lines has no effect in Japanese systems.
++    uint7 control1;
++    uint7 control2;
++    uint7 data1;
++    uint7 data2;
++    control1.bit(5) = data.bit(0);
++    control1.bit(6) = data.bit(1);
++    control2.bit(5) = data.bit(2);
++    control2.bit(6) = data.bit(3);
++    data1.bit(5) = data.bit(4);
++    data1.bit(6) = data.bit(5);
++    data2.bit(5) = data.bit(6);
++    data2.bit(6) = data.bit(7);
++    MasterSystem::peripherals.controllerPort1->writeControl(control1);
++    MasterSystem::peripherals.controllerPort2->writeControl(control2);
++    MasterSystem::peripherals.controllerPort1->writeData(data1);
++    MasterSystem::peripherals.controllerPort2->writeData(data2);
++    break;
++  }
++
++  case 0x40: case 0x41: case 0x42: case 0x43:
++  case 0x44: case 0x45: case 0x46: case 0x47:
++  case 0x48: case 0x49: case 0x4a: case 0x4b:
++  case 0x4c: case 0x4d: case 0x4e: case 0x4f:
++  case 0x50: case 0x51: case 0x52: case 0x53:
++  case 0x54: case 0x55: case 0x56: case 0x57:
++  case 0x58: case 0x59: case 0x5a: case 0x5b:
++  case 0x5c: case 0x5d: case 0x5e: case 0x5f:
++  case 0x60: case 0x61: case 0x62: case 0x63:
++  case 0x64: case 0x65: case 0x66: case 0x67:
++  case 0x68: case 0x69: case 0x6a: case 0x6b:
++  case 0x6c: case 0x6d: case 0x6e: case 0x6f:
++  case 0x70: case 0x71: case 0x72: case 0x73:
++  case 0x74: case 0x75: case 0x76: case 0x77:
++  case 0x78: case 0x79: case 0x7a: case 0x7b:
++  case 0x7c: case 0x7d: case 0x7e: case 0x7f: {  //port $7f;
++    psg.out(addr, data);
++  }
++
++  case 0x80: case 0x81: case 0x82: case 0x83:
++  case 0x84: case 0x85: case 0x86: case 0x87:
++  case 0x88: case 0x89: case 0x8a: case 0x8b:
++  case 0x8c: case 0x8d: case 0x8e: case 0x8f:
++  case 0x90: case 0x91: case 0x92: case 0x93:
++  case 0x94: case 0x95: case 0x96: case 0x97:
++  case 0x98: case 0x99: case 0x9a: case 0x9b:
++  case 0x9c: case 0x9d: case 0x9e: case 0x9f:
++  case 0xa0: case 0xa1: case 0xa2: case 0xa3:
++  case 0xa4: case 0xa5: case 0xa6: case 0xa7:
++  case 0xa8: case 0xa9: case 0xaa: case 0xab:
++  case 0xac: case 0xad: case 0xae: case 0xaf:
++  case 0xb0: case 0xb1: case 0xb2: case 0xb3:
++  case 0xb4: case 0xb5: case 0xb6: case 0xb7:
++  case 0xb8: case 0xb9: case 0xba: case 0xbb:
++  case 0xbc: case 0xbd: case 0xbe: case 0xbf: {  //ports $be and $bf
++    vdp.out(addr, data);
++    break;
++  }
++
++  }
+ }
+ 
+ }
+diff --git a/higan/higan/ms/bus/bus.hpp b/nSide/higan/ms/bus/bus.hpp
+index c8826a3..69d2769 100644
+--- a/higan/higan/ms/bus/bus.hpp
++++ b/nSide/higan/ms/bus/bus.hpp
+@@ -5,8 +5,26 @@ struct Bus : Processor::Z80::Bus {
+   auto in(uint8 addr) -> uint8 override;
+   auto out(uint8 addr, uint8 data) -> void override;
+ 
++  uint ramMask;
++
++  bool disableIO;
++  bool disableBIOS;
++  bool disableRAM;
++  bool disableMyCard;
++  bool disableCartridge;
++  bool disableExpansion;
++
++  struct IO {
++    struct Port {
++      bool trDirection;
++      bool thDirection;
++      bool trOutput;
++      bool thOutput;
++    } port[2];
++  } io;
++
+ private:
+-  uint8 ram[0x2000];
++  uint8 ram[0x2000];  //SG-1000 = 1KB, MS/GG = 8KB
+ };
+ 
+ extern Bus bus;
+diff --git a/higan/higan/ms/cartridge/cartridge.cpp b/nSide/higan/ms/cartridge/cartridge.cpp
+index 2d5330d..7581be1 100644
+--- a/higan/higan/ms/cartridge/cartridge.cpp
++++ b/nSide/higan/ms/cartridge/cartridge.cpp
+@@ -8,6 +8,11 @@ auto Cartridge::load() -> bool {
+   information = {};
+ 
+   switch(system.model()) {
++  case Model::SG1000:
++    if(auto pathID = interface->load(ID::SG1000, "SG-1000", "sg")) {
++      information.pathID = pathID();
++    } else return false;
++    break;
+   case Model::MasterSystem:
+     if(auto pathID = interface->load(ID::MasterSystem, "Master System", "ms")) {
+       information.pathID = pathID();
+diff --git a/nSide/higan/ms/controller/controller.cpp b/nSide/higan/ms/controller/controller.cpp
+new file mode 100644
+index 0000000..22d87ca
+--- /dev/null
++++ b/nSide/higan/ms/controller/controller.cpp
+@@ -0,0 +1,28 @@
++#include <ms/ms.hpp>
++
++namespace MasterSystem {
++
++#include "gamepad/gamepad.cpp"
++
++Controller::Controller(bool port) : port(port) {
++  if(!handle()) create(Controller::Enter, 1);
++}
++
++Controller::~Controller() {
++  scheduler.remove(*this);
++}
++
++auto Controller::Enter() -> void {
++  while(true) {
++    scheduler.synchronize();
++    if(peripherals.controllerPort1->active()) peripherals.controllerPort1->main();
++    if(peripherals.controllerPort2->active()) peripherals.controllerPort2->main();
++  }
++}
++
++auto Controller::main() -> void {
++  step(1);
++  synchronize(cpu);
++}
++
++}
+diff --git a/nSide/higan/ms/controller/controller.hpp b/nSide/higan/ms/controller/controller.hpp
+new file mode 100644
+index 0000000..c6ef429
+--- /dev/null
++++ b/nSide/higan/ms/controller/controller.hpp
+@@ -0,0 +1,34 @@
++//Master System controller port pinout:
++//  ___________________
++// /(1) (2) (3) (4) (5)\
++//  \ (6) (7) (8) (9) /
++//   \---------------/
++//
++// pin  name   port1    port2
++//  1:  up     $dc.d0   $dc.d6
++//  2:  down   $dc.d1   $dc.d7
++//  3:  left   $dc.d2   $dd.d0
++//  4:  right  $dc.d3   $dd.d1
++//  5:  +5v
++//  6:  tl     $dc.d4   $dd.d2
++//  7:  th     $dd.d6   $dd.d7
++//  8:  gnd
++//  9:  tr     $dc.d5   $dd.d3
++
++struct Controller : Thread {
++  Controller(bool port);
++  virtual ~Controller();
++
++  static auto Enter() -> void;
++  virtual auto main() -> void;
++
++  virtual auto readData() -> uint7 { return 0x7f; }
++  virtual auto writeData(uint7 data) -> void {}
++
++  virtual auto readControl() -> uint7 { return 0x00; }
++  virtual auto writeControl(uint7 data) -> void {}
++
++  const bool port;
++};
++
++#include "gamepad/gamepad.hpp"
+diff --git a/nSide/higan/ms/controller/gamepad/gamepad.cpp b/nSide/higan/ms/controller/gamepad/gamepad.cpp
+new file mode 100644
+index 0000000..928d88c
+--- /dev/null
++++ b/nSide/higan/ms/controller/gamepad/gamepad.cpp
+@@ -0,0 +1,20 @@
++Gamepad::Gamepad(bool port) : Controller(port) {
++}
++
++auto Gamepad::readData() -> uint7 {
++  uint6 data;
++
++  data.bit(0) = interface->inputPoll(port, ID::Device::Gamepad, Up);
++  data.bit(1) = interface->inputPoll(port, ID::Device::Gamepad, Down);
++  data.bit(2) = interface->inputPoll(port, ID::Device::Gamepad, Left);
++  data.bit(3) = interface->inputPoll(port, ID::Device::Gamepad, Right);
++  data.bit(4) = interface->inputPoll(port, ID::Device::Gamepad, I);
++  data.bit(5) = interface->inputPoll(port, ID::Device::Gamepad, II);
++
++  data = ~data;
++  return latch << 6 | data;
++}
++
++auto Gamepad::writeData(uint7 data) -> void {
++  latch  = data.bit(6);
++}
+diff --git a/nSide/higan/ms/controller/gamepad/gamepad.hpp b/nSide/higan/ms/controller/gamepad/gamepad.hpp
+new file mode 100644
+index 0000000..11d2bbe
+--- /dev/null
++++ b/nSide/higan/ms/controller/gamepad/gamepad.hpp
+@@ -0,0 +1,12 @@
++struct Gamepad : Controller {
++  enum : uint {
++    Up, Down, Left, Right, I, II,
++  };
++
++  Gamepad(bool port);
++
++  auto readData() -> uint7 override;
++  auto writeData(uint7 data) -> void override;
++
++  boolean latch;
++};
+diff --git a/higan/higan/ms/cpu/cpu.cpp b/nSide/higan/ms/cpu/cpu.cpp
+index 80b3652..d6e51f8 100644
+--- a/higan/higan/ms/cpu/cpu.cpp
++++ b/nSide/higan/ms/cpu/cpu.cpp
+@@ -25,7 +25,7 @@ auto CPU::power() -> void {
+ 
+ auto CPU::reset() -> void {
+   Z80::reset();
+-  create(CPU::Enter, system.colorburst());
++  create(CPU::Enter, system.colorburst() * 6.0);
+ }
+ 
+ }
+diff --git a/higan/higan/ms/cpu/cpu.hpp b/nSide/higan/ms/cpu/cpu.hpp
+index 127e7d4..009350a 100644
+--- a/higan/higan/ms/cpu/cpu.hpp
++++ b/nSide/higan/ms/cpu/cpu.hpp
+@@ -7,6 +7,8 @@ struct CPU : Processor::Z80, Thread {
+ 
+   auto power() -> void;
+   auto reset() -> void;
++
++  vector<Thread*> peripherals;
+ };
+ 
+ extern CPU cpu;
+diff --git a/higan/higan/ms/interface/interface.cpp b/nSide/higan/ms/interface/interface.cpp
+index 61b2749..b03a90d 100644
+--- a/higan/higan/ms/interface/interface.cpp
++++ b/nSide/higan/ms/interface/interface.cpp
+@@ -7,7 +7,9 @@ Settings settings;
+ 
+ Interface::Interface() {
+   interface = this;
++  system.init();
+ 
++  information.preAlpha     = true;
+   information.manufacturer = "Sega";
+   information.name         = "Master System";
+   information.overscan     = true;
+@@ -16,11 +18,16 @@ Interface::Interface() {
+   information.capability.states = false;
+   information.capability.cheats = false;
+ 
+-  media.append({ID::MasterSystem, "Master System", "ms"});
+-  media.append({ID::GameGear,     "Game Gear",     "gg"});
++  media.append({ID::SG1000,       "SG-1000",       "sg", Domain::Home});
++  media.append({ID::MasterSystem, "Master System", "ms", Domain::Home});
++  media.append({ID::GameGear,     "Game Gear",     "gg", Domain::Portable});
+ 
+-  Port controllerPort1{ID::Port::Controller1, "Controller Port 1"};
+-  Port controllerPort2{ID::Port::Controller2, "Controller Port 2"};
++  Port controllerPort1{ID::Port::Controller1, "Controller Port 1", PlugAndPlay};
++  Port controllerPort2{ID::Port::Controller2, "Controller Port 2", PlugAndPlay};
++
++  { Device device{ID::Device::None, "None"};
++    controllerPort2.devices.append(device);
++  }
+ 
+   { Device device{ID::Device::Gamepad, "Gamepad"};
+     device.inputs.append({0, "Up"});
+@@ -46,15 +53,25 @@ auto Interface::title() -> string {
+ }
+ 
+ auto Interface::videoSize() -> VideoSize {
+-  return {256, 240};
++  switch(system.model()) {
++  case Model::SG1000:       return {256, 192};
++  case Model::MasterSystem: return {256, 240};
++  case Model::GameGear:     return {160, 144};
++  }
++  unreachable;
+ }
+ 
+ auto Interface::videoSize(uint width, uint height, bool arc) -> VideoSize {
+-  auto a = arc ? 8.0 / 7.0 : 1.0;
+-  uint w = 256;
+-  uint h = 240;
+-  uint m = min(width / (w * a), height / h);
+-  return {uint(w * a * m), uint(h * m)};
++  double w = system.model() != Model::GameGear ? 256 : 160;
++  if(arc && system.model() != Model::GameGear) {
++    double squarePixelRate = system.region() == System::Region::NTSC
++    ? 135.0 / 22.0 * 1'000'000.0
++    : 7'375'000.0;
++    w *= squarePixelRate / (system.colorburst() * 6.0 / (system.region() == System::Region::NTSC ? 4.0 : 4.0));
++  }
++  uint h = system.model() == Model::SG1000 ? 192 : system.model() == Model::MasterSystem ? 240 : 144;
++  uint m = min((uint)(width / w), height / h);
++  return {(uint)(w * m), h * m};
+ }
+ 
+ auto Interface::videoFrequency() -> double {
+@@ -62,11 +79,73 @@ auto Interface::videoFrequency() -> double {
+ }
+ 
+ auto Interface::videoColors() -> uint32 {
+-  return 1 << 6;
++  switch(system.model()) {
++  case Model::SG1000:       return 1 <<  4;
++  case Model::MasterSystem: return 1 <<  6;
++  case Model::GameGear:     return 1 << 12;
++  }
++  unreachable;
+ }
+ 
+ auto Interface::videoColor(uint32 color) -> uint64 {
+-  return 0;
++  uint64 r;
++  uint64 g;
++  uint64 b;
++
++  if(system.model() == Model::SG1000) {
++    double gamma = settings.colorEmulation ? 1.8 : 2.2;
++
++    static double Y[] = {
++      0.00, 0.00, 0.53, 0.67,
++      0.40, 0.53, 0.47, 0.67,
++      0.53, 0.67, 0.73, 0.80,
++      0.46, 0.53, 0.80, 1.00,
++    };
++    static double Saturation[] = {
++      0.000, 0.000, 0.267, 0.200,
++      0.300, 0.267, 0.233, 0.300,
++      0.300, 0.300, 0.233, 0.167,
++      0.233, 0.200, 0.000, 0.000,
++    };
++    static uint Phase[] = {
++        0,   0, 237, 235,
++      354, 354, 114, 295,
++      114, 114, 173, 173,
++      235,  53,   0,   0,
++    };
++    double y = Y[color];
++    double i = Saturation[color] * std::sin((Phase[color] - 33) * Math::Pi / 180.0);
++    double q = Saturation[color] * std::cos((Phase[color] - 33) * Math::Pi / 180.0);
++
++    auto gammaAdjust = [=](double f) -> double { return f < 0.0 ? 0.0 : std::pow(f, 2.2 / gamma); };
++    //This matrix is from FCC's 1953 NTSC standard.
++    //The SG-1000, ColecoVision, and MSX are older than the SMPTE C standard that followed in 1987.
++    r = uclamp<16>(65535.0 * gammaAdjust(y +  0.946882 * i +  0.623557 * q));
++    g = uclamp<16>(65535.0 * gammaAdjust(y + -0.274788 * i + -0.635691 * q));
++    b = uclamp<16>(65535.0 * gammaAdjust(y + -1.108545 * i +  1.709007 * q));
++  }
++
++  if(system.model() == Model::MasterSystem) {
++    uint R = color.bits(0,1);
++    uint G = color.bits(2,3);
++    uint B = color.bits(4,5);
++
++    r = image::normalize(R, 2, 16);
++    g = image::normalize(G, 2, 16);
++    b = image::normalize(B, 2, 16);
++  }
++
++  if(system.model() == Model::GameGear) {
++    uint R = color.bits( 0, 3);
++    uint G = color.bits( 4, 7);
++    uint B = color.bits( 8,11);
++
++    r = image::normalize(R, 4, 16);
++    g = image::normalize(G, 4, 16);
++    b = image::normalize(B, 4, 16);
++  }
++
++  return r << 32 | g << 16 | b << 0;
+ }
+ 
+ auto Interface::audioFrequency() -> double {
+@@ -78,6 +157,7 @@ auto Interface::loaded() -> bool {
+ }
+ 
+ auto Interface::load(uint id) -> bool {
++  if(id == ID::SG1000) return system.load(Model::SG1000);
+   if(id == ID::MasterSystem) return system.load(Model::MasterSystem);
+   if(id == ID::GameGear) return system.load(Model::GameGear);
+   return false;
+diff --git a/higan/higan/ms/interface/interface.hpp b/nSide/higan/ms/interface/interface.hpp
+index 076e575..b571868 100644
+--- a/higan/higan/ms/interface/interface.hpp
++++ b/nSide/higan/ms/interface/interface.hpp
+@@ -3,6 +3,7 @@ namespace MasterSystem {
+ struct ID {
+   enum : uint {
+     System,
++    SG1000,
+     MasterSystem,
+     GameGear,
+   };
+@@ -13,6 +14,7 @@ struct ID {
+   };};
+ 
+   struct Device { enum : uint {
++    None,
+     Gamepad,
+   };};
+ };
+@@ -51,6 +53,10 @@ struct Interface : Emulator::Interface {
+ };
+ 
+ struct Settings {
++  bool colorEmulation = true;
++
++  uint controllerPort1 = ID::Device::None;
++  uint controllerPort2 = ID::Device::None;
+ };
+ 
+ extern Interface* interface;
+diff --git a/higan/higan/ms/ms.hpp b/nSide/higan/ms/ms.hpp
+index 471ade7..a3242d2 100644
+--- a/higan/higan/ms/ms.hpp
++++ b/nSide/higan/ms/ms.hpp
+@@ -15,6 +15,7 @@ namespace MasterSystem {
+   extern Scheduler scheduler;
+ 
+   enum class Model : uint {
++    SG1000,
+     MasterSystem,
+     GameGear,
+   };
+@@ -30,6 +31,8 @@ namespace MasterSystem {
+     }
+   };
+ 
++  #include <ms/controller/controller.hpp>
++
+   #include <ms/cpu/cpu.hpp>
+   #include <ms/vdp/vdp.hpp>
+   #include <ms/psg/psg.hpp>
+diff --git a/higan/higan/ms/psg/psg.cpp b/nSide/higan/ms/psg/psg.cpp
+index 7d08d9e..58c979c 100644
+--- a/higan/higan/ms/psg/psg.cpp
++++ b/nSide/higan/ms/psg/psg.cpp
+@@ -17,6 +17,9 @@ auto PSG::step(uint clocks) -> void {
+   synchronize(cpu);
+ }
+ 
++auto PSG::out(uint8 addr, uint8 data) -> void {
++}
++
+ auto PSG::power() -> void {
+ }
+ 
+diff --git a/higan/higan/ms/psg/psg.hpp b/nSide/higan/ms/psg/psg.hpp
+index f9d2093..6164530 100644
+--- a/higan/higan/ms/psg/psg.hpp
++++ b/nSide/higan/ms/psg/psg.hpp
+@@ -5,6 +5,8 @@ struct PSG : Thread {
+   auto main() -> void;
+   auto step(uint clocks) -> void;
+ 
++  auto out(uint8 addr, uint8 data) -> void;
++
+   auto power() -> void;
+   auto reset() -> void;
+ };
+diff --git a/nSide/higan/ms/system/peripherals.cpp b/nSide/higan/ms/system/peripherals.cpp
+new file mode 100644
+index 0000000..7af8613
+--- /dev/null
++++ b/nSide/higan/ms/system/peripherals.cpp
+@@ -0,0 +1,30 @@
++Peripherals peripherals;
++
++auto Peripherals::unload() -> void {
++  delete controllerPort1;
++  delete controllerPort2;
++  controllerPort1 = nullptr;
++  controllerPort2 = nullptr;
++}
++
++auto Peripherals::reset() -> void {
++  connect(ID::Port::Controller1, settings.controllerPort1);
++  connect(ID::Port::Controller2, settings.controllerPort2);
++}
++
++auto Peripherals::connect(uint port, uint device) -> void {
++  if(port == ID::Port::Controller2) {
++    settings.controllerPort2 = device;
++    if(!system.loaded()) return;
++
++    delete controllerPort2;
++    switch(device) { default:
++    case ID::Device::None:    controllerPort1 = new Controller(1); break;
++    case ID::Device::Gamepad: controllerPort1 = new Gamepad(1); break;
++    }
++  }
++
++  cpu.peripherals.reset();
++  cpu.peripherals.append(controllerPort1);
++  cpu.peripherals.append(controllerPort2);
++}
+diff --git a/higan/higan/ms/system/system.cpp b/nSide/higan/ms/system/system.cpp
+index 469c0f6..e5534b3 100644
+--- a/higan/higan/ms/system/system.cpp
++++ b/nSide/higan/ms/system/system.cpp
+@@ -2,6 +2,7 @@
+ 
+ namespace MasterSystem {
+ 
++#include "peripherals.cpp"
+ System system;
+ Scheduler scheduler;
+ 
+@@ -9,6 +10,10 @@ auto System::run() -> void {
+   if(scheduler.enter() == Scheduler::Event::Frame) vdp.refresh();
+ }
+ 
++auto System::init() -> void {
++  assert(interface != nullptr);
++}
++
+ auto System::load(Model model) -> bool {
+   information = {};
+   information.model = model;
+@@ -17,6 +22,8 @@ auto System::load(Model model) -> bool {
+     information.manifest = fp->reads();
+   } else return false;
+ 
++  bus.ramMask = system.model() == Model::SG1000 ? 0x3ff : 0x1fff;
++
+   auto document = BML::unserialize(information.manifest);
+   if(!cartridge.load()) return false;
+ 
+@@ -25,11 +32,16 @@ auto System::load(Model model) -> bool {
+ }
+ 
+ auto System::save() -> void {
++  if(!loaded()) return;
+   cartridge.save();
+ }
+ 
+ auto System::unload() -> void {
++  if(!loaded()) return;
++  peripherals.unload();
++
+   cartridge.unload();
++  information.loaded = false;
+ }
+ 
+ auto System::power() -> void {
+@@ -54,6 +66,8 @@ auto System::reset() -> void {
+   vdp.reset();
+   psg.reset();
+   scheduler.primary(cpu);
++
++  peripherals.reset();
+ }
+ 
+ }
+diff --git a/higan/higan/ms/system/system.hpp b/nSide/higan/ms/system/system.hpp
+index dfc6c96..10b17b5 100644
+--- a/higan/higan/ms/system/system.hpp
++++ b/nSide/higan/ms/system/system.hpp
+@@ -1,10 +1,14 @@
+ struct System {
++  enum class Region : uint { NTSC = 0, PAL = 1 };
++
+   auto loaded() const -> bool { return information.loaded; }
+   auto model() const -> Model { return information.model; }
++  auto region() const -> Region { return information.region; }
+   auto colorburst() const -> double { return information.colorburst; }
+ 
+   auto run() -> void;
+ 
++  auto init() -> void;
+   auto load(Model model) -> bool;
+   auto save() -> void;
+   auto unload() -> void;
+@@ -14,11 +18,22 @@ struct System {
+ 
+ private:
+   struct Information {
+-    bool loaded = false;
+-    Model model = Model::MasterSystem;
+     string manifest;
++    bool loaded = false;
++    Model model = Model::SG1000;
++    Region region = Region::NTSC;
+     double colorburst = 0.0;
+   } information;
+ };
+ 
++struct Peripherals {
++  auto unload() -> void;
++  auto reset() -> void;
++  auto connect(uint port, uint device) -> void;
++
++  Controller* controllerPort1 = nullptr;
++  Controller* controllerPort2 = nullptr;
++};
++
+ extern System system;
++extern Peripherals peripherals;
+diff --git a/nSide/higan/ms/vdp/io.cpp b/nSide/higan/ms/vdp/io.cpp
+new file mode 100644
+index 0000000..201c433
+--- /dev/null
++++ b/nSide/higan/ms/vdp/io.cpp
+@@ -0,0 +1,126 @@
++auto VDP::readData() -> uint8 {
++  switch(io.controlCode) {
++  case 0: {  //VRAM read
++    return vram[io.controlAddress++];
++  }
++
++  case 1: {  //VRAM write
++    return vram[io.controlAddress++];
++  }
++
++  case 2: {  //register
++    return vram[io.controlAddress++];
++  }
++
++  case 3: {  //CRAM write
++    return cram[(io.controlAddress++) & 0x3f];
++  }
++
++  }
++  unreachable;
++}
++
++auto VDP::writeData(uint8 data) -> void {
++  switch(io.controlCode) {
++  case 0: {  //VRAM read
++    vram[io.controlAddress++] = data;
++    break;
++  }
++
++  case 1: {  //VRAM write
++    vram[io.controlAddress++] = data;
++    break;
++  }
++
++  case 2: {  //register
++    switch((io.controlAddress++) & (system.model() == Model::SG1000 ? 7 : 15)) {
++    case 0x00:
++      io.externalVDP = data.bit(0);
++      io.mode3       = data.bit(1);
++      if(system.model() != Model::SG1000) {
++        io.mode4           = data.bit(2);
++        io.spriteShiftLeft = data.bit(3);
++        io.lineInterrupt   = data.bit(4);
++        io.hideLeft        = data.bit(5);
++        io.horizontalLock  = data.bit(6);
++        io.verticalLock    = data.bit(7);
++      }
++      break;
++    case 0x01:
++      io.spriteMag  = data.bit(0);
++      io.spriteSize = data.bit(1);
++      io.mode2      = data.bit(3);
++      io.mode1      = data.bit(4);
++      io.interrupt  = data.bit(5);
++      io.blank      = data.bit(6);
++      io.ramSize    = data.bit(7);
++      break;
++    case 0x02:
++      io.nametableMask    = data.bit (  0);
++      io.nametableAddress = data.bits(1,3) << 11;
++      break;
++    case 0x03:
++      io.colorAddress = data << 6;
++      break;
++    case 0x04:
++      io.patternAddress = data.bits(0,2) << 11;
++      break;
++    case 0x05:
++      io.spriteAttributeMask    = data.bit (  0);
++      io.spriteAttributeAddress = data.bits(1,6) << 8;
++      break;
++    case 0x06:
++      io.spritePatternMask    = data.bit (  0);
++      io.spritePatternAddress = data.bits(1,2) << 12;
++      break;
++    case 0x07:
++      io.backColor = data.bits(0,3);
++      io.textColor = data.bits(4,7);
++      break;
++    case 0x08:
++      io.scrollX = data;
++      break;
++    case 0x09:
++      io.scrollY = data;
++      break;
++    case 0x0a:
++      io.lineCounter = data;
++      break;
++    case 0x0b: case 0x0c: case 0x0d: case 0x0e: case 0x0f:
++      break;
++    }
++    break;
++  }
++
++  case 3: {  //CRAM write
++    cram[(io.controlAddress++) & 0x3f];
++    break;
++  }
++
++  }
++}
++
++auto VDP::readControl() -> uint8 {
++  io.controlLatch = false;
++  uint8 data = (
++    (io.fifthSprite) +  //Modes 1, 2, 3; undefined in Mode 4
++    (io.spriteCollision << 5) +
++    (io.spriteOverflow << 6) +
++    (vblank() << 7)
++  );
++  io.fifthSprite     = 0;
++  io.spriteCollision = false;
++  io.spriteOverflow  = false;
++  return data;
++}
++
++auto VDP::writeControl(uint8 data) -> void {
++  if(!io.controlLatch) {
++    io.controlAddress.bits( 0, 7) = data;
++    io.controlLatch = true;
++  } else {
++    io.controlAddress.bits( 8,13) = (uint)data.bits(0,5);
++    io.controlCode                =       data.bits(6,7);
++    io.controlLatch = false;
++  }
++}
+diff --git a/nSide/higan/ms/vdp/render.cpp b/nSide/higan/ms/vdp/render.cpp
+new file mode 100644
+index 0000000..44ec326
+--- /dev/null
++++ b/nSide/higan/ms/vdp/render.cpp
+@@ -0,0 +1,30 @@
++auto VDP::scanline() -> void {
++  state.x = 0;
++  if(++state.y >= 262) state.y = 0;
++
++  if(state.y < activeHeight()) {
++  }
++
++  if(state.y == screenY() + screenHeight()) scheduler.exit(Scheduler::Event::Frame);
++
++  state.output = buffer + (state.y - screenY()) * 256;
++}
++
++auto VDP::run() -> void {
++  uint32 color;
++  switch(system.model()) {
++  case Model::SG1000: color = state.x / 16; break;
++  case Model::MasterSystem: color = state.x / 16 | (state.y / (screenHeight() / 4)) << 4; break;
++  case Model::GameGear: color = ((state.x - screenX()) * 64 / 160) | ((state.y - screenY()) * 64 / 144) << 6; break;
++  }
++  outputPixel(color);
++  state.x++;
++}
++
++auto VDP::outputPixel(uint12 color) -> void {
++  if(system.model() == Model::GameGear) {
++    if((state.x < screenX() || state.x >= screenX() + screenWidth())) return;
++    if((state.y < screenY() || state.y >= screenY() + screenHeight())) return;
++  }
++  *(state.output++) = color;
++}
+diff --git a/higan/higan/ms/vdp/vdp.cpp b/nSide/higan/ms/vdp/vdp.cpp
+index a899837..0d069ab 100644
+--- a/higan/higan/ms/vdp/vdp.cpp
++++ b/nSide/higan/ms/vdp/vdp.cpp
+@@ -3,17 +3,24 @@
+ namespace MasterSystem {
+ 
+ VDP vdp;
++#include "io.cpp"
++#include "render.cpp"
+ 
+ auto VDP::Enter() -> void {
+   while(true) scheduler.synchronize(), vdp.main();
+ }
+ 
+ auto VDP::main() -> void {
+-  for(uint y : range(262)) {
+-    for(uint x : range(342)) {
+-      step(1);
++  scanline();
++  if(state.y < activeHeight()) {
++    for(uint x : range(activeWidth())) {
++      run();
++      step(4);
+     }
+-    if(y == 240) scheduler.exit(Scheduler::Event::Frame);
++    step(344);
++    if(state.y == screenY() + screenHeight()) scheduler.exit(Scheduler::Event::Frame);
++  } else {
++    step(1368);
+   }
+ }
+ 
+@@ -23,11 +30,48 @@ auto VDP::step(uint clocks) -> void {
+ }
+ 
+ auto VDP::refresh() -> void {
+-  Emulator::video.refresh(buffer, 256 * sizeof(uint32), 256, 240);
++  Emulator::video.refresh(buffer, 256 * sizeof(uint32), screenWidth(), screenHeight());
+ }
+ 
+ auto VDP::in(uint8 addr) -> uint8 {
+   switch(addr) {
++
++  case 0x40: case 0x42: case 0x44: case 0x46:
++  case 0x48: case 0x4a: case 0x4c: case 0x4e:
++  case 0x50: case 0x52: case 0x54: case 0x56:
++  case 0x58: case 0x5a: case 0x5c: case 0x5e:
++  case 0x60: case 0x62: case 0x64: case 0x66:
++  case 0x68: case 0x6a: case 0x6c: case 0x6e:
++  case 0x70: case 0x72: case 0x74: case 0x76:
++  case 0x78: case 0x7a: case 0x7c: case 0x7e:  //port $7e
++    return 0xb0/*hcounter*/;
++  case 0x41: case 0x43: case 0x45: case 0x47:
++  case 0x49: case 0x4b: case 0x4d: case 0x4f:
++  case 0x51: case 0x53: case 0x55: case 0x57:
++  case 0x59: case 0x5b: case 0x5d: case 0x5f:
++  case 0x61: case 0x63: case 0x65: case 0x67:
++  case 0x69: case 0x6b: case 0x6d: case 0x6f:
++  case 0x71: case 0x73: case 0x75: case 0x77:
++  case 0x79: case 0x7b: case 0x7d: case 0x7f:  //port $7f
++    return 0xb0/*vcounter*/;
++  case 0x80: case 0x82: case 0x84: case 0x86:
++  case 0x88: case 0x8a: case 0x8c: case 0x8e:
++  case 0x90: case 0x92: case 0x94: case 0x96:
++  case 0x98: case 0x9a: case 0x9c: case 0x9e:
++  case 0xa0: case 0xa2: case 0xa4: case 0xa6:
++  case 0xa8: case 0xaa: case 0xac: case 0xae:
++  case 0xb0: case 0xb2: case 0xb4: case 0xb6:
++  case 0xb8: case 0xba: case 0xbc: case 0xbe:  //port $be
++    return readData();
++  case 0x81: case 0x83: case 0x85: case 0x87:
++  case 0x89: case 0x8b: case 0x8d: case 0x8f:
++  case 0x91: case 0x93: case 0x95: case 0x97:
++  case 0x99: case 0x9b: case 0x9d: case 0x9f:
++  case 0xa1: case 0xa3: case 0xa5: case 0xa7:
++  case 0xa9: case 0xab: case 0xad: case 0xaf:
++  case 0xb1: case 0xb3: case 0xb5: case 0xb7:
++  case 0xb9: case 0xbb: case 0xbd: case 0xbf:  //port $bf
++    return readControl();
+   }
+ 
+   return 0xb0;
+@@ -35,6 +79,31 @@ auto VDP::in(uint8 addr) -> uint8 {
+ 
+ auto VDP::out(uint8 addr, uint8 data) -> void {
+   switch(addr) {
++
++  case 0x80: case 0x82: case 0x84: case 0x86:
++  case 0x88: case 0x8a: case 0x8c: case 0x8e:
++  case 0x90: case 0x92: case 0x94: case 0x96:
++  case 0x98: case 0x9a: case 0x9c: case 0x9e:
++  case 0xa0: case 0xa2: case 0xa4: case 0xa6:
++  case 0xa8: case 0xaa: case 0xac: case 0xae:
++  case 0xb0: case 0xb2: case 0xb4: case 0xb6:
++  case 0xb8: case 0xba: case 0xbc: case 0xbe: {  //port $be
++    writeData(data);
++    break;
++  }
++
++  case 0x81: case 0x83: case 0x85: case 0x87:
++  case 0x89: case 0x8b: case 0x8d: case 0x8f:
++  case 0x91: case 0x93: case 0x95: case 0x97:
++  case 0x99: case 0x9b: case 0x9d: case 0x9f:
++  case 0xa1: case 0xa3: case 0xa5: case 0xa7:
++  case 0xa9: case 0xab: case 0xad: case 0xaf:
++  case 0xb1: case 0xb3: case 0xb5: case 0xb7:
++  case 0xb9: case 0xbb: case 0xbd: case 0xbf: {  //port $bf
++    writeControl(data);
++    break;
++  }
++
+   }
+ }
+ 
+@@ -42,7 +111,39 @@ auto VDP::power() -> void {
+ }
+ 
+ auto VDP::reset() -> void {
+-  create(VDP::Enter, system.colorburst());
++  create(VDP::Enter, system.colorburst() * 6.0);
++}
++
++auto VDP::vblank() -> bool {
++  return false;
++}
++
++inline auto VDP::screenX() -> uint {
++  return system.model() != Model::GameGear ? 0 : (256 - 160) / 2;
++}
++
++inline auto VDP::screenY() -> uint {
++  return system.model() != Model::GameGear ? 0 : (240 - 144) / 2;
++}
++
++inline auto VDP::screenWidth() -> uint {
++  return system.model() != Model::GameGear ? 256 : 160;
++}
++
++inline auto VDP::screenHeight() -> uint {
++  switch(system.model()) {
++  case Model::SG1000: return 192;
++  case Model::MasterSystem: return 240;
++  case Model::GameGear: return 144;
++  }
++}
++
++inline auto VDP::activeWidth() -> uint {
++  return 256;
++}
++
++inline auto VDP::activeHeight() -> uint {
++  return system.model() == Model::SG1000 ? 192 : 240;
+ }
+ 
+ }
+diff --git a/higan/higan/ms/vdp/vdp.hpp b/nSide/higan/ms/vdp/vdp.hpp
+index b0fb8fe..a1c30a4 100644
+--- a/higan/higan/ms/vdp/vdp.hpp
++++ b/nSide/higan/ms/vdp/vdp.hpp
+@@ -12,8 +12,87 @@ struct VDP : Thread {
+   auto power() -> void;
+   auto reset() -> void;
+ 
++  auto vblank() -> bool;
++
++  //io.cpp
++  auto readData() -> uint8;
++  auto writeData(uint8 data) -> void;
++
++  auto readControl() -> uint8;
++  auto writeControl(uint8 data) -> void;
++
++  //render.cpp
++  auto scanline() -> void;
++  auto run() -> void;
++  auto outputPixel(uint12 color) -> void;
++
+ private:
+-  uint32 buffer[256 * 240];
++  inline auto screenX() -> uint;
++  inline auto screenY() -> uint;
++  inline auto screenWidth() -> uint;
++  inline auto screenHeight() -> uint;
++  inline auto activeWidth() -> uint;
++  inline auto activeHeight() -> uint;
++
++  uint8 vram[16 * 1024];
++  uint8 cram[64];  //SG-1000: 0, MS: 32, GG: 64
++
++  struct IO {
++    uint14 controlAddress;
++    uint2 controlCode;
++    bool controlLatch;
++
++    bool externalVDP;
++    bool mode3;
++    bool mode4;
++    bool spriteShiftLeft;
++    bool lineInterrupt;
++    bool hideLeft;
++    bool horizontalLock;
++    bool verticalLock;
++
++    bool spriteMag;
++    bool spriteSize;
++    bool mode2;
++    bool mode1;
++    bool interrupt;
++    bool blank;
++    bool ramSize;
++
++    bool nametableMask;
++    uint14 nametableAddress;
++
++    uint14 colorAddress;
++
++    uint14 patternAddress;
++
++    uint14 spriteAttributeMask;
++    uint14 spriteAttributeAddress;
++
++    uint14 spritePatternMask;
++    uint14 spritePatternAddress;
++
++    uint4 backColor;
++    uint4 textColor;
++
++    uint8 scrollX;
++
++    uint8 scrollY;
++
++    uint8 lineCounter;
++
++    uint5 fifthSprite;
++    bool spriteCollision;
++    bool spriteOverflow;
++  } io;
++
++  struct State {
++    uint32* output = nullptr;
++    uint x;
++    uint y;
++  } state;
++
++  uint32 buffer[256 * 240];  //SG-1000: 256 * 192
+ };
+ 
+ extern VDP vdp;
+

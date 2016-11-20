@@ -1,0 +1,248 @@
+diff --git a/higan/higan/sfc/GNUmakefile b/nSide/higan/sfc/GNUmakefile
+index 045a9cf..8d25ddf 100644
+--- a/higan/higan/sfc/GNUmakefile
++++ b/nSide/higan/sfc/GNUmakefile
+@@ -1,4 +1,4 @@
+-processors += r65816 spc700 arm gsu hg51b upd96050
++processors += wdc65816 spc700 arm gsu hg51b upd96050
+ 
+ objects += sfc-interface sfc-system sfc-controller
+ objects += sfc-cartridge sfc-memory
+diff --git a/higan/higan/sfc/controller/justifier/justifier.cpp b/nSide/higan/sfc/controller/justifier/justifier.cpp
+index ec90af0..520c72b 100644
+--- a/higan/higan/sfc/controller/justifier/justifier.cpp
++++ b/nSide/higan/sfc/controller/justifier/justifier.cpp
+@@ -10,7 +10,7 @@ device(!chained ? ID::Device::Justifier : ID::Device::Justifiers)
+   prev = 0;
+ 
+   player1.sprite = Emulator::video.createSprite(32, 32);
+-  player1.sprite->setPixels(Resource::Sprite::CrosshairGreen);
++  player1.sprite->setPixels(Resource::Sprite::CrosshairBlue);
+   player1.x = 256 / 2;
+   player1.y = 240 / 2;
+   player1.trigger = false;
+diff --git a/higan/higan/sfc/controller/super-scope/super-scope.cpp b/nSide/higan/sfc/controller/super-scope/super-scope.cpp
+index 7980cce..a66aa47 100644
+--- a/higan/higan/sfc/controller/super-scope/super-scope.cpp
++++ b/nSide/higan/sfc/controller/super-scope/super-scope.cpp
+@@ -77,7 +77,7 @@ auto SuperScope::data() -> uint2 {
+     bool newturbo = interface->inputPoll(port, ID::Device::SuperScope, Turbo);
+     if(newturbo && !oldturbo) {
+       turbo = !turbo;  //toggle state
+-      sprite->setPixels(turbo ? Resource::Sprite::CrosshairRed : Resource::Sprite::CrosshairGreen);
++      sprite->setPixels(turbo ? Resource::Sprite::CrosshairTurbo : Resource::Sprite::CrosshairGreen);
+     }
+     oldturbo = newturbo;
+ 
+diff --git a/higan/higan/sfc/coprocessor/sa1/sa1.cpp b/nSide/higan/sfc/coprocessor/sa1/sa1.cpp
+index 3f0c0d7..bb84b1f 100644
+--- a/higan/higan/sfc/coprocessor/sa1/sa1.cpp
++++ b/nSide/higan/sfc/coprocessor/sa1/sa1.cpp
+@@ -30,7 +30,7 @@ auto SA1::main() -> void {
+   instruction();
+ }
+ 
+-//override R65816::interrupt() to support SA-1 vector location IO registers
++//override WDC65816::interrupt() to support SA-1 vector location IO registers
+ auto SA1::interrupt() -> void {
+   read(r.pc.d);
+   idle();
+diff --git a/higan/higan/sfc/coprocessor/sa1/sa1.hpp b/nSide/higan/sfc/coprocessor/sa1/sa1.hpp
+index 80543e8..4df67be 100644
+--- a/higan/higan/sfc/coprocessor/sa1/sa1.hpp
++++ b/nSide/higan/sfc/coprocessor/sa1/sa1.hpp
+@@ -1,4 +1,4 @@
+-struct SA1 : Processor::R65816, Thread {
++struct SA1 : Processor::WDC65816, Thread {
+   //sa1.cpp
+   static auto Enter() -> void;
+   auto main() -> void;
+diff --git a/higan/higan/sfc/coprocessor/sa1/serialization.cpp b/nSide/higan/sfc/coprocessor/sa1/serialization.cpp
+index 9902a0b..5ab0688 100644
+--- a/higan/higan/sfc/coprocessor/sa1/serialization.cpp
++++ b/nSide/higan/sfc/coprocessor/sa1/serialization.cpp
+@@ -1,5 +1,5 @@
+ auto SA1::serialize(serializer& s) -> void {
+-  R65816::serialize(s);
++  WDC65816::serialize(s);
+   Thread::serialize(s);
+ 
+   s.array(iram.data(), iram.size());
+diff --git a/higan/higan/sfc/cpu/cpu.hpp b/nSide/higan/sfc/cpu/cpu.hpp
+index d899fab..6dcb316 100644
+--- a/higan/higan/sfc/cpu/cpu.hpp
++++ b/nSide/higan/sfc/cpu/cpu.hpp
+@@ -1,4 +1,4 @@
+-struct CPU : Processor::R65816, Thread, PPUcounter {
++struct CPU : Processor::WDC65816, Thread, PPUcounter {
+   auto interruptPending() const -> bool override;
+   auto pio() const -> uint8;
+   auto joylatch() const -> bool;
+diff --git a/higan/higan/sfc/cpu/serialization.cpp b/nSide/higan/sfc/cpu/serialization.cpp
+index 6439ca6..90c2a82 100644
+--- a/higan/higan/sfc/cpu/serialization.cpp
++++ b/nSide/higan/sfc/cpu/serialization.cpp
+@@ -1,5 +1,5 @@
+ auto CPU::serialize(serializer& s) -> void {
+-  R65816::serialize(s);
++  WDC65816::serialize(s);
+   Thread::serialize(s);
+   PPUcounter::serialize(s);
+ 
+diff --git a/higan/higan/sfc/cpu/timing.cpp b/nSide/higan/sfc/cpu/timing.cpp
+index 72fe614..3c610ff 100644
+--- a/higan/higan/sfc/cpu/timing.cpp
++++ b/nSide/higan/sfc/cpu/timing.cpp
+@@ -25,9 +25,9 @@ auto CPU::step(uint clocks) -> void {
+   }
+ 
+   #if defined(DEBUGGER)
+-  synchronizeSMP();
+-  synchronizePPU();
+-  synchronizeCoprocessors();
++  synchronize(smp);
++  synchronize(ppu);
++  for(auto coprocessor : coprocessors) synchronize(*coprocessor);
+   #endif
+ }
+ 
+diff --git a/higan/higan/sfc/interface/interface.cpp b/nSide/higan/sfc/interface/interface.cpp
+index 211b16a..ae1163b 100644
+--- a/higan/higan/sfc/interface/interface.cpp
++++ b/nSide/higan/sfc/interface/interface.cpp
+@@ -10,6 +10,7 @@ Interface::Interface() {
+   interface = this;
+   system.init();
+ 
++  information.preAlpha     = false;
+   information.manufacturer = "Nintendo";
+   information.name         = "Super Famicom";
+   information.overscan     = true;
+@@ -18,11 +19,11 @@ Interface::Interface() {
+   information.capability.states = true;
+   information.capability.cheats = true;
+ 
+-  media.append({ID::SuperFamicom, "Super Famicom", "sfc"});
++  media.append({ID::SuperFamicom, "Super Famicom", "sfc", Domain::Home});
+ 
+-  Port controllerPort1{ID::Port::Controller1, "Controller Port 1"};
+-  Port controllerPort2{ID::Port::Controller2, "Controller Port 2"};
+-  Port expansionPort{ID::Port::Expansion, "Expansion Port"};
++  Port controllerPort1{ID::Port::Controller1, "Controller Port 1", PlugAndPlay};
++  Port controllerPort2{ID::Port::Controller2, "Controller Port 2", PlugAndPlay};
++  Port expansionPort{ID::Port::Expansion, "Expansion Port", PlugAndPlay};
+ 
+   { Device device{ID::Device::None, "None"};
+     controllerPort1.devices.append(device);
+@@ -130,10 +131,17 @@ auto Interface::videoSize() -> VideoSize {
+ }
+ 
+ auto Interface::videoSize(uint width, uint height, bool arc) -> VideoSize {
+-  uint w = 256 * (arc ? 8.0 / 7.0 : 1.0);
++  double w = 256;
++  if(arc) {
++    double squarePixelRate = system.region() == System::Region::NTSC
++    ? 135.0 / 22.0 * 1'000'000.0
++    : 7'375'000.0;
++    //note: PAL SNES multiples colorburst by 4/5 to make clock rate
++    w *= squarePixelRate / (system.colorburst() * 6.0 / (2.0 + 2.0));
++  }
+   uint h = 240;
+-  uint m = min(width / w, height / h);
+-  return {w * m, h * m};
++  uint m = min((uint)(width / w), height / h);
++  return {(uint)(w * m), h * m};
+ }
+ 
+ auto Interface::videoFrequency() -> double {
+@@ -275,4 +283,49 @@ auto Interface::set(const string& name, const any& value) -> bool {
+   return false;
+ }
+ 
++auto Interface::exportMemory() -> void {
++  string pathname = {path(cartridge.pathID()), "debug/"};
++  directory::create(pathname);
++
++  if(auto fp = interface->open(cartridge.pathID(), "debug/work.ram", File::Write)) fp->write(cpu.wram, 128 * 1024);
++  if(cartridge.ram.size()) if(auto fp = interface->open(cartridge.pathID(), "debug/program-save.ram", File::Write)) {
++    fp->write(cartridge.ram.data(), cartridge.ram.size());
++  }
++  if(cartridge.has.MCC) if(auto fp = interface->open(cartridge.pathID(), "debug/mcc.ram", File::Write)) {
++    fp->write(mcc.ram.data(), mcc.ram.size());
++  }
++  if(cartridge.has.Event) if(auto fp = interface->open(cartridge.pathID(), "debug/event.ram", File::Write)) {
++    fp->write(event.ram.data(), event.ram.size());
++  }
++  if(cartridge.has.SA1) {
++    if(auto fp = interface->open(cartridge.pathID(), "debug/sa1.internal.ram", File::Write)) {
++      fp->write(sa1.iram.data(), sa1.iram.size());
++    }
++    if(auto fp = interface->open(cartridge.pathID(), "debug/sa1.bitmap-work.ram", File::Write)) {
++      fp->write(sa1.bwram.data(), sa1.bwram.size());
++    }
++  }
++  if(cartridge.has.SuperFX) if(auto fp = interface->open(cartridge.pathID(), "debug/superfx.ram", File::Write)) {
++    fp->write(superfx.ram.data(), superfx.ram.size());
++  }
++  if(cartridge.has.SPC7110) if(auto fp = interface->open(cartridge.pathID(), "debug/spc7110.ram", File::Write)) {
++    fp->write(spc7110.ram.data(), spc7110.ram.size());
++  }
++  if(cartridge.has.SDD1) if(auto fp = interface->open(cartridge.pathID(), "debug/sdd1.ram", File::Write)) {
++    fp->write(sdd1.ram.data(), sdd1.ram.size());
++  }
++  if(cartridge.has.OBC1) if(auto fp = interface->open(cartridge.pathID(), "debug/obc1.ram", File::Write)) {
++    fp->write(obc1.ram.data(), obc1.ram.size());
++  }
++
++  if(cartridge.has.SufamiTurboSlots) {
++    if(auto fp = interface->open(cartridge.pathID(), "debug/sufamiturbo.slota.ram", File::Write)) {
++      fp->write(sufamiturboA.ram.data(), sufamiturboA.ram.size());
++    }
++    if(auto fp = interface->open(cartridge.pathID(), "debug/sufamiturbo.slotb.ram", File::Write)) {
++      fp->write(sufamiturboB.ram.data(), sufamiturboB.ram.size());
++    }
++  }
++}
++
+ }
+diff --git a/higan/higan/sfc/interface/interface.hpp b/nSide/higan/sfc/interface/interface.hpp
+index 4ff0eaa..490c6cf 100644
+--- a/higan/higan/sfc/interface/interface.hpp
++++ b/nSide/higan/sfc/interface/interface.hpp
+@@ -70,6 +70,9 @@ struct Interface : Emulator::Interface {
+   auto cap(const string& name) -> bool override;
+   auto get(const string& name) -> any override;
+   auto set(const string& name, const any& value) -> bool override;
++
++  //debugger functions
++  auto exportMemory() -> void override;
+ };
+ 
+ struct Settings {
+diff --git a/higan/higan/sfc/memory/memory-inline.hpp b/nSide/higan/sfc/memory/memory-inline.hpp
+index 92387c1..babbd5d 100644
+--- a/higan/higan/sfc/memory/memory-inline.hpp
++++ b/nSide/higan/sfc/memory/memory-inline.hpp
+@@ -69,7 +69,7 @@ auto Bus::read(uint24 addr, uint8 data) -> uint8 {
+   data = reader[lookup[addr]](target[addr], data);
+   if(cheat) {
+     if(!(addr & 0x40e000)) addr = 0x7e0000 | (addr & 0x1fff);  //de-mirror WRAM
+-    if(auto result = cheat.find(addr, data)) return result();
++    if(auto result = cheat.find<1>(addr, data)) return result();
+   }
+   return data;
+ }
+diff --git a/higan/higan/sfc/sfc.hpp b/nSide/higan/sfc/sfc.hpp
+index fc71d2a..72137a3 100644
+--- a/higan/higan/sfc/sfc.hpp
++++ b/nSide/higan/sfc/sfc.hpp
+@@ -11,7 +11,7 @@
+ #include <processor/arm/arm.hpp>
+ #include <processor/gsu/gsu.hpp>
+ #include <processor/hg51b/hg51b.hpp>
+-#include <processor/r65816/r65816.hpp>
++#include <processor/wdc65816/wdc65816.hpp>
+ #include <processor/spc700/spc700.hpp>
+ #include <processor/upd96050/upd96050.hpp>
+ 
+

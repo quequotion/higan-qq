@@ -1,0 +1,66 @@
+diff --git a/higan-hack/hiro/gtk/keyboard.cpp b/nSide/hiro/gtk/keyboard.cpp
+index 7a579d4..57cd570 100644
+--- a/higan-hack/hiro/gtk/keyboard.cpp
++++ b/nSide/hiro/gtk/keyboard.cpp
+@@ -19,7 +19,7 @@ auto pKeyboard::pressed(unsigned code) -> bool {
+   #if defined(DISPLAY_XORG)
+   XQueryKeymap(pApplication::display, state);
+   #endif
+-  return _pressed(state, code);
++  return _pressed(state, settings->keycodes[code]);
+ }
+ 
+ auto pKeyboard::_pressed(const char* state, uint16_t code) -> bool {
+diff --git a/higan-hack/hiro/qt/keyboard.cpp b/nSide/hiro/qt/keyboard.cpp
+index 4872be6..81dd3ba 100644
+--- a/higan-hack/hiro/qt/keyboard.cpp
++++ b/nSide/hiro/qt/keyboard.cpp
+@@ -15,7 +15,7 @@ auto pKeyboard::poll() -> vector<bool> {
+ auto pKeyboard::pressed(unsigned code) -> bool {
+   char state[256];
+   XQueryKeymap(pApplication::display, state);
+-  return _pressed(state, code);
++  return _pressed(state, settings->keycodes[code]);
+ }
+ 
+ auto pKeyboard::_pressed(const char* state, uint16_t code) -> bool {
+diff --git a/higan-hack/hiro/windows/keyboard.cpp b/nSide/hiro/windows/keyboard.cpp
+index c2c95d1..fdb20b4 100644
+--- a/higan-hack/hiro/windows/keyboard.cpp
++++ b/nSide/hiro/windows/keyboard.cpp
+@@ -6,11 +6,15 @@ vector<uint16_t> pKeyboard::keycodes;
+ 
+ auto pKeyboard::poll() -> vector<bool> {
+   vector<bool> result;
+-  for(auto& code : keycodes) result.append(pressed(code));
++  for(auto& code : keycodes) result.append(_pressed(code));
+   return result;
+ }
+ 
+ auto pKeyboard::pressed(unsigned code) -> bool {
++  return _pressed(keycodes[code]);
++}
++
++auto pKeyboard::_pressed(uint16_t code) -> bool {
+   uint8_t lo = code >> 0;
+   uint8_t hi = code >> 8;
+   if(lo && GetAsyncKeyState(lo) & 0x8000) return true;
+diff --git a/higan-hack/hiro/windows/keyboard.hpp b/nSide/hiro/windows/keyboard.hpp
+index 5cf00c8..6b2ecb8 100644
+--- a/higan-hack/hiro/windows/keyboard.hpp
++++ b/nSide/hiro/windows/keyboard.hpp
+@@ -6,10 +6,11 @@ struct pKeyboard {
+   static auto poll() -> vector<bool>;
+   static auto pressed(unsigned code) -> bool;
+ 
+-  static auto initialize() -> void;
+-
++  static auto _pressed(uint16_t code) -> bool;
+   static auto _translate(unsigned code, unsigned flags) -> signed;
+ 
++  static auto initialize() -> void;
++
+   static vector<uint16_t> keycodes;
+ };
+ 
+

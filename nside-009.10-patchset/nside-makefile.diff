@@ -1,0 +1,15 @@
+diff --git a/higan-hack/higan/GNUmakefile b/nSide/higan/GNUmakefile
+index acac7eb..20effe8 100644
+--- a/higan-hack/higan/GNUmakefile
++++ b/nSide/higan/GNUmakefile
+@@ -1,6 +1,8 @@
+ include ../nall/GNUmakefile
+ 
+-target := tomoko
++ifndef target
++  target := tomoko
++endif
+ # console := true
+ 
+ flags += -I. -I.. -O3
+

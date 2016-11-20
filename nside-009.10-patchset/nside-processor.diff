@@ -1,0 +1,4929 @@
+diff --git a/higan/higan/processor/GNUmakefile b/nSide/higan/processor/GNUmakefile
+index 2aaa74f..b5c518b 100644
+--- a/higan/higan/processor/GNUmakefile
++++ b/nSide/higan/processor/GNUmakefile
+@@ -5,11 +5,11 @@ objects += $(if $(findstring gsu,$(processors)),processor-gsu)
+ objects += $(if $(findstring hg51b,$(processors)),processor-hg51b)
+ objects += $(if $(findstring lr35902,$(processors)),processor-lr35902)
+ objects += $(if $(findstring m68k,$(processors)),processor-m68k)
+-objects += $(if $(findstring r6502,$(processors)),processor-r6502)
+-objects += $(if $(findstring r65816,$(processors)),processor-r65816)
++objects += $(if $(findstring mos6502,$(processors)),processor-mos6502)
+ objects += $(if $(findstring spc700,$(processors)),processor-spc700)
+ objects += $(if $(findstring upd96050,$(processors)),processor-upd96050)
+ objects += $(if $(findstring v30mz,$(processors)),processor-v30mz)
++objects += $(if $(findstring wdc65816,$(processors)),processor-wdc65816)
+ objects += $(if $(findstring z80,$(processors)),processor-z80)
+ 
+ obj/processor-arm.o:      processor/arm/arm.cpp $(call rwildcard,processor/arm)
+@@ -17,9 +17,9 @@ obj/processor-gsu.o:      processor/gsu/gsu.cpp $(call rwildcard,processor/gsu)
+ obj/processor-hg51b.o:    processor/hg51b/hg51b.cpp $(call rwildcard,processor/hg51b)
+ obj/processor-lr35902.o:  processor/lr35902/lr35902.cpp $(call rwildcard,processor/lr35902)
+ obj/processor-m68k.o:     processor/m68k/m68k.cpp $(call rwildcard,processor/m68k)
+-obj/processor-r6502.o:    processor/r6502/r6502.cpp $(call rwildcard,processor/r6502)
+-obj/processor-r65816.o:   processor/r65816/r65816.cpp $(call rwildcard,processor/r65816)
++obj/processor-mos6502.o:  processor/mos6502/mos6502.cpp $(call rwildcard,processor/mos6502)
+ obj/processor-spc700.o:   processor/spc700/spc700.cpp $(call rwildcard,processor/spc700)
+ obj/processor-upd96050.o: processor/upd96050/upd96050.cpp $(call rwildcard,processor/upd96050)
+ obj/processor-v30mz.o:    processor/v30mz/v30mz.cpp $(call rwildcard,processor/v30mz)
++obj/processor-wdc65816.o: processor/wdc65816/wdc65816.cpp $(call rwildcard,processor/wdc65816)
+ obj/processor-z80.o:      processor/z80/z80.cpp $(call rwildcard,processor/z80)
+diff --git a/nSide/higan/processor/mos6502/algorithms.cpp b/nSide/higan/processor/mos6502/algorithms.cpp
+new file mode 100644
+index 0000000..a4a1dc2
+--- /dev/null
++++ b/nSide/higan/processor/mos6502/algorithms.cpp
+@@ -0,0 +1,189 @@
++//opcode functions
++//================
++
++auto MOS6502::fp_adc() {
++  int result;
++
++  if(!allowBCD || !r.p.d) {
++    result = r.a + rd + r.p.c;
++  } else {
++    result = (r.a & 0x0f) + (rd & 0x0f) + (r.p.c << 0);
++    if(result > 0x09) result += 0x06;
++    r.p.c = result > 0x0f;
++    result = (r.a & 0xf0) + (rd & 0xf0) + (r.p.c << 4) + (result & 0x0f);
++  }
++
++  r.p.v = ~(r.a ^ rd) & (r.a ^ result) & 0x80;
++  r.p.c = (result > 0xff);
++  r.p.n = (result & 0x80);
++  r.p.z = ((uint8)result == 0);
++  r.a = result;
++}
++
++auto MOS6502::fp_and() {
++  r.a &= rd;
++  r.p.n = (r.a & 0x80);
++  r.p.z = (r.a == 0);
++}
++
++auto MOS6502::fp_asl() {
++  r.p.c = rd & 0x80;
++  rd <<= 1;
++  r.p.n = (rd & 0x80);
++  r.p.z = (rd == 0);
++}
++
++auto MOS6502::fp_bit() {
++  r.p.n = (rd & 0x80);
++  r.p.v = (rd & 0x40);
++  r.p.z = ((rd & r.a) == 0);
++}
++
++auto MOS6502::fp_cmp() {
++  int result = r.a - rd;
++  r.p.n = (result & 0x80);
++  r.p.z = (uint8)(result == 0);
++  r.p.c = (result >= 0);
++}
++
++auto MOS6502::fp_cpx() {
++  int result = r.x - rd;
++  r.p.n = (result & 0x80);
++  r.p.z = (uint8)(result == 0);
++  r.p.c = (result >= 0);
++}
++
++auto MOS6502::fp_cpy() {
++  int result = r.y - rd;
++  r.p.n = (result & 0x80);
++  r.p.z = (uint8)(result == 0);
++  r.p.c = (result >= 0);
++}
++
++auto MOS6502::fp_dec() {
++  rd--;
++  r.p.n = (rd & 0x80);
++  r.p.z = (rd == 0);
++}
++
++auto MOS6502::fp_eor() {
++  r.a ^= rd;
++  r.p.n = (r.a & 0x80);
++  r.p.z = (r.a == 0);
++}
++
++auto MOS6502::fp_inc() {
++  rd++;
++  r.p.n = (rd & 0x80);
++  r.p.z = (rd == 0);
++}
++
++auto MOS6502::fp_lda() {
++  r.a = rd;
++  r.p.n = (r.a & 0x80);
++  r.p.z = (r.a == 0);
++}
++
++auto MOS6502::fp_ldx() {
++  r.x = rd;
++  r.p.n = (r.x & 0x80);
++  r.p.z = (r.x == 0);
++}
++
++auto MOS6502::fp_ldy() {
++  r.y = rd;
++  r.p.n = (r.y & 0x80);
++  r.p.z = (r.y == 0);
++}
++
++auto MOS6502::fp_lsr() {
++  r.p.c = rd & 0x01;
++  rd >>= 1;
++  r.p.n = (rd & 0x80);
++  r.p.z = (rd == 0);
++}
++
++auto MOS6502::fp_ora() {
++  r.a |= rd;
++  r.p.n = (r.a & 0x80);
++  r.p.z = (r.a == 0);
++}
++
++auto MOS6502::fp_rla() {
++  uint carry = (uint)r.p.c;
++  r.p.c = r.a & 0x80;
++  r.a = (r.a << 1) | carry;
++  r.p.n = (r.a & 0x80);
++  r.p.z = (r.a == 0);
++}
++
++auto MOS6502::fp_rol() {
++  uint carry = (uint)r.p.c;
++  r.p.c = rd & 0x80;
++  rd = (rd << 1) | carry;
++  r.p.n = (rd & 0x80);
++  r.p.z = (rd == 0);
++}
++
++auto MOS6502::fp_ror() {
++  uint carry = (uint)r.p.c << 7;
++  r.p.c = rd & 0x01;
++  rd = carry | (rd >> 1);
++  r.p.n = (rd & 0x80);
++  r.p.z = (rd == 0);
++}
++
++auto MOS6502::fp_rra() {
++  uint carry = (uint)r.p.c << 7;
++  r.p.c = r.a & 0x01;
++  r.a = carry | (r.a >> 1);
++  r.p.n = (r.a & 0x80);
++  r.p.z = (r.a == 0);
++}
++
++auto MOS6502::fp_sbc() {
++  int result;
++  rd ^= 0xff;
++
++  if(!allowBCD || !r.p.d) {
++    result = r.a + rd + r.p.c;
++  } else {
++    result = (r.a & 0x0f) + (rd & 0x0f) + (r.p.c << 0);
++    if(result <= 0x0f) result -= 0x06;
++    r.p.c = result > 0x0f;
++    result = (r.a & 0xf0) + (rd & 0xf0) + (r.p.c << 4) + (result & 0x0f);
++  }
++
++  r.p.v = ~(r.a ^ rd) & (r.a ^ result) & 0x80;
++  r.p.c = (result > 0xff);
++  r.p.n = (result & 0x80);
++  r.p.z = ((uint8)result == 0);
++  r.a = result;
++}
++
++auto MOS6502::fp_sla() {
++  r.p.c = r.a & 0x80;
++  r.a <<= 1;
++  r.p.n = (r.a & 0x80);
++  r.p.z = (r.a == 0);
++}
++
++auto MOS6502::fp_sra() {
++  r.p.c = r.a & 0x01;
++  r.a >>= 1;
++  r.p.n = (r.a & 0x80);
++  r.p.z = (r.a == 0);
++}
++
++//illegal opcode functions
++//========================
++
++auto MOS6502::fp_dcp() {
++  fp_dec();
++  fp_cmp();
++}
++
++auto MOS6502::fp_lax() {
++  fp_lda();
++  r.x = r.a;
++}
+diff --git a/nSide/higan/processor/mos6502/disassembler.cpp b/nSide/higan/processor/mos6502/disassembler.cpp
+new file mode 100644
+index 0000000..90481aa
+--- /dev/null
++++ b/nSide/higan/processor/mos6502/disassembler.cpp
+@@ -0,0 +1,299 @@
++auto MOS6502::disassemble() -> string {
++  return disassemble(r.pc);
++}
++
++auto MOS6502::disassemble(uint16 addr) -> string {
++  string output = {hex(addr, 4L), "  "};
++
++  auto abs = [&]() -> string { return {"$", hex(readDisassembler(addr + 2), 2L), hex(readDisassembler(addr + 1), 2L)}; };
++  auto abx = [&]() -> string { return {"$", hex(readDisassembler(addr + 2), 2L), hex(readDisassembler(addr + 1), 2L), ",x"}; };
++  auto aby = [&]() -> string { return {"$", hex(readDisassembler(addr + 2), 2L), hex(readDisassembler(addr + 1), 2L), ",y"}; };
++  auto iab = [&]() -> string { return {"($", hex(readDisassembler(addr + 2), 2L), hex(readDisassembler(addr + 1), 2L), ")"}; };
++  auto imm = [&]() -> string { return {"#$", hex(readDisassembler(addr + 1), 2L)}; };
++  auto imp = [&]() -> string { return {""}; };
++  auto izx = [&]() -> string { return {"($", hex(readDisassembler(addr + 1), 2L), ",x)"}; };
++  auto izy = [&]() -> string { return {"($", hex(readDisassembler(addr + 1), 2L), "),y"}; };
++  auto rel = [&]() -> string { return {"$", hex((addr + 2) + (int8)readDisassembler(addr + 1), 4L)}; };
++  auto zpg = [&]() -> string { return {"$", hex(readDisassembler(addr + 1), 2L)}; };
++  auto zpx = [&]() -> string { return {"$", hex(readDisassembler(addr + 1), 2L), ",x"}; };
++  auto zpy = [&]() -> string { return {"$", hex(readDisassembler(addr + 1), 2L), ",y"}; };
++
++  #define op(byte, prefix, mode) \
++    case byte: output.append(#prefix, " ", mode()); \
++    break
++
++  uint8 opcode = readDisassembler(addr);
++  switch(opcode) {
++    op(0x00, brk, imm);
++    op(0x01, ora, izx);
++    op(0x02, stp, imp); // I
++    op(0x03, slo, izx); // I
++    op(0x04, nop, zpg); // I
++    op(0x05, ora, zpg);
++    op(0x06, asl, zpg);
++    op(0x07, slo, zpg); // I
++    op(0x08, php, imp);
++    op(0x09, ora, imm);
++    op(0x0a, asl, imp);
++    op(0x0b, anc, imm); // I
++    op(0x0c, nop, abs); // I
++    op(0x0d, ora, abs);
++    op(0x0e, asl, abs);
++    op(0x0f, slo, abs); // I
++    op(0x10, bpl, rel);
++    op(0x11, ora, izy);
++    op(0x12, stp, imp); // I
++    op(0x13, slo, izy); // I
++    op(0x14, nop, zpx); // I
++    op(0x15, ora, zpx);
++    op(0x16, asl, zpx);
++    op(0x17, slo, zpx); // I
++    op(0x18, clc, imp);
++    op(0x19, ora, aby);
++    op(0x1a, nop, imp); // I
++    op(0x1b, slo, aby); // I
++    op(0x1c, nop, abx); // I
++    op(0x1d, ora, abx);
++    op(0x1e, asl, abx);
++    op(0x1f, slo, abx); // I
++    op(0x20, jsr, abs);
++    op(0x21, and, izx);
++    op(0x22, stp, imp); // I
++    op(0x23, rla, izx); // I
++    op(0x24, bit, zpg);
++    op(0x25, and, zpg);
++    op(0x26, rol, zpg);
++    op(0x27, rla, zpg); // I
++    op(0x28, plp, imp);
++    op(0x29, and, imm);
++    op(0x2a, rol, imp);
++    op(0x2b, anc, imm); // I
++    op(0x2c, bit, abs);
++    op(0x2d, and, abs);
++    op(0x2e, rol, abs);
++    op(0x2f, rla, abs); // I
++    op(0x30, bmi, rel);
++    op(0x31, and, izy);
++    op(0x32, stp, imp); // I
++    op(0x33, rla, izy); // I
++    op(0x34, nop, zpx); // I
++    op(0x35, and, zpx);
++    op(0x36, rol, zpx);
++    op(0x37, rla, zpx); // I
++    op(0x38, sec, imp);
++    op(0x39, and, aby);
++    op(0x3a, nop, imp); // I
++    op(0x3b, rla, aby); // I
++    op(0x3c, nop, abx); // I
++    op(0x3d, and, abx);
++    op(0x3e, rol, abx);
++    op(0x3f, rla, abx); // I
++    op(0x40, rti, imp);
++    op(0x41, eor, izx);
++    op(0x42, stp, imp); // I
++    op(0x43, sre, izx); // I
++    op(0x44, nop, zpg); // I
++    op(0x45, eor, zpg);
++    op(0x46, lsr, zpg);
++    op(0x47, sre, zpg); // I
++    op(0x48, pha, imp);
++    op(0x49, eor, imm);
++    op(0x4a, lsr, imp);
++    op(0x4b, alr, imm); // I
++    op(0x4c, jmp, abs);
++    op(0x4d, eor, abs);
++    op(0x4e, lsr, abs);
++    op(0x4f, sre, abs); // I
++    op(0x50, bvc, rel);
++    op(0x51, eor, izy);
++    op(0x52, stp, imp); // I
++    op(0x53, sre, izy); // I
++    op(0x54, nop, zpx); // I
++    op(0x55, eor, zpx);
++    op(0x56, lsr, zpx);
++    op(0x57, sre, zpx); // I
++    op(0x58, cli, imp);
++    op(0x59, eor, aby);
++    op(0x5a, nop, imp); // I
++    op(0x5b, sre, aby); // I
++    op(0x5c, nop, abx); // I
++    op(0x5d, eor, abx);
++    op(0x5e, lsr, abx);
++    op(0x5f, sre, abx); // I
++    op(0x60, rts, imp);
++    op(0x61, adc, izx);
++    op(0x62, stp, imp); // I
++    op(0x63, rra, izx); // I
++    op(0x64, nop, zpg); // I
++    op(0x65, adc, zpg);
++    op(0x66, ror, zpg);
++    op(0x67, rra, zpg); // I
++    op(0x68, pla, imp);
++    op(0x69, adc, imm);
++    op(0x6a, ror, imp);
++    op(0x6b, arr, imm); // I
++    op(0x6c, jmp, iab);
++    op(0x6d, adc, abs);
++    op(0x6e, ror, abs);
++    op(0x6f, rra, abs); // I
++    op(0x70, bvs, rel);
++    op(0x71, adc, izy);
++    op(0x72, stp, imp); // I
++    op(0x73, rra, izy); // I
++    op(0x74, nop, zpx); // I
++    op(0x75, adc, zpx);
++    op(0x76, ror, zpx);
++    op(0x77, rra, zpx); // I
++    op(0x78, sei, imp);
++    op(0x79, adc, aby);
++    op(0x7a, nop, imp); // I
++    op(0x7b, rra, aby); // I
++    op(0x7c, nop, abx); // I
++    op(0x7d, adc, abx);
++    op(0x7e, ror, abx);
++    op(0x7f, rra, abx); // I
++    op(0x80, nop, imm); // I
++    op(0x81, sta, izx);
++    op(0x82, nop, imm); // I
++    op(0x83, sax, izx); // I
++    op(0x84, sty, zpg);
++    op(0x85, sta, zpg);
++    op(0x86, stx, zpg);
++    op(0x87, sax, zpg); // I
++    op(0x88, dey, imp);
++    op(0x89, nop, imm); // I
++    op(0x8a, txa, imp);
++    op(0x8b, xaa, imm); // I
++    op(0x8c, sty, abs);
++    op(0x8d, sta, abs);
++    op(0x8e, stx, abs);
++    op(0x8f, sax, abs); // I
++    op(0x90, bcc, rel);
++    op(0x91, sta, izy);
++    op(0x92, stp, imp); // I
++    op(0x93, sha, izy); // I
++    op(0x94, sty, zpx);
++    op(0x95, sta, zpx);
++    op(0x96, stx, zpy);
++    op(0x97, sax, zpy); // I
++    op(0x98, tya, imp);
++    op(0x99, sta, aby);
++    op(0x9a, txs, imp);
++    op(0x9b, tas, aby); // I
++    op(0x9c, shy, abx); // I
++    op(0x9d, sta, abx);
++    op(0x9e, shx, imm); // I
++    op(0x9f, sha, imm); // I
++    op(0xa0, ldy, imm);
++    op(0xa1, lda, izx);
++    op(0xa2, ldx, imm);
++    op(0xa3, lax, izx); // I
++    op(0xa4, ldy, zpg);
++    op(0xa5, lda, zpg);
++    op(0xa6, ldx, zpg);
++    op(0xa7, lax, zpg); // I
++    op(0xa8, tay, imp);
++    op(0xa9, lda, imm);
++    op(0xaa, tax, imp);
++    op(0xab, lxa, imm); // I
++    op(0xac, ldy, abs);
++    op(0xad, lda, abs);
++    op(0xae, ldx, abs);
++    op(0xaf, lax, abs); // I
++    op(0xb0, bcs, rel);
++    op(0xb1, lda, izy);
++    op(0xb2, stp, imp); // I
++    op(0xb3, lax, izy); // I
++    op(0xb4, ldy, zpx);
++    op(0xb5, lda, zpx);
++    op(0xb6, ldx, zpy);
++    op(0xb7, lax, zpy); // I
++    op(0xb8, clv, imp);
++    op(0xb9, lda, aby);
++    op(0xba, tsx, imp);
++    op(0xbb, las, aby); // I
++    op(0xbc, ldy, abx);
++    op(0xbd, lda, abx);
++    op(0xbe, ldx, aby);
++    op(0xbf, lax, aby); // I
++    op(0xc0, cpy, imm);
++    op(0xc1, cmp, izx);
++    op(0xc2, nop, imm); // I
++    op(0xc3, dcp, izx); // I
++    op(0xc4, cpy, zpg);
++    op(0xc5, cmp, zpg);
++    op(0xc6, dec, zpg);
++    op(0xc7, dcp, zpg); // I
++    op(0xc8, iny, imp);
++    op(0xc9, cmp, imm);
++    op(0xca, dex, imp);
++    op(0xcb, axs, imm); // I
++    op(0xcc, cpy, abs);
++    op(0xcd, cmp, abs);
++    op(0xce, dec, abs);
++    op(0xcf, dcp, abs); // I
++    op(0xd0, bne, rel);
++    op(0xd1, cmp, izy);
++    op(0xd2, stp, imp); // I
++    op(0xd3, dcp, izy); // I
++    op(0xd4, nop, zpx); // I
++    op(0xd5, cmp, zpx);
++    op(0xd6, dec, zpx);
++    op(0xd7, dcp, zpx); // I
++    op(0xd8, cld, imp);
++    op(0xd9, cmp, aby);
++    op(0xda, nop, imp); // I
++    op(0xdb, dcp, aby); // I
++    op(0xdc, nop, abx); // I
++    op(0xdd, cmp, abx);
++    op(0xde, dec, abx);
++    op(0xdf, dcp, abs); // I
++    op(0xe0, cpx, imm);
++    op(0xe1, sbc, izx);
++    op(0xe2, nop, imm); // I
++    op(0xe3, isc, zpx); // I
++    op(0xe4, cpx, zpg);
++    op(0xe5, sbc, zpg);
++    op(0xe6, inc, zpg);
++    op(0xe7, isc, zpg); // I
++    op(0xe8, inx, imp);
++    op(0xe9, sbc, imm);
++    op(0xea, nop, imp);
++    op(0xeb, sbc, imm); // I
++    op(0xec, cpx, abs);
++    op(0xed, sbc, abs);
++    op(0xee, inc, abs);
++    op(0xef, isc, abs); // I
++    op(0xf0, beq, rel);
++    op(0xf1, sbc, izy);
++    op(0xf2, stp, imp); // I
++    op(0xf3, isc, izy); // I
++    op(0xf4, nop, zpx); // I
++    op(0xf5, sbc, zpx);
++    op(0xf6, inc, zpx);
++    op(0xf7, isc, zpx); // I
++    op(0xf8, sed, imp);
++    op(0xf9, sbc, aby);
++    op(0xfa, nop, imp);
++    op(0xfb, isc, aby);
++    op(0xfc, nop, abx); // I
++    op(0xfd, sbc, abx);
++    op(0xfe, inc, abx);
++    op(0xff, isc, abx); // I
++
++    default: output.append("$", hex(opcode, 2L)); break;
++  }
++
++  #undef op
++
++  output.append("                ");
++  output.resize(20);
++
++  output.append(
++    "A:", hex(r.a, 2L), " X:", hex(r.x, 2L), " Y:", hex(r.y, 2L), " S:", hex(r.s, 2L), " ",
++    r.p.n ? "N" : "n", r.p.v ? "V" : "v", r.p.d ? "D" : "d",
++    r.p.i ? "I" : "i", r.p.z ? "Z" : "z", r.p.c ? "C" : "c"
++  );
++
++  return output;
++}
+diff --git a/nSide/higan/processor/mos6502/instructions-illegal.cpp b/nSide/higan/processor/mos6502/instructions-illegal.cpp
+new file mode 100644
+index 0000000..f7e3efd
+--- /dev/null
++++ b/nSide/higan/processor/mos6502/instructions-illegal.cpp
+@@ -0,0 +1,230 @@
++auto MOS6502::op_nop_immediate() {
++L rd = readPC();
++}
++
++auto MOS6502::op_nop_absolute() {
++  abs.l = readPC();
++  abs.h = readPC();
++L idle();
++}
++
++auto MOS6502::op_nop_absolute_x() {
++  abs.l = readPC();
++  abs.h = readPC();
++  ioPage(abs.w, abs.w + r.x);
++L idle();
++}
++
++auto MOS6502::op_nop_zero_page() {
++  zp = readPC();
++L readZP(zp);
++}
++
++auto MOS6502::op_nop_zero_page_x() {
++  zp = readPC();
++  readZP(zp);
++L readZP(zp + r.x);
++}
++
++auto MOS6502::op_stp() {
++  while(true) idle();
++}
++
++auto MOS6502::op_rmwr_absolute(fp opw, fp opr) {
++  abs.l = readPC();
++  abs.h = readPC();
++  rd = read(abs.w);
++  write(abs.w, rd);
++  call(opw);
++L write(abs.w, rd);
++  call(opr);
++}
++
++auto MOS6502::op_rmwr_absolute_x(fp opw, fp opr) {
++  abs.l = readPC();
++  abs.h = readPC();
++  ioPageAlways(abs.w, abs.w + r.x);
++  rd = read(abs.w + r.x);
++  write(abs.w + r.x, rd);
++  call(opw);
++L write(abs.w + r.x, rd);
++  call(opr);
++}
++
++auto MOS6502::op_rmwr_absolute_y(fp opw, fp opr) {
++  abs.l = readPC();
++  abs.h = readPC();
++  ioPageAlways(abs.w, abs.w + r.y);
++  rd = read(abs.w + r.y);
++  write(abs.w + r.y, rd);
++  call(opw);
++L write(abs.w + r.y, rd);
++  call(opr);
++}
++
++auto MOS6502::op_rmwr_indirect_zero_page_x(fp opw, fp opr) {
++  zp = readPC();
++  readZP(zp);
++  abs.l = readZP(zp++ + r.x);
++  abs.h = readZP(zp++ + r.x);
++  rd = read(abs.w);
++  write(abs.w, rd);
++  call(opw);
++L write(abs.w, rd);
++  call(opr);
++}
++
++auto MOS6502::op_rmwr_indirect_zero_page_y(fp opw, fp opr) {
++  rd = readPC();
++  abs.l = readZP(rd++);
++  abs.h = readZP(rd++);
++  ioPageAlways(abs.w, abs.w + r.y);
++  rd = read(abs.w + r.y);
++  write(abs.w + r.y, rd);
++  call(opw);
++L write(abs.w + r.y, rd);
++  call(opr);
++}
++
++auto MOS6502::op_rmwr_zero_page(fp opw, fp opr) {
++  zp = readPC();
++  rd = readZP(zp);
++  writeZP(zp, rd);
++  call(opw);
++L writeZP(zp, rd);
++  call(opr);
++}
++
++auto MOS6502::op_rmwr_zero_page_x(fp opw, fp opr) {
++  zp = readPC();
++  readZP(zp);
++  rd = readZP(zp + r.x);
++  writeZP(zp + r.x, rd);
++  call(opw);
++L writeZP(zp + r.x, rd);
++  call(opr);
++}
++
++auto MOS6502::op_alr_immediate() {
++  op_read_immediate(&MOS6502::fp_and);
++  fp_sra();
++}
++
++auto MOS6502::op_anc_immediate() {
++L rd = readPC();
++  fp_and();
++  r.p.c = r.p.n;
++}
++
++auto MOS6502::op_arr_immediate() {
++L rd = readPC();
++  r.a &= rd;
++  r.a = (r.p.c << 7) | (r.a >> 1);
++  r.p.n = (r.a & 0x80);
++  r.p.z = (r.a == 0);
++  r.p.c = (r.a & 0x40);
++  r.p.v = r.p.c ^ ((r.a >> 5) & 1);
++}
++
++auto MOS6502::op_axs_immediate() {
++L rd = readPC();
++  int result = (r.a & r.x) - rd;
++  r.p.n = (result & 0x80);
++  r.p.z = ((uint8)result == 0);
++  r.p.c = (result >= 0);
++  r.x = result;
++}
++
++auto MOS6502::op_dcp_absolute_y() {
++  abs.l = readPC();
++  abs.h = readPC();
++  ioPageAlways(abs.w, abs.w + r.y);
++  rd = read(abs.w + r.y);
++  write(abs.w + r.y, rd);
++  fp_dcp();
++L write(abs.w + r.y, rd);
++}
++
++auto MOS6502::op_dcp_indirect_zero_page_x() {
++  zp = readPC();
++  readZP(zp);
++  abs.l = readZP(zp++ + r.x);
++  abs.h = readZP(zp++ + r.x);
++  rd = read(abs.w);
++  write(abs.w, rd);
++  fp_dcp();
++L write(abs.w, rd);
++}
++
++auto MOS6502::op_dcp_indirect_zero_page_y() {
++  rd = readPC();
++  abs.l = readZP(rd++);
++  abs.h = readZP(rd++);
++  ioPageAlways(abs.w, abs.w + r.y);
++  rd = read(abs.w + r.y);
++  write(abs.w + r.y, rd);
++  fp_dcp();
++L write(abs.w + r.y, rd);
++}
++
++auto MOS6502::op_las_absolute_y() {
++  abs.l = readPC();
++  abs.h = readPC();
++  ioPage(abs.w, abs.w + r.y);
++L rd = read(abs.w + r.y);
++  r.a = r.x = r.s = rd & r.s;
++}
++
++auto MOS6502::op_lxa_immediate() {
++L rd = readPC();
++  //While other LAX opcodes decode to LDA and LDX, this one decodes
++  //to LDA, LDX, and TAX, causing line noise on the data bus to interfere.
++  //http://atariage.com/forums/topic/168616-lxa-stable/
++  r.a = r.x = (r.a | (rand() & 0xff)) & rd;
++  r.p.n = (r.a & 0x80);
++  r.p.z = (r.a == 0);
++}
++
++auto MOS6502::op_sha_absolute_y() {
++  abs.l = readPC();
++  abs.h = readPC();
++  ioPageAlways(abs.w, abs.w + r.y);
++L write(abs.w + r.y, r.a & r.x & (abs.h + 1));
++}
++
++auto MOS6502::op_sha_indirect_zero_page_y() {
++  rd = readPC();
++  abs.l = readZP(rd++);
++  abs.h = readZP(rd++);
++  ioPageAlways(abs.w, abs.w + r.y);
++L write(abs.w + r.y, r.a & r.x & (abs.h + 1));
++}
++
++auto MOS6502::op_shx_absolute_y() {
++  abs.l = readPC();
++  abs.h = readPC();
++  ioPageAlways(abs.w, abs.w + r.y);
++  if(abs.h != (abs.w + r.y) >> 8) abs.h &= r.x;
++L write(abs.w + r.y, r.x & (abs.h + 1));
++}
++
++auto MOS6502::op_shy_absolute_x() {
++  abs.l = readPC();
++  abs.h = readPC();
++  ioPageAlways(abs.w, abs.w + r.x);
++  if(abs.h != (abs.w + r.x) >> 8) abs.h &= r.y;
++L write(abs.w + r.x, r.y & (abs.h + 1));
++}
++
++auto MOS6502::op_tas_absolute_y() {
++  abs.l = readPC();
++  abs.h = readPC();
++  ioPageAlways(abs.w, abs.w + r.y);
++  r.s = r.a & r.x;
++L write(abs.w + r.y, r.a & r.x & (abs.h + 1));
++}
++
++auto MOS6502::op_xaa_immediate() {
++  rd = readPC();
++  r.a = (r.a | (rand() & 0xff)) & r.x & rd;
++}
+diff --git a/nSide/higan/processor/mos6502/instructions-misc.cpp b/nSide/higan/processor/mos6502/instructions-misc.cpp
+new file mode 100644
+index 0000000..4fb20ae
+--- /dev/null
++++ b/nSide/higan/processor/mos6502/instructions-misc.cpp
+@@ -0,0 +1,58 @@
++auto MOS6502::op_nop() {
++L idle();
++}
++
++auto MOS6502::op_brk() {
++  readPC();
++  writeSP(r.pc >> 8);
++  writeSP(r.pc >> 0);
++  uint16 vector = 0xfffe;
++  nmi(vector);
++  writeSP(r.p | 0x30);
++  abs.l = read(vector + 0);
++  r.p.i = 1;
++L abs.h = read(vector + 1);
++  r.pc = abs.w;
++}
++
++auto MOS6502::op_set_flag(uint bit) {
++L idle();
++  r.p |= 1 << bit;
++}
++
++auto MOS6502::op_clear_flag(uint bit) {
++L idle();
++  r.p &= ~(1 << bit);
++}
++
++auto MOS6502::op_transfer(uint8& s, uint8& d, bool flag) {
++L idle();
++  d = s;
++  if(flag == false) return;
++  r.p.n = (d & 0x80);
++  r.p.z = (d == 0);
++}
++
++auto MOS6502::op_push(uint8& reg) {
++  idle();
++L writeSP(reg);
++}
++
++auto MOS6502::op_php() {
++  idle();
++L writeSP(r.p | 0x30);
++}
++
++auto MOS6502::op_pull(uint8& reg) {
++  idle();
++  idle();
++L reg = readSP();
++  r.p.n = (reg & 0x80);
++  r.p.z = (reg == 0);
++}
++
++auto MOS6502::op_plp() {
++  idle();
++  idle();
++L r.p = readSP();
++}
+diff --git a/nSide/higan/processor/mos6502/instructions-pc.cpp b/nSide/higan/processor/mos6502/instructions-pc.cpp
+new file mode 100644
+index 0000000..dedbff4
+--- /dev/null
++++ b/nSide/higan/processor/mos6502/instructions-pc.cpp
+@@ -0,0 +1,53 @@
++auto MOS6502::op_branch(bool flag, bool value) {
++  if(flag != value) {
++L   rd = readPC();
++  } else {
++    rd = readPC();
++    aa = r.pc + (int8)rd;
++    ioPage(r.pc, aa);
++L   idle();
++    r.pc = aa;
++  }
++}
++
++auto MOS6502::op_jmp_absolute() {
++  abs.l = readPC();
++L abs.h = readPC();
++  r.pc = abs.w;
++}
++
++auto MOS6502::op_jmp_indirect_absolute() {
++  abs.l = readPC();
++  abs.h = readPC();
++  iabs.l = read(abs.w); abs.l++;
++L iabs.h = read(abs.w); abs.l++;
++  r.pc = iabs.w;
++}
++
++auto MOS6502::op_jsr_absolute() {
++  abs.l = readPC();
++  abs.h = readPC();
++  idle();
++  r.pc.w--;
++  writeSP(r.pc >> 8);
++L writeSP(r.pc >> 0);
++  r.pc.w = abs.w;
++}
++
++auto MOS6502::op_rti() {
++  idle();
++  idle();
++  r.p = readSP();
++  abs.l = readSP();
++L abs.h = readSP();
++  r.pc = abs.w;
++}
++
++auto MOS6502::op_rts() {
++  idle();
++  idle();
++  abs.l = readSP();
++  abs.h = readSP();
++L idle();
++  r.pc = ++abs.w;
++}
+diff --git a/nSide/higan/processor/mos6502/instructions-read.cpp b/nSide/higan/processor/mos6502/instructions-read.cpp
+new file mode 100644
+index 0000000..323720d
+--- /dev/null
++++ b/nSide/higan/processor/mos6502/instructions-read.cpp
+@@ -0,0 +1,65 @@
++auto MOS6502::op_read_immediate(fp op) {
++L rd = readPC();
++  call(op);
++}
++
++auto MOS6502::op_read_absolute(fp op) {
++  abs.l = readPC();
++  abs.h = readPC();
++L rd = read(abs.w);
++  call(op);
++}
++
++auto MOS6502::op_read_absolute_x(fp op) {
++  abs.l = readPC();
++  abs.h = readPC();
++  ioPage(abs.w, abs.w + r.x);
++L rd = read(abs.w + r.x);
++  call(op);
++}
++
++auto MOS6502::op_read_absolute_y(fp op) {
++  abs.l = readPC();
++  abs.h = readPC();
++  ioPage(abs.w, abs.w + r.y);
++L rd = read(abs.w + r.y);
++  call(op);
++}
++
++auto MOS6502::op_read_zero_page(fp op) {
++  zp = readPC();
++L rd = readZP(zp);
++  call(op);
++}
++
++auto MOS6502::op_read_zero_page_x(fp op) {
++  zp = readPC();
++  readZP(zp);
++L rd = readZP(zp + r.x);
++  call(op);
++}
++
++auto MOS6502::op_read_zero_page_y(fp op) {
++  zp = readPC();
++  readZP(zp);
++L rd = readZP(zp + r.y);
++  call(op);
++}
++
++auto MOS6502::op_read_indirect_zero_page_x(fp op) {
++  zp = readPC();
++  readZP(zp);
++  abs.l = readZP(zp++ + r.x);
++  abs.h = readZP(zp++ + r.x);
++L rd = read(abs.w);
++  call(op);
++}
++
++auto MOS6502::op_read_indirect_zero_page_y(fp op) {
++  rd = readPC();
++  abs.l = readZP(rd++);
++  abs.h = readZP(rd++);
++  ioPage(abs.w, abs.w + r.y);
++L rd = read(abs.w + r.y);
++  call(op);
++}
+diff --git a/nSide/higan/processor/mos6502/instructions-rmw.cpp b/nSide/higan/processor/mos6502/instructions-rmw.cpp
+new file mode 100644
+index 0000000..b7c111e
+--- /dev/null
++++ b/nSide/higan/processor/mos6502/instructions-rmw.cpp
+@@ -0,0 +1,54 @@
++auto MOS6502::op_increment(uint8& reg) {
++L idle();
++  reg++;
++  r.p.n = (reg & 0x80);
++  r.p.z = (reg == 0);
++}
++
++auto MOS6502::op_decrement(uint8& reg) {
++L idle();
++  reg--;
++  r.p.n = (reg & 0x80);
++  r.p.z = (reg == 0);
++}
++
++auto MOS6502::op_shift(fp op) {
++L idle();
++  call(op);
++}
++
++auto MOS6502::op_rmw_absolute(fp op) {
++  abs.l = readPC();
++  abs.h = readPC();
++  rd = read(abs.w);
++  write(abs.w, rd);
++  call(op);
++L write(abs.w, rd);
++}
++
++auto MOS6502::op_rmw_absolute_x(fp op) {
++  abs.l = readPC();
++  abs.h = readPC();
++  ioPageAlways(abs.w, abs.w + r.x);
++  rd = read(abs.w + r.x);
++  write(abs.w + r.x, rd);
++  call(op);
++L write(abs.w + r.x, rd);
++}
++
++auto MOS6502::op_rmw_zero_page(fp op) {
++  zp = readPC();
++  rd = readZP(zp);
++  writeZP(zp, rd);
++  call(op);
++L writeZP(zp, rd);
++}
++
++auto MOS6502::op_rmw_zero_page_x(fp op) {
++  zp = readPC();
++  readZP(zp);
++  rd = readZP(zp + r.x);
++  writeZP(zp + r.x, rd);
++  call(op);
++L writeZP(zp + r.x, rd);
++}
+diff --git a/nSide/higan/processor/mos6502/instructions-write.cpp b/nSide/higan/processor/mos6502/instructions-write.cpp
+new file mode 100644
+index 0000000..c7ef049
+--- /dev/null
++++ b/nSide/higan/processor/mos6502/instructions-write.cpp
+@@ -0,0 +1,52 @@
++auto MOS6502::op_store_absolute(uint8 reg) {
++  abs.l = readPC();
++  abs.h = readPC();
++L write(abs.w, reg);
++}
++
++auto MOS6502::op_store_absolute_x(uint8& reg) {
++  abs.l = readPC();
++  abs.h = readPC();
++  ioPageAlways(abs.w, abs.w + r.x);
++L write(abs.w + r.x, reg);
++}
++
++auto MOS6502::op_store_absolute_y(uint8& reg) {
++  abs.l = readPC();
++  abs.h = readPC();
++  ioPageAlways(abs.w, abs.w + r.y);
++L write(abs.w + r.y, reg);
++}
++
++auto MOS6502::op_store_zero_page(uint8 reg) {
++  zp = readPC();
++L writeZP(zp, reg);
++}
++
++auto MOS6502::op_store_zero_page_x(uint8 reg) {
++  zp = readPC();
++  readZP(zp);
++L writeZP(zp + r.x, reg);
++}
++
++auto MOS6502::op_store_zero_page_y(uint8 reg) {
++  zp = readPC();
++  readZP(zp);
++L writeZP(zp + r.y, reg);
++}
++
++auto MOS6502::op_store_indirect_zero_page_x(uint8 reg) {
++  zp = readPC();
++  readZP(zp);
++  abs.l = readZP(zp++ + r.x);
++  abs.h = readZP(zp++ + r.x);
++L write(abs.w, reg);
++}
++
++auto MOS6502::op_store_indirect_zero_page_y(uint8& reg) {
++  rd = readPC();
++  abs.l = readZP(rd++);
++  abs.h = readZP(rd++);
++  ioPageAlways(abs.w, abs.w + r.y);
++L write(abs.w + r.y, reg);
++}
+diff --git a/nSide/higan/processor/mos6502/memory.hpp b/nSide/higan/processor/mos6502/memory.hpp
+new file mode 100644
+index 0000000..6da1498
+--- /dev/null
++++ b/nSide/higan/processor/mos6502/memory.hpp
+@@ -0,0 +1,31 @@
++alwaysinline auto idle() -> uint8 {
++  return read(r.pc);
++}
++
++alwaysinline auto readPC() -> uint8 {
++  return read(r.pc.w++);
++}
++
++alwaysinline auto readSP() -> uint8 {
++  return read(0x0100 | ++r.s);
++}
++
++alwaysinline auto readZP(uint8 addr) -> uint8 {
++  return read(addr);
++}
++
++alwaysinline auto writeSP(uint8 data) -> void {
++  write(0x0100 | r.s--, data);
++}
++
++alwaysinline auto writeZP(uint8 addr, uint8 data) -> void {
++  write(addr, data);
++}
++
++alwaysinline auto ioPage(uint16 x, uint16 y) -> void {
++  if((x & 0xff00) != (y & 0xff00)) read((x & 0xff00) | (y & 0x00ff));
++}
++
++alwaysinline auto ioPageAlways(uint16 x, uint16 y) -> void {
++  read((x & 0xff00) | (y & 0x00ff));
++}
+diff --git a/nSide/higan/processor/mos6502/mos6502.cpp b/nSide/higan/processor/mos6502/mos6502.cpp
+new file mode 100644
+index 0000000..55ae23a
+--- /dev/null
++++ b/nSide/higan/processor/mos6502/mos6502.cpp
+@@ -0,0 +1,59 @@
++#include <processor/processor.hpp>
++#include "mos6502.hpp"
++
++namespace Processor {
++
++#include "algorithms.cpp"
++#include "disassembler.cpp"
++#include "serialization.cpp"
++
++#define L lastCycle();
++#define call(op) (this->*op)()
++
++#include "instructions-read.cpp"
++#include "instructions-write.cpp"
++#include "instructions-rmw.cpp"
++#include "instructions-pc.cpp"
++#include "instructions-misc.cpp"
++#include "instructions-illegal.cpp"
++#include "switch.cpp"
++
++MOS6502::MOS6502(bool allowBCD) : allowBCD(allowBCD) {
++}
++
++auto MOS6502::interrupt() -> void {
++  idle();
++  idle();
++  writeSP(r.pc.h);
++  writeSP(r.pc.l);
++  uint16 vector = 0xfffe;  //IRQ
++  nmi(vector);
++  writeSP(r.p | 0x20);
++  abs.l = read(vector + 0);
++  r.p.i = 1;
++L abs.h = read(vector + 1);
++  r.pc = abs.w;
++}
++
++auto MOS6502::mdr() const -> uint8 {
++  return r.mdr;
++}
++
++auto MOS6502::power() -> void {
++  r.a = 0x00;
++  r.x = 0x00;
++  r.y = 0x00;
++  r.s = 0x00;
++  r.p = 0x04;
++}
++
++auto MOS6502::reset() -> void {
++  r.mdr = 0x00;
++  r.s -= 3;
++  r.p.i = 1;
++}
++
++#undef L
++#undef call
++
++}
+diff --git a/higan/higan/processor/r6502/r6502.hpp b/nSide/higan/processor/mos6502/mos6502.hpp
+similarity index 54%
+rename from higan/higan/processor/r6502/r6502.hpp
+rename to nSide/higan/processor/mos6502/mos6502.hpp
+index 9dd6206..97c4f17 100644
+--- a/higan/higan/processor/r6502/r6502.hpp
++++ b/nSide/higan/processor/mos6502/mos6502.hpp
+@@ -1,4 +1,5 @@
+-//Ricoh 6502
++//MOS 6502
++//* MOS 6507
+ //* Ricoh 2A03
+ //* Ricoh 2A07
+ 
+@@ -6,35 +7,28 @@
+ 
+ namespace Processor {
+ 
+-struct R6502 {
++struct MOS6502 {
++  #include "registers.hpp"
++  #include "memory.hpp"
++
++  using fp = auto (MOS6502::*)() -> void;
++
++  MOS6502(bool allowBCD);
++
+   virtual auto read(uint16 addr) -> uint8 = 0;
+   virtual auto write(uint16 addr, uint8 data) -> void = 0;
+   virtual auto lastCycle() -> void = 0;
+   virtual auto nmi(uint16& vector) -> void = 0;
+-  virtual auto readDebugger(uint16 addr) -> uint8 { return 0u; }
+ 
++  virtual auto readDisassembler(uint16 addr) -> uint8 { return 0; }
++
++  //mos6502.cpp
++  auto interrupt() -> void;
+   auto mdr() const -> uint8;
+   auto power() -> void;
+   auto reset() -> void;
+-  auto interrupt() -> void;
+-  auto instruction() -> void;
+-
+-  auto serialize(serializer&) -> void;
+-
+-  //memory.cpp
+-  auto io() -> uint8;
+-  auto readPC() -> uint8;
+-  auto readSP() -> uint8;
+-  auto readZP(uint8 addr) -> uint8;
+ 
+-  auto writeSP(uint8 data) -> void;
+-  auto writeZP(uint8 addr, uint8 data) -> void;
+-
+-  auto ioPage(uint16 x, uint16 y) -> void;
+-  auto ioPageAlways(uint16 x, uint16 y) -> void;
+-
+-  //instructions.cpp
+-  using fp = auto (R6502::*)() -> void;
++  //algorithms.cpp
+   auto fp_asl();
+   auto fp_adc();
+   auto fp_and();
+@@ -57,60 +51,104 @@ struct R6502 {
+   auto fp_sbc();
+   auto fp_sla();
+   auto fp_sra();
++  auto fp_dcp();
++  auto fp_lax();
+ 
+-  auto op_branch(bool condition);
+-  auto op_clear_flag(uint bit);
+-  auto op_decrement(uint8& r);
+-  auto op_increment(uint8& r);
+-  auto op_pull(uint8& r);
+-  auto op_push(uint8& r);
++  //opcode_read.cpp
++  auto op_read_immediate(fp);
+   auto op_read_absolute(fp);
+   auto op_read_absolute_x(fp);
+   auto op_read_absolute_y(fp);
+-  auto op_read_immediate(fp);
+-  auto op_read_indirect_zero_page_x(fp);
+-  auto op_read_indirect_zero_page_y(fp);
+   auto op_read_zero_page(fp);
+   auto op_read_zero_page_x(fp);
+   auto op_read_zero_page_y(fp);
++  auto op_read_indirect_zero_page_x(fp);
++  auto op_read_indirect_zero_page_y(fp);
++
++  //opcode_write.cpp
++  auto op_store_absolute(uint8);
++  auto op_store_absolute_x(uint8&);
++  auto op_store_absolute_y(uint8&);
++  auto op_store_zero_page(uint8);
++  auto op_store_zero_page_x(uint8);
++  auto op_store_zero_page_y(uint8);
++  auto op_store_indirect_zero_page_x(uint8);
++  auto op_store_indirect_zero_page_y(uint8&);
++
++  //opcode_rmw.cpp
++  auto op_increment(uint8& r);
++  auto op_decrement(uint8& r);
++  auto op_shift(fp);
+   auto op_rmw_absolute(fp);
+   auto op_rmw_absolute_x(fp);
+   auto op_rmw_zero_page(fp);
+   auto op_rmw_zero_page_x(fp);
+-  auto op_set_flag(uint bit);
+-  auto op_shift(fp);
+-  auto op_store_absolute(uint8& r);
+-  auto op_store_absolute_x(uint8& r);
+-  auto op_store_absolute_y(uint8& r);
+-  auto op_store_indirect_zero_page_x(uint8& r);
+-  auto op_store_indirect_zero_page_y(uint8& r);
+-  auto op_store_zero_page(uint8& r);
+-  auto op_store_zero_page_x(uint8& r);
+-  auto op_store_zero_page_y(uint8& r);
+-  auto op_transfer(uint8& s, uint8& d, bool flag);
+ 
+-  auto op_brk();
++  //opcode_pc.cpp
++  auto op_branch(bool flag, bool value);
+   auto op_jmp_absolute();
+   auto op_jmp_indirect_absolute();
+   auto op_jsr_absolute();
++  auto op_rti();
++  auto op_rts();
++
++  //opcode_misc.cpp
+   auto op_nop();
++  auto op_brk();
++  auto op_set_flag(uint bit);
++  auto op_clear_flag(uint bit);
++  auto op_transfer(uint8& s, uint8& d, bool flag);
++  auto op_push(uint8& r);
+   auto op_php();
++  auto op_pull(uint8& r);
+   auto op_plp();
+-  auto op_rti();
+-  auto op_rts();
+ 
+-  auto op_arr_immediate();
++  //opcode_illegal.cpp
++  auto op_nop_immediate();
+   auto op_nop_absolute();
+   auto op_nop_absolute_x();
+-  auto op_nop_immediate();
+-  auto op_nop_implied();
+   auto op_nop_zero_page();
+   auto op_nop_zero_page_x();
++  auto op_stp();
++  auto op_rmwr_absolute(fp, fp);
++  auto op_rmwr_absolute_x(fp, fp);
++  auto op_rmwr_absolute_y(fp, fp);
++  auto op_rmwr_indirect_zero_page_x(fp, fp);
++  auto op_rmwr_indirect_zero_page_y(fp, fp);
++  auto op_rmwr_zero_page(fp, fp);
++  auto op_rmwr_zero_page_x(fp, fp);
++  auto op_alr_immediate();
++  auto op_anc_immediate();
++  auto op_arr_immediate();
++  auto op_axs_immediate();
++  auto op_dcp_absolute_y();
++  auto op_dcp_indirect_zero_page_x();
++  auto op_dcp_indirect_zero_page_y();
++  auto op_las_absolute_y();
++  auto op_lxa_immediate();
++  auto op_sha_absolute_y();
++  auto op_sha_indirect_zero_page_y();
++  auto op_shx_absolute_y();
++  auto op_shy_absolute_x();
++  auto op_tas_absolute_y();
++  auto op_xaa_immediate();
++
++  //switch.cpp
++  auto instruction() -> void;
++
++  //serialization.cpp
++  auto serialize(serializer&) -> void;
+ 
+   //disassembler.cpp
+   auto disassemble() -> string;
++  auto disassemble(uint16 addr) -> string;
+ 
+-  #include "registers.hpp"
++  Registers r;
++  Reg16 abs, iabs;
++  uint8 rd, zp;
++  uint16 aa;
++
++  const bool allowBCD;
+ };
+ 
+ }
+diff --git a/nSide/higan/processor/mos6502/registers.hpp b/nSide/higan/processor/mos6502/registers.hpp
+new file mode 100644
+index 0000000..3594e4a
+--- /dev/null
++++ b/nSide/higan/processor/mos6502/registers.hpp
+@@ -0,0 +1,45 @@
++struct Flags {
++  union {
++    uint8_t b = 0;
++    BooleanBitField<uint8_t, 7> n;
++    BooleanBitField<uint8_t, 6> v;
++    BooleanBitField<uint8_t, 3> d;
++    BooleanBitField<uint8_t, 2> i;
++    BooleanBitField<uint8_t, 1> z;
++    BooleanBitField<uint8_t, 0> c;
++  };
++
++  inline operator uint() const { return b; }
++  inline auto operator =(uint value) -> uint { return b  = value; }
++  inline auto operator&=(uint value) -> uint { return b &= value; }
++  inline auto operator|=(uint value) -> uint { return b |= value; }
++  inline auto operator^=(uint value) -> uint { return b ^= value; }
++};
++
++struct Reg16 {
++  union {
++    uint16_t w;
++    NaturalBitField<uint16_t, 0,  7> l;
++    NaturalBitField<uint16_t, 8, 15> h;
++  };
++
++  inline operator uint() const { return w; }
++  inline auto operator  =(uint value) -> uint { return w   = value; }
++  inline auto operator |=(uint value) -> uint { return w  |= value; }
++  inline auto operator ^=(uint value) -> uint { return w  ^= value; }
++  inline auto operator &=(uint value) -> uint { return w  &= value; }
++  inline auto operator<<=(uint value) -> uint { return w <<= value; }
++  inline auto operator>>=(uint value) -> uint { return w >>= value; }
++  inline auto operator +=(uint value) -> uint { return w  += value; }
++  inline auto operator -=(uint value) -> uint { return w  -= value; }
++  inline auto operator *=(uint value) -> uint { return w  *= value; }
++  inline auto operator /=(uint value) -> uint { return w  /= value; }
++  inline auto operator %=(uint value) -> uint { return w  %= value; }
++};
++
++struct Registers {
++  uint8 mdr;
++  Reg16 pc;
++  uint8 a, x, y, s;
++  Flags p;
++};
+diff --git a/nSide/higan/processor/mos6502/serialization.cpp b/nSide/higan/processor/mos6502/serialization.cpp
+new file mode 100644
+index 0000000..13f9fc1
+--- /dev/null
++++ b/nSide/higan/processor/mos6502/serialization.cpp
+@@ -0,0 +1,15 @@
++auto MOS6502::serialize(serializer& s) -> void {
++  s.integer(r.mdr);
++  s.integer(r.pc.w);
++  s.integer(r.a);
++  s.integer(r.x);
++  s.integer(r.y);
++  s.integer(r.s);
++  s.integer(r.p.b);
++
++  s.integer(abs.w);
++  s.integer(iabs.w);
++  s.integer(rd);
++  s.integer(zp);
++  s.integer(aa);
++}
+diff --git a/nSide/higan/processor/mos6502/switch.cpp b/nSide/higan/processor/mos6502/switch.cpp
+new file mode 100644
+index 0000000..20215c1
+--- /dev/null
++++ b/nSide/higan/processor/mos6502/switch.cpp
+@@ -0,0 +1,268 @@
++#define I  //prefix highlights illegal instructions
++#define op(id, name, ...) case id: return op_##name(__VA_ARGS__);
++#define fp(name) &MOS6502::fp_##name
++
++auto MOS6502::instruction() -> void {
++  switch(readPC()) {
++  op(0x00, brk)
++  op(0x01, read_indirect_zero_page_x, fp(ora))
++I op(0x02, stp)
++I op(0x03, rmwr_indirect_zero_page_x, fp(asl), fp(ora))
++I op(0x04, nop_zero_page)
++  op(0x05, read_zero_page, fp(ora))
++  op(0x06, rmw_zero_page, fp(asl))
++I op(0x07, rmwr_zero_page, fp(asl), fp(ora))
++  op(0x08, php)
++  op(0x09, read_immediate, fp(ora))
++  op(0x0a, shift, fp(sla))
++I op(0x0b, anc_immediate)
++I op(0x0c, nop_absolute)
++  op(0x0d, read_absolute, fp(ora))
++  op(0x0e, rmw_absolute, fp(asl))
++I op(0x0f, rmwr_absolute, fp(asl), fp(ora))
++  op(0x10, branch, r.p.n, 0)
++  op(0x11, read_indirect_zero_page_y, fp(ora))
++I op(0x12, stp)
++I op(0x13, rmwr_indirect_zero_page_y, fp(asl), fp(ora))
++I op(0x14, nop_zero_page_x)
++  op(0x15, read_zero_page_x, fp(ora))
++  op(0x16, rmw_zero_page_x, fp(asl))
++I op(0x17, rmwr_zero_page_x, fp(asl), fp(ora))
++  op(0x18, clear_flag, r.p.c.bit)
++  op(0x19, read_absolute_y, fp(ora))
++I op(0x1a, nop)
++I op(0x1b, rmwr_absolute_y, fp(asl), fp(ora))
++I op(0x1c, nop_absolute_x)
++  op(0x1d, read_absolute_x, fp(ora))
++  op(0x1e, rmw_absolute_x, fp(asl))
++I op(0x1f, rmwr_absolute_x, fp(asl), fp(ora))
++  op(0x20, jsr_absolute)
++  op(0x21, read_indirect_zero_page_x, fp(and))
++I op(0x22, stp)
++I op(0x23, rmwr_indirect_zero_page_x, fp(rol), fp(and))
++  op(0x24, read_zero_page, fp(bit))
++  op(0x25, read_zero_page, fp(and))
++  op(0x26, rmw_zero_page, fp(rol))
++I op(0x27, rmwr_zero_page, fp(rol), fp(and))
++  op(0x28, plp)
++  op(0x29, read_immediate, fp(and))
++  op(0x2a, shift, fp(rla))
++I op(0x2b, anc_immediate)
++  op(0x2c, read_absolute, fp(bit))
++  op(0x2d, read_absolute, fp(and))
++  op(0x2e, rmw_absolute, fp(rol))
++I op(0x2f, rmwr_absolute, fp(rol), fp(and))
++  op(0x30, branch, r.p.n, 1)
++  op(0x31, read_indirect_zero_page_y, fp(and))
++I op(0x32, stp)
++I op(0x33, rmwr_indirect_zero_page_y, fp(rol), fp(and))
++I op(0x34, nop_zero_page_x)
++  op(0x35, read_zero_page_x, fp(and))
++  op(0x36, rmw_zero_page_x, fp(rol))
++I op(0x37, rmwr_zero_page_x, fp(rol), fp(and))
++  op(0x38, set_flag, r.p.c.bit)
++  op(0x39, read_absolute_y, fp(and))
++I op(0x3a, nop)
++I op(0x3b, rmwr_absolute_y, fp(rol), fp(and))
++I op(0x3c, nop_absolute_x)
++  op(0x3d, read_absolute_x, fp(and))
++  op(0x3e, rmw_absolute_x, fp(rol))
++I op(0x3f, rmwr_absolute_x, fp(rol), fp(and))
++  op(0x40, rti)
++  op(0x41, read_indirect_zero_page_x, fp(eor))
++I op(0x42, stp)
++I op(0x43, rmwr_indirect_zero_page_x, fp(lsr), fp(eor))
++I op(0x44, nop_zero_page)
++  op(0x45, read_zero_page, fp(eor))
++  op(0x46, rmw_zero_page, fp(lsr))
++I op(0x47, rmwr_zero_page, fp(lsr), fp(eor))
++  op(0x48, push, r.a)
++  op(0x49, read_immediate, fp(eor))
++  op(0x4a, shift, fp(sra))
++I op(0x4b, alr_immediate)
++  op(0x4c, jmp_absolute)
++  op(0x4d, read_absolute, fp(eor))
++  op(0x4e, rmw_absolute, fp(lsr))
++I op(0x4f, rmwr_absolute, fp(lsr), fp(eor))
++  op(0x50, branch, r.p.v, 0)
++  op(0x51, read_indirect_zero_page_y, fp(eor))
++I op(0x52, stp)
++I op(0x53, rmwr_indirect_zero_page_y, fp(lsr), fp(eor))
++I op(0x54, nop_zero_page_x)
++  op(0x55, read_zero_page_x, fp(eor))
++  op(0x56, rmw_zero_page_x, fp(lsr))
++I op(0x57, rmwr_zero_page_x, fp(lsr), fp(eor))
++  op(0x58, clear_flag, r.p.i.bit)
++  op(0x59, read_absolute_y, fp(eor))
++I op(0x5a, nop)
++I op(0x5b, rmwr_absolute_y, fp(lsr), fp(eor))
++I op(0x5c, nop_absolute_x)
++  op(0x5d, read_absolute_x, fp(eor))
++  op(0x5e, rmw_absolute_x, fp(lsr))
++I op(0x5f, rmwr_absolute_x, fp(lsr), fp(eor))
++  op(0x60, rts)
++  op(0x61, read_indirect_zero_page_x, fp(adc))
++I op(0x62, stp)
++I op(0x63, rmwr_indirect_zero_page_x, fp(ror), fp(adc))
++I op(0x64, nop_zero_page)
++  op(0x65, read_zero_page, fp(adc))
++  op(0x66, rmw_zero_page, fp(ror))
++I op(0x67, rmwr_zero_page, fp(ror), fp(adc))
++  op(0x68, pull, r.a)
++  op(0x69, read_immediate, fp(adc))
++  op(0x6a, shift, fp(rra))
++I op(0x6b, arr_immediate)
++  op(0x6c, jmp_indirect_absolute)
++  op(0x6d, read_absolute, fp(adc))
++  op(0x6e, rmw_absolute, fp(ror))
++I op(0x6f, rmwr_absolute, fp(ror), fp(adc))
++  op(0x70, branch, r.p.v, 1)
++  op(0x71, read_indirect_zero_page_y, fp(adc))
++I op(0x72, stp)
++I op(0x73, rmwr_indirect_zero_page_y, fp(ror), fp(adc))
++I op(0x74, nop_zero_page_x)
++  op(0x75, read_zero_page_x, fp(adc))
++  op(0x76, rmw_zero_page_x, fp(ror))
++I op(0x77, rmwr_zero_page_x, fp(ror), fp(adc))
++  op(0x78, set_flag, r.p.i.bit)
++  op(0x79, read_absolute_y, fp(adc))
++I op(0x7a, nop)
++I op(0x7b, rmwr_absolute_y, fp(ror), fp(adc))
++I op(0x7c, nop_absolute_x)
++  op(0x7d, read_absolute_x, fp(adc))
++  op(0x7e, rmw_absolute_x, fp(ror))
++I op(0x7f, rmwr_absolute_x, fp(ror), fp(adc))
++I op(0x80, nop_immediate) // r.y
++  op(0x81, store_indirect_zero_page_x, r.a)
++I op(0x82, nop_immediate) // r.x
++I op(0x83, store_indirect_zero_page_x, r.a & r.x)
++  op(0x84, store_zero_page, r.y)
++  op(0x85, store_zero_page, r.a)
++  op(0x86, store_zero_page, r.x)
++I op(0x87, store_zero_page, r.a & r.x)
++  op(0x88, decrement, r.y)
++I op(0x89, nop_immediate) // r.a
++  op(0x8a, transfer, r.x, r.a, 1)
++I op(0x8b, xaa_immediate)
++  op(0x8c, store_absolute, r.y)
++  op(0x8d, store_absolute, r.a)
++  op(0x8e, store_absolute, r.x)
++I op(0x8f, store_absolute, r.a & r.x)
++  op(0x90, branch, r.p.c, 0)
++  op(0x91, store_indirect_zero_page_y, r.a)
++I op(0x92, stp)
++I op(0x93, sha_indirect_zero_page_y)
++  op(0x94, store_zero_page_x, r.y)
++  op(0x95, store_zero_page_x, r.a)
++  op(0x96, store_zero_page_y, r.x)
++I op(0x97, store_zero_page_y, r.a & r.x)
++  op(0x98, transfer, r.y, r.a, 1)
++  op(0x99, store_absolute_y, r.a)
++  op(0x9a, transfer, r.x, r.s, 0)
++I op(0x9b, tas_absolute_y)
++I op(0x9c, shy_absolute_x)
++  op(0x9d, store_absolute_x, r.a)
++I op(0x9e, shx_absolute_y)
++I op(0x9f, sha_absolute_y)
++  op(0xa0, read_immediate, fp(ldy))
++  op(0xa1, read_indirect_zero_page_x, fp(lda))
++  op(0xa2, read_immediate, fp(ldx))
++I op(0xa3, read_indirect_zero_page_x, fp(lax))
++  op(0xa4, read_zero_page, fp(ldy))
++  op(0xa5, read_zero_page, fp(lda))
++  op(0xa6, read_zero_page, fp(ldx))
++I op(0xa7, read_zero_page, fp(lax))
++  op(0xa8, transfer, r.a, r.y, 1)
++  op(0xa9, read_immediate, fp(lda))
++  op(0xaa, transfer, r.a, r.x, 1)
++I op(0xab, lxa_immediate)
++  op(0xac, read_absolute, fp(ldy))
++  op(0xad, read_absolute, fp(lda))
++  op(0xae, read_absolute, fp(ldx))
++I op(0xaf, read_absolute, fp(lax))
++  op(0xb0, branch, r.p.c, 1)
++  op(0xb1, read_indirect_zero_page_y, fp(lda))
++I op(0xb2, stp)
++I op(0xb3, read_indirect_zero_page_y, fp(lax))
++  op(0xb4, read_zero_page_x, fp(ldy))
++  op(0xb5, read_zero_page_x, fp(lda))
++  op(0xb6, read_zero_page_y, fp(ldx))
++I op(0xb7, read_zero_page_y, fp(lax))
++  op(0xb8, clear_flag, r.p.v.bit)
++  op(0xb9, read_absolute_y, fp(lda))
++  op(0xba, transfer, r.s, r.x, 1)
++I op(0xbb, las_absolute_y)
++  op(0xbc, read_absolute_x, fp(ldy))
++  op(0xbd, read_absolute_x, fp(lda))
++  op(0xbe, read_absolute_y, fp(ldx))
++I op(0xbf, read_absolute_y, fp(lax))
++  op(0xc0, read_immediate, fp(cpy))
++  op(0xc1, read_indirect_zero_page_x, fp(cmp))
++I op(0xc2, nop_immediate)
++I op(0xc3, dcp_indirect_zero_page_x)
++  op(0xc4, read_zero_page, fp(cpy))
++  op(0xc5, read_zero_page, fp(cmp))
++  op(0xc6, rmw_zero_page, fp(dec))
++I op(0xc7, rmw_zero_page, fp(dcp))
++  op(0xc8, increment, r.y)
++  op(0xc9, read_immediate, fp(cmp))
++  op(0xca, decrement, r.x)
++I op(0xcb, axs_immediate)
++  op(0xcc, read_absolute, fp(cpy))
++  op(0xcd, read_absolute, fp(cmp))
++  op(0xce, rmw_absolute, fp(dec))
++I op(0xcf, rmw_absolute, fp(dcp))
++  op(0xd0, branch, r.p.z, 0)
++  op(0xd1, read_indirect_zero_page_y, fp(cmp))
++I op(0xd2, stp)
++I op(0xd3, dcp_indirect_zero_page_y)
++I op(0xd4, nop_zero_page_x)
++  op(0xd5, read_zero_page_x, fp(cmp))
++  op(0xd6, rmw_zero_page_x, fp(dec))
++I op(0xd7, rmw_zero_page_x, fp(dcp))
++  op(0xd8, clear_flag, r.p.d.bit)
++  op(0xd9, read_absolute_y, fp(cmp))
++I op(0xda, nop)
++I op(0xdb, dcp_absolute_y)
++I op(0xdc, nop_absolute_x)
++  op(0xdd, read_absolute_x, fp(cmp))
++  op(0xde, rmw_absolute_x, fp(dec))
++I op(0xdf, rmw_absolute_x, fp(dcp))
++  op(0xe0, read_immediate, fp(cpx))
++  op(0xe1, read_indirect_zero_page_x, fp(sbc))
++I op(0xe2, nop_immediate)
++I op(0xe3, rmwr_indirect_zero_page_x, fp(inc), fp(sbc))
++  op(0xe4, read_zero_page, fp(cpx))
++  op(0xe5, read_zero_page, fp(sbc))
++  op(0xe6, rmw_zero_page, fp(inc))
++I op(0xe7, rmwr_zero_page, fp(inc), fp(sbc))
++  op(0xe8, increment, r.x)
++  op(0xe9, read_immediate, fp(sbc))
++  op(0xea, nop)
++I op(0xeb, read_immediate, fp(sbc))
++  op(0xec, read_absolute, fp(cpx))
++  op(0xed, read_absolute, fp(sbc))
++  op(0xee, rmw_absolute, fp(inc))
++I op(0xef, rmwr_absolute, fp(inc), fp(sbc))
++  op(0xf0, branch, r.p.z, 1)
++  op(0xf1, read_indirect_zero_page_y, fp(sbc))
++I op(0xf2, stp)
++I op(0xf3, rmwr_indirect_zero_page_y, fp(inc), fp(sbc))
++I op(0xf4, nop_zero_page_x)
++  op(0xf5, read_zero_page_x, fp(sbc))
++  op(0xf6, rmw_zero_page_x, fp(inc))
++I op(0xf7, rmwr_zero_page_x, fp(inc), fp(sbc))
++  op(0xf8, set_flag, r.p.d.bit)
++  op(0xf9, read_absolute_y, fp(sbc))
++I op(0xfa, nop)
++I op(0xfb, rmwr_absolute_y, fp(inc), fp(sbc))
++I op(0xfc, nop_absolute_x)
++  op(0xfd, read_absolute_x, fp(sbc))
++  op(0xfe, rmw_absolute_x, fp(inc))
++I op(0xff, rmwr_absolute_x, fp(inc), fp(sbc))
++  }
++}
++
++#undef I
++#undef op
++#undef fp
+diff --git a/higan/higan/processor/r6502/algorithms.cpp b/higan/higan/processor/r6502/algorithms.cpp
+deleted file mode 100644
+index 27c786e..0000000
+--- a/higan/higan/processor/r6502/algorithms.cpp
++++ /dev/null
+@@ -1,148 +0,0 @@
+-auto R6502::fp_adc() {
+-  int result = regs.a + rd + regs.p.c;
+-  regs.p.v = ~(regs.a ^ rd) & (regs.a ^ result) & 0x80;
+-  regs.p.c = (result > 0xff);
+-  regs.p.n = (result & 0x80);
+-  regs.p.z = ((uint8)result == 0);
+-  regs.a = result;
+-}
+-
+-auto R6502::fp_and() {
+-  regs.a &= rd;
+-  regs.p.n = (regs.a & 0x80);
+-  regs.p.z = (regs.a == 0);
+-}
+-
+-auto R6502::fp_asl() {
+-  regs.p.c = rd & 0x80;
+-  rd <<= 1;
+-  regs.p.n = (rd & 0x80);
+-  regs.p.z = (rd == 0);
+-}
+-
+-auto R6502::fp_bit() {
+-  regs.p.n = (rd & 0x80);
+-  regs.p.v = (rd & 0x40);
+-  regs.p.z = ((rd & regs.a) == 0);
+-}
+-
+-auto R6502::fp_cmp() {
+-  int r = regs.a - rd;
+-  regs.p.n = (r & 0x80);
+-  regs.p.z = (uint8)(r == 0);
+-  regs.p.c = (r >= 0);
+-}
+-
+-auto R6502::fp_cpx() {
+-  int r = regs.x - rd;
+-  regs.p.n = (r & 0x80);
+-  regs.p.z = (uint8)(r == 0);
+-  regs.p.c = (r >= 0);
+-}
+-
+-auto R6502::fp_cpy() {
+-  int r = regs.y - rd;
+-  regs.p.n = (r & 0x80);
+-  regs.p.z = (uint8)(r == 0);
+-  regs.p.c = (r >= 0);
+-}
+-
+-auto R6502::fp_dec() {
+-  rd--;
+-  regs.p.n = (rd & 0x80);
+-  regs.p.z = (rd == 0);
+-}
+-
+-auto R6502::fp_eor() {
+-  regs.a ^= rd;
+-  regs.p.n = (regs.a & 0x80);
+-  regs.p.z = (regs.a == 0);
+-}
+-
+-auto R6502::fp_inc() {
+-  rd++;
+-  regs.p.n = (rd & 0x80);
+-  regs.p.z = (rd == 0);
+-}
+-
+-auto R6502::fp_lda() {
+-  regs.a = rd;
+-  regs.p.n = (regs.a & 0x80);
+-  regs.p.z = (regs.a == 0);
+-}
+-
+-auto R6502::fp_ldx() {
+-  regs.x = rd;
+-  regs.p.n = (regs.x & 0x80);
+-  regs.p.z = (regs.x == 0);
+-}
+-
+-auto R6502::fp_ldy() {
+-  regs.y = rd;
+-  regs.p.n = (regs.y & 0x80);
+-  regs.p.z = (regs.y == 0);
+-}
+-
+-auto R6502::fp_lsr() {
+-  regs.p.c = rd & 0x01;
+-  rd >>= 1;
+-  regs.p.n = (rd & 0x80);
+-  regs.p.z = (rd == 0);
+-}
+-
+-auto R6502::fp_ora() {
+-  regs.a |= rd;
+-  regs.p.n = (regs.a & 0x80);
+-  regs.p.z = (regs.a == 0);
+-}
+-
+-auto R6502::fp_rla() {
+-  uint carry = (uint)regs.p.c;
+-  regs.p.c = regs.a & 0x80;
+-  regs.a = (regs.a << 1) | carry;
+-  regs.p.n = (regs.a & 0x80);
+-  regs.p.z = (regs.a == 0);
+-}
+-
+-auto R6502::fp_rol() {
+-  uint carry = (uint)regs.p.c;
+-  regs.p.c = rd & 0x80;
+-  rd = (rd << 1) | carry;
+-  regs.p.n = (rd & 0x80);
+-  regs.p.z = (rd == 0);
+-}
+-
+-auto R6502::fp_ror() {
+-  uint carry = (uint)regs.p.c << 7;
+-  regs.p.c = rd & 0x01;
+-  rd = carry | (rd >> 1);
+-  regs.p.n = (rd & 0x80);
+-  regs.p.z = (rd == 0);
+-}
+-
+-auto R6502::fp_rra() {
+-  uint carry = (uint)regs.p.c << 7;
+-  regs.p.c = regs.a & 0x01;
+-  regs.a = carry | (regs.a >> 1);
+-  regs.p.n = (regs.a & 0x80);
+-  regs.p.z = (regs.a == 0);
+-}
+-
+-auto R6502::fp_sbc() {
+-  rd ^= 0xff;
+-  return fp_adc();
+-}
+-
+-auto R6502::fp_sla() {
+-  regs.p.c = regs.a & 0x80;
+-  regs.a <<= 1;
+-  regs.p.n = (regs.a & 0x80);
+-  regs.p.z = (regs.a == 0);
+-}
+-
+-auto R6502::fp_sra() {
+-  regs.p.c = regs.a & 0x01;
+-  regs.a >>= 1;
+-  regs.p.n = (regs.a & 0x80);
+-  regs.p.z = (regs.a == 0);
+-}
+diff --git a/higan/higan/processor/r6502/disassembler.cpp b/higan/higan/processor/r6502/disassembler.cpp
+deleted file mode 100644
+index c9ee6b0..0000000
+--- a/higan/higan/processor/r6502/disassembler.cpp
++++ /dev/null
+@@ -1,193 +0,0 @@
+-auto R6502::disassemble() -> string {
+-  string output = {hex(regs.pc, 4L), "  "};
+-
+-  auto abs = [&]() -> string { return {"$", hex(readDebugger(regs.pc + 2), 2L), hex(readDebugger(regs.pc + 1), 2L)}; };
+-  auto abx = [&]() -> string { return {"$", hex(readDebugger(regs.pc + 2), 2L), hex(readDebugger(regs.pc + 1), 2L), ",x"}; };
+-  auto aby = [&]() -> string { return {"$", hex(readDebugger(regs.pc + 2), 2L), hex(readDebugger(regs.pc + 1), 2L), ",y"}; };
+-  auto iab = [&]() -> string { return {"($", hex(readDebugger(regs.pc + 2), 2L), hex(readDebugger(regs.pc + 1), 2L), ")"}; };
+-  auto imm = [&]() -> string { return {"#$", hex(readDebugger(regs.pc + 1), 2L)}; };
+-  auto imp = [&]() -> string { return {""}; };
+-  auto izx = [&]() -> string { return {"($", hex(readDebugger(regs.pc + 1), 2L), ",x)"}; };
+-  auto izy = [&]() -> string { return {"($", hex(readDebugger(regs.pc + 1), 2L), "),y"}; };
+-  auto rel = [&]() -> string { return {"$", hex((regs.pc + 2) + (int8)readDebugger(regs.pc + 1), 4L)}; };
+-  auto zpg = [&]() -> string { return {"$", hex(readDebugger(regs.pc + 1), 2L)}; };
+-  auto zpx = [&]() -> string { return {"$", hex(readDebugger(regs.pc + 1), 2L), ",x"}; };
+-  auto zpy = [&]() -> string { return {"$", hex(readDebugger(regs.pc + 1), 2L), ",y"}; };
+-
+-  #define op(byte, prefix, mode) \
+-    case byte: output.append(#prefix, " ", mode()); \
+-    break
+-
+-  switch(auto opcode = readDebugger(regs.pc)) {
+-  op(0x00, brk, imm);
+-  op(0x01, ora, izx);
+-  op(0x05, ora, zpg);
+-  op(0x06, asl, zpg);
+-  op(0x08, php, imp);
+-  op(0x09, ora, imm);
+-  op(0x0a, asl, imp);
+-  op(0x0d, ora, abs);
+-  op(0x0e, asl, abs);
+-  op(0x10, bpl, rel);
+-  op(0x11, ora, izy);
+-  op(0x15, ora, zpx);
+-  op(0x16, asl, zpx);
+-  op(0x18, clc, imp);
+-  op(0x19, ora, aby);
+-  op(0x1d, ora, abx);
+-  op(0x1e, asl, abx);
+-  op(0x20, jsr, abs);
+-  op(0x21, and, izx);
+-  op(0x24, bit, zpg);
+-  op(0x25, and, zpg);
+-  op(0x26, rol, zpg);
+-  op(0x28, plp, imp);
+-  op(0x29, and, imm);
+-  op(0x2a, rol, imp);
+-  op(0x2c, bit, abs);
+-  op(0x2d, and, abs);
+-  op(0x2e, rol, abs);
+-  op(0x30, bmi, rel);
+-  op(0x31, and, izy);
+-  op(0x35, and, zpx);
+-  op(0x36, rol, zpx);
+-  op(0x38, sec, imp);
+-  op(0x39, and, aby);
+-  op(0x3d, and, abx);
+-  op(0x3e, rol, abx);
+-  op(0x40, rti, imp);
+-  op(0x41, eor, izx);
+-  op(0x45, eor, zpg);
+-  op(0x46, lsr, zpg);
+-  op(0x48, pha, imp);
+-  op(0x49, eor, imm);
+-  op(0x4a, lsr, imp);
+-  op(0x4c, jmp, abs);
+-  op(0x4d, eor, abs);
+-  op(0x4e, lsr, abs);
+-  op(0x50, bvc, rel);
+-  op(0x51, eor, izy);
+-  op(0x55, eor, zpx);
+-  op(0x56, lsr, zpx);
+-  op(0x58, cli, imp);
+-  op(0x59, eor, aby);
+-  op(0x5a, phy, imp);
+-  op(0x5d, eor, abx);
+-  op(0x5e, lsr, abx);
+-  op(0x60, rts, imp);
+-  op(0x61, adc, izx);
+-  op(0x65, adc, zpg);
+-  op(0x66, ror, zpg);
+-  op(0x68, pla, imp);
+-  op(0x69, adc, imm);
+-  op(0x6a, ror, imp);
+-  op(0x6c, jmp, iab);
+-  op(0x6d, adc, abs);
+-  op(0x6e, ror, abs);
+-  op(0x70, bvs, rel);
+-  op(0x71, adc, izy);
+-  op(0x75, adc, zpx);
+-  op(0x76, ror, zpx);
+-  op(0x78, sei, imp);
+-  op(0x79, adc, aby);
+-  op(0x7a, ply, imp);
+-  op(0x7d, adc, abx);
+-  op(0x7e, ror, abx);
+-  op(0x81, sta, izx);
+-  op(0x84, sty, zpg);
+-  op(0x85, sta, zpg);
+-  op(0x86, stx, zpg);
+-  op(0x88, dey, imp);
+-  op(0x8a, txa, imp);
+-  op(0x8c, sty, abs);
+-  op(0x8d, sta, abs);
+-  op(0x8e, stx, abs);
+-  op(0x90, bcc, rel);
+-  op(0x91, sta, izy);
+-  op(0x94, sty, zpx);
+-  op(0x95, sta, zpx);
+-  op(0x96, stx, zpy);
+-  op(0x98, tya, imp);
+-  op(0x99, sta, aby);
+-  op(0x9a, txs, imp);
+-  op(0x9d, sta, abx);
+-  op(0xa0, ldy, imm);
+-  op(0xa1, lda, izx);
+-  op(0xa2, ldx, imm);
+-  op(0xa4, ldy, zpg);
+-  op(0xa5, lda, zpg);
+-  op(0xa6, ldx, zpg);
+-  op(0xa8, tay, imp);
+-  op(0xa9, lda, imm);
+-  op(0xaa, tax, imp);
+-  op(0xac, ldy, abs);
+-  op(0xad, lda, abs);
+-  op(0xae, ldx, abs);
+-  op(0xb0, bcs, rel);
+-  op(0xb1, lda, izy);
+-  op(0xb4, ldy, zpx);
+-  op(0xb5, lda, zpx);
+-  op(0xb6, ldx, zpy);
+-  op(0xb8, clv, imp);
+-  op(0xb9, lda, aby);
+-  op(0xba, tsx, imp);
+-  op(0xbc, ldy, abx);
+-  op(0xbd, lda, abx);
+-  op(0xbe, ldx, aby);
+-  op(0xc0, cpy, imm);
+-  op(0xc1, cmp, izx);
+-  op(0xc4, cpy, zpg);
+-  op(0xc5, cmp, zpg);
+-  op(0xc6, dec, zpg);
+-  op(0xc8, iny, imp);
+-  op(0xc9, cmp, imm);
+-  op(0xca, dex, imp);
+-  op(0xcc, cpy, abs);
+-  op(0xcd, cmp, abs);
+-  op(0xce, dec, abs);
+-  op(0xd0, bne, rel);
+-  op(0xd1, cmp, izy);
+-  op(0xd5, cmp, zpx);
+-  op(0xd6, dec, zpx);
+-  op(0xd8, cld, imp);
+-  op(0xd9, cmp, aby);
+-  op(0xda, phx, imp);
+-  op(0xdd, cmp, abx);
+-  op(0xde, dec, abx);
+-  op(0xe0, cpx, imm);
+-  op(0xe1, sbc, izx);
+-  op(0xe4, cpx, zpg);
+-  op(0xe5, sbc, zpg);
+-  op(0xe6, inc, zpg);
+-  op(0xe8, inx, imp);
+-  op(0xe9, sbc, imm);
+-  op(0xea, nop, imp);
+-  op(0xec, cpx, abs);
+-  op(0xed, sbc, abs);
+-  op(0xee, inc, abs);
+-  op(0xf0, beq, rel);
+-  op(0xf1, sbc, izy);
+-  op(0xf5, sbc, zpx);
+-  op(0xf6, inc, zpx);
+-  op(0xf8, sed, imp);
+-  op(0xf9, sbc, aby);
+-  op(0xfa, plx, imp);
+-  op(0xfd, sbc, abx);
+-  op(0xfe, inc, abx);
+-
+-  default: output.append("$", hex(opcode, 2L)); break;
+-  }
+-
+-  #undef op
+-
+-  output.append("                ");
+-  output.resize(20);
+-
+-  output.append(
+-    "A:", hex(regs.a, 2L), " X:", hex(regs.x, 2L), " Y:", hex(regs.y, 2L), " S:", hex(regs.s, 2L), " ",
+-    regs.p.n ? "N" : "n", regs.p.v ? "V" : "v", regs.p.d ? "D" : "d",
+-    regs.p.i ? "I" : "i", regs.p.z ? "Z" : "z", regs.p.c ? "C" : "c"
+-  );
+-
+-  return output;
+-}
+diff --git a/higan/higan/processor/r6502/instructions.cpp b/higan/higan/processor/r6502/instructions.cpp
+deleted file mode 100644
+index 7c87352..0000000
+--- a/higan/higan/processor/r6502/instructions.cpp
++++ /dev/null
+@@ -1,332 +0,0 @@
+-auto R6502::op_branch(bool condition) {
+-  if(!condition) {
+-L   rd = readPC();
+-  } else {
+-    rd = readPC();
+-    aa = regs.pc + (int8)rd;
+-    ioPage(regs.pc, aa);
+-L   io();
+-    regs.pc = aa;
+-  }
+-}
+-
+-auto R6502::op_clear_flag(uint bit) {
+-L io();
+-  regs.p &= ~(1 << bit);
+-}
+-
+-auto R6502::op_decrement(uint8& r) {
+-L io();
+-  r--;
+-  regs.p.n = (r & 0x80);
+-  regs.p.z = (r == 0);
+-}
+-
+-auto R6502::op_increment(uint8& r) {
+-L io();
+-  r++;
+-  regs.p.n = (r & 0x80);
+-  regs.p.z = (r == 0);
+-}
+-
+-auto R6502::op_pull(uint8& r) {
+-  io();
+-  io();
+-L r = readSP();
+-  regs.p.n = (r & 0x80);
+-  regs.p.z = (r == 0);
+-}
+-
+-auto R6502::op_push(uint8& r) {
+-  io();
+-L writeSP(r);
+-}
+-
+-auto R6502::op_read_absolute(fp op) {
+-  abs.l = readPC();
+-  abs.h = readPC();
+-L rd = read(abs.w);
+-  call(op);
+-}
+-
+-auto R6502::op_read_absolute_x(fp op) {
+-  abs.l = readPC();
+-  abs.h = readPC();
+-  ioPage(abs.w, abs.w + regs.x);
+-L rd = read(abs.w + regs.x);
+-  call(op);
+-}
+-
+-auto R6502::op_read_absolute_y(fp op) {
+-  abs.l = readPC();
+-  abs.h = readPC();
+-  ioPage(abs.w, abs.w + regs.y);
+-L rd = read(abs.w + regs.y);
+-  call(op);
+-}
+-
+-auto R6502::op_read_immediate(fp op) {
+-L rd = readPC();
+-  call(op);
+-}
+-
+-auto R6502::op_read_indirect_zero_page_x(fp op) {
+-  zp = readPC();
+-  readZP(zp);
+-  abs.l = readZP(zp++ + regs.x);
+-  abs.h = readZP(zp++ + regs.x);
+-L rd = read(abs.w);
+-  call(op);
+-}
+-
+-auto R6502::op_read_indirect_zero_page_y(fp op) {
+-  rd = readPC();
+-  abs.l = readZP(rd++);
+-  abs.h = readZP(rd++);
+-  ioPage(abs.w, abs.w + regs.y);
+-L rd = read(abs.w + regs.y);
+-  call(op);
+-}
+-
+-auto R6502::op_read_zero_page(fp op) {
+-  zp = readPC();
+-L rd = readZP(zp);
+-  call(op);
+-}
+-
+-auto R6502::op_read_zero_page_x(fp op) {
+-  zp = readPC();
+-  readZP(zp);
+-L rd = readZP(zp + regs.x);
+-  call(op);
+-}
+-
+-auto R6502::op_read_zero_page_y(fp op) {
+-  zp = readPC();
+-  readZP(zp);
+-L rd = readZP(zp + regs.y);
+-  call(op);
+-}
+-
+-auto R6502::op_rmw_absolute(fp op) {
+-  abs.l = readPC();
+-  abs.h = readPC();
+-  rd = read(abs.w);
+-  write(abs.w, rd);
+-  call(op);
+-L write(abs.w, rd);
+-}
+-
+-auto R6502::op_rmw_absolute_x(fp op) {
+-  abs.l = readPC();
+-  abs.h = readPC();
+-  ioPageAlways(abs.w, abs.w + regs.x);
+-  rd = read(abs.w + regs.x);
+-  write(abs.w + regs.x, rd);
+-  call(op);
+-L write(abs.w + regs.x, rd);
+-}
+-
+-auto R6502::op_rmw_zero_page(fp op) {
+-  zp = readPC();
+-  rd = readZP(zp);
+-  writeZP(zp, rd);
+-  call(op);
+-L writeZP(zp, rd);
+-}
+-
+-auto R6502::op_rmw_zero_page_x(fp op) {
+-  zp = readPC();
+-  readZP(zp);
+-  rd = readZP(zp + regs.x);
+-  writeZP(zp + regs.x, rd);
+-  call(op);
+-L writeZP(zp + regs.x, rd);
+-}
+-
+-auto R6502::op_set_flag(uint bit) {
+-L io();
+-  regs.p |= 1 << bit;
+-}
+-
+-auto R6502::op_shift(fp op) {
+-L io();
+-  call(op);
+-}
+-
+-auto R6502::op_store_absolute(uint8& r) {
+-  abs.l = readPC();
+-  abs.h = readPC();
+-L write(abs.w, r);
+-}
+-
+-auto R6502::op_store_absolute_x(uint8& r) {
+-  abs.l = readPC();
+-  abs.h = readPC();
+-  ioPageAlways(abs.w, abs.w + regs.x);
+-L write(abs.w + regs.x, r);
+-}
+-
+-auto R6502::op_store_absolute_y(uint8& r) {
+-  abs.l = readPC();
+-  abs.h = readPC();
+-  ioPageAlways(abs.w, abs.w + regs.y);
+-L write(abs.w + regs.y, r);
+-}
+-
+-auto R6502::op_store_indirect_zero_page_x(uint8& r) {
+-  zp = readPC();
+-  readZP(zp);
+-  abs.l = readZP(zp++ + regs.x);
+-  abs.h = readZP(zp++ + regs.x);
+-L write(abs.w, r);
+-}
+-
+-auto R6502::op_store_indirect_zero_page_y(uint8& r) {
+-  rd = readPC();
+-  abs.l = readZP(rd++);
+-  abs.h = readZP(rd++);
+-  ioPageAlways(abs.w, abs.w + regs.y);
+-L write(abs.w + regs.y, r);
+-}
+-
+-auto R6502::op_store_zero_page(uint8& r) {
+-  zp = readPC();
+-L writeZP(zp, r);
+-}
+-
+-auto R6502::op_store_zero_page_x(uint8& r) {
+-  zp = readPC();
+-  readZP(zp);
+-L writeZP(zp + regs.x, r);
+-}
+-
+-auto R6502::op_store_zero_page_y(uint8& r) {
+-  zp = readPC();
+-  readZP(zp);
+-L writeZP(zp + regs.y, r);
+-}
+-
+-auto R6502::op_transfer(uint8& s, uint8& d, bool flag) {
+-L io();
+-  d = s;
+-  if(!flag) return;
+-  regs.p.n = (d & 0x80);
+-  regs.p.z = (d == 0);
+-}
+-
+-//
+-
+-auto R6502::op_brk() {
+-  readPC();
+-  writeSP(regs.pc >> 8);
+-  writeSP(regs.pc >> 0);
+-  writeSP(regs.p | 0x30);
+-  abs.l = read(0xfffe);
+-  regs.p.i = 1;
+-  regs.p.d = 0;
+-L abs.h = read(0xffff);
+-  regs.pc = abs.w;
+-}
+-
+-auto R6502::op_jmp_absolute() {
+-  abs.l = readPC();
+-L abs.h = readPC();
+-  regs.pc = abs.w;
+-}
+-
+-auto R6502::op_jmp_indirect_absolute() {
+-  abs.l = readPC();
+-  abs.h = readPC();
+-  iabs.l = read(abs.w); abs.l++;
+-L iabs.h = read(abs.w); abs.l++;
+-  regs.pc = iabs.w;
+-}
+-
+-auto R6502::op_jsr_absolute() {
+-  abs.l = readPC();
+-  abs.h = readPC();
+-  io();
+-  regs.pc--;
+-  writeSP(regs.pc >> 8);
+-L writeSP(regs.pc >> 0);
+-  regs.pc = abs.w;
+-}
+-
+-auto R6502::op_nop() {
+-L io();
+-}
+-
+-auto R6502::op_php() {
+-  io();
+-L writeSP(regs.p | 0x30);
+-}
+-
+-auto R6502::op_plp() {
+-  io();
+-  io();
+-L regs.p = readSP();
+-}
+-
+-auto R6502::op_rti() {
+-  io();
+-  io();
+-  regs.p = readSP();
+-  abs.l = readSP();
+-L abs.h = readSP();
+-  regs.pc = abs.w;
+-}
+-
+-auto R6502::op_rts() {
+-  io();
+-  io();
+-  abs.l = readSP();
+-  abs.h = readSP();
+-L io();
+-  regs.pc = ++abs.w;
+-}
+-
+-//illegal opcodes
+-//===============
+-
+-auto R6502::op_arr_immediate() {
+-L rd = readPC();
+-  regs.a &= rd;
+-  regs.a = (regs.p.c << 7) | (regs.a >> 1);
+-  regs.p.n = (regs.a & 0x80);
+-  regs.p.z = (regs.a == 0);
+-  regs.p.c = (regs.a & 0x40);
+-  regs.p.v = regs.p.c ^ ((regs.a >> 5) & 1);
+-}
+-
+-auto R6502::op_nop_absolute() {
+-  abs.l = readPC();
+-  abs.h = readPC();
+-L io();
+-}
+-
+-auto R6502::op_nop_absolute_x() {
+-  abs.l = readPC();
+-  abs.h = readPC();
+-  ioPage(abs.w, abs.w + regs.x);
+-L io();
+-}
+-
+-auto R6502::op_nop_immediate() {
+-L io();
+-}
+-
+-auto R6502::op_nop_implied() {
+-L io();
+-}
+-
+-auto R6502::op_nop_zero_page() {
+-  zp = readPC();
+-L readZP(zp);
+-}
+-
+-auto R6502::op_nop_zero_page_x() {
+-  zp = readPC();
+-  readZP(zp);
+-L readZP(zp + regs.x);
+-}
+diff --git a/higan/higan/processor/r6502/memory.cpp b/higan/higan/processor/r6502/memory.cpp
+deleted file mode 100644
+index 7814124..0000000
+--- a/higan/higan/processor/r6502/memory.cpp
++++ /dev/null
+@@ -1,36 +0,0 @@
+-auto R6502::io() -> uint8 {
+-  return read(regs.pc);
+-}
+-
+-auto R6502::readPC() -> uint8 {
+-  return read(regs.pc++);
+-}
+-
+-auto R6502::readSP() -> uint8 {
+-  return read(0x0100 | ++regs.s);
+-}
+-
+-auto R6502::readZP(uint8 addr) -> uint8 {
+-  return read(addr);
+-}
+-
+-//
+-
+-auto R6502::writeSP(uint8 data) -> void {
+-  write(0x0100 | regs.s--, data);
+-}
+-
+-auto R6502::writeZP(uint8 addr, uint8 data) -> void {
+-  write(addr, data);
+-}
+-
+-//
+-
+-auto R6502::ioPage(uint16 x, uint16 y) -> void {
+-  if(x >> 8 == y >> 8) return;
+-  read((x & 0xff00) | (y & 0x00ff));
+-}
+-
+-auto R6502::ioPageAlways(uint16 x, uint16 y) -> void {
+-  read((x & 0xff00) | (y & 0x00ff));
+-}
+diff --git a/higan/higan/processor/r6502/r6502.cpp b/higan/higan/processor/r6502/r6502.cpp
+deleted file mode 100644
+index 0616425..0000000
+--- a/higan/higan/processor/r6502/r6502.cpp
++++ /dev/null
+@@ -1,52 +0,0 @@
+-#include <processor/processor.hpp>
+-#include "r6502.hpp"
+-
+-namespace Processor {
+-
+-#define L lastCycle();
+-#define call(op) (this->*op)()
+-
+-#include "memory.cpp"
+-#include "algorithms.cpp"
+-#include "instructions.cpp"
+-#include "switch.cpp"
+-#include "disassembler.cpp"
+-#include "serialization.cpp"
+-
+-auto R6502::mdr() const -> uint8 {
+-  return regs.mdr;
+-}
+-
+-auto R6502::power() -> void {
+-  regs.a = 0x00;
+-  regs.x = 0x00;
+-  regs.y = 0x00;
+-  regs.s = 0x00;
+-  regs.p = 0x04;
+-}
+-
+-auto R6502::reset() -> void {
+-  regs.mdr = 0x00;
+-  regs.s -= 3;
+-  regs.p.i = 1;
+-}
+-
+-auto R6502::interrupt() -> void {
+-  io();
+-  io();
+-  writeSP(regs.pc >> 8);
+-  writeSP(regs.pc >> 0);
+-  writeSP(regs.p | 0x20);
+-  uint16 vector = 0xfffe;  //IRQ
+-  nmi(vector);
+-  abs.l = read(vector++);
+-  regs.p.i = 1;
+-  regs.p.d = 0;
+-L abs.h = read(vector++);
+-  regs.pc = abs.w;
+-}
+-
+-#undef L
+-#undef call
+-
+-}
+diff --git a/higan/higan/processor/r6502/registers.hpp b/higan/higan/processor/r6502/registers.hpp
+deleted file mode 100644
+index 9389faa..0000000
+--- a/higan/higan/processor/r6502/registers.hpp
++++ /dev/null
+@@ -1,36 +0,0 @@
+-struct Flags {
+-  union {
+-    uint8_t data = 0;
+-    BooleanBitField<uint8_t, 7> n;
+-    BooleanBitField<uint8_t, 6> v;
+-    BooleanBitField<uint8_t, 3> d;
+-    BooleanBitField<uint8_t, 2> i;
+-    BooleanBitField<uint8_t, 1> z;
+-    BooleanBitField<uint8_t, 0> c;
+-  };
+-
+-  inline operator uint() { return data; }
+-  inline auto& operator =(uint value) { return data  = value, *this; }
+-  inline auto& operator&=(uint value) { return data &= value, *this; }
+-  inline auto& operator|=(uint value) { return data |= value, *this; }
+-  inline auto& operator^=(uint value) { return data ^= value, *this; }
+-};
+-
+-struct Registers {
+-  uint8  mdr;
+-  uint16 pc;
+-  uint8  a, x, y, s;
+-  Flags  p;
+-} regs;
+-
+-struct Register16 {
+-  union {
+-    uint16_t w;
+-    NaturalBitField<uint16_t, 0,  7> l;
+-    NaturalBitField<uint16_t, 8, 15> h;
+-  };
+-} abs, iabs;
+-
+-uint8 rd;
+-uint8 zp;
+-uint16 aa;
+diff --git a/higan/higan/processor/r6502/serialization.cpp b/higan/higan/processor/r6502/serialization.cpp
+deleted file mode 100644
+index ab5452c..0000000
+--- a/higan/higan/processor/r6502/serialization.cpp
++++ /dev/null
+@@ -1,15 +0,0 @@
+-auto R6502::serialize(serializer& s) -> void {
+-  s.integer(regs.mdr);
+-  s.integer(regs.pc);
+-  s.integer(regs.a);
+-  s.integer(regs.x);
+-  s.integer(regs.y);
+-  s.integer(regs.s);
+-  s.integer(regs.p.data);
+-
+-  s.integer(abs.w);
+-  s.integer(iabs.w);
+-  s.integer(rd);
+-  s.integer(zp);
+-  s.integer(aa);
+-}
+diff --git a/higan/higan/processor/r6502/switch.cpp b/higan/higan/processor/r6502/switch.cpp
+deleted file mode 100644
+index 1dd9e74..0000000
+--- a/higan/higan/processor/r6502/switch.cpp
++++ /dev/null
+@@ -1,195 +0,0 @@
+-#define I  //prefix highlights illegal instructions
+-#define op(id, name, ...) case id: return op_##name(__VA_ARGS__);
+-#define fp(name) &R6502::fp_##name
+-
+-auto R6502::instruction() -> void {
+-  switch(readPC()) {
+-  op(0x00, brk)
+-  op(0x01, read_indirect_zero_page_x, fp(ora))
+-I op(0x04, nop_zero_page)
+-  op(0x05, read_zero_page, fp(ora))
+-  op(0x06, rmw_zero_page, fp(asl))
+-  op(0x08, php)
+-  op(0x09, read_immediate, fp(ora))
+-  op(0x0a, shift, fp(sla))
+-I op(0x0c, nop_absolute)
+-  op(0x0d, read_absolute, fp(ora))
+-  op(0x0e, rmw_absolute, fp(asl))
+-  op(0x10, branch, regs.p.n == 0)
+-  op(0x11, read_indirect_zero_page_y, fp(ora))
+-I op(0x14, nop_zero_page_x)
+-  op(0x15, read_zero_page_x, fp(ora))
+-  op(0x16, rmw_zero_page_x, fp(asl))
+-  op(0x18, clear_flag, regs.p.c.bit)
+-  op(0x19, read_absolute_y, fp(ora))
+-I op(0x1a, nop_implied)
+-I op(0x1c, nop_absolute_x)
+-  op(0x1d, read_absolute_x, fp(ora))
+-  op(0x1e, rmw_absolute_x, fp(asl))
+-  op(0x20, jsr_absolute)
+-  op(0x21, read_indirect_zero_page_x, fp(and))
+-  op(0x24, read_zero_page, fp(bit))
+-  op(0x25, read_zero_page, fp(and))
+-  op(0x26, rmw_zero_page, fp(rol))
+-  op(0x28, plp)
+-  op(0x29, read_immediate, fp(and))
+-  op(0x2a, shift, fp(rla))
+-  op(0x2c, read_absolute, fp(bit))
+-  op(0x2d, read_absolute, fp(and))
+-  op(0x2e, rmw_absolute, fp(rol))
+-  op(0x30, branch, regs.p.n == 1)
+-  op(0x31, read_indirect_zero_page_y, fp(and))
+-I op(0x34, nop_zero_page_x)
+-  op(0x35, read_zero_page_x, fp(and))
+-  op(0x36, rmw_zero_page_x, fp(rol))
+-  op(0x38, set_flag, regs.p.c.bit)
+-  op(0x39, read_absolute_y, fp(and))
+-I op(0x3a, nop_implied)
+-I op(0x3c, nop_absolute_x)
+-  op(0x3d, read_absolute_x, fp(and))
+-  op(0x3e, rmw_absolute_x, fp(rol))
+-  op(0x40, rti)
+-  op(0x41, read_indirect_zero_page_x, fp(eor))
+-I op(0x44, nop_zero_page)
+-  op(0x45, read_zero_page, fp(eor))
+-  op(0x46, rmw_zero_page, fp(lsr))
+-  op(0x48, push, regs.a)
+-  op(0x49, read_immediate, fp(eor))
+-  op(0x4a, shift, fp(sra))
+-  op(0x4c, jmp_absolute)
+-  op(0x4d, read_absolute, fp(eor))
+-  op(0x4e, rmw_absolute, fp(lsr))
+-  op(0x50, branch, regs.p.v == 0)
+-  op(0x51, read_indirect_zero_page_y, fp(eor))
+-I op(0x54, nop_zero_page_x)
+-  op(0x55, read_zero_page_x, fp(eor))
+-  op(0x56, rmw_zero_page_x, fp(lsr))
+-  op(0x58, clear_flag, regs.p.i.bit)
+-  op(0x59, read_absolute_y, fp(eor))
+-I op(0x5a, nop_implied)
+-I op(0x5c, nop_absolute_x)
+-  op(0x5d, read_absolute_x, fp(eor))
+-  op(0x5e, rmw_absolute_x, fp(lsr))
+-  op(0x60, rts)
+-  op(0x61, read_indirect_zero_page_x, fp(adc))
+-I op(0x64, nop_zero_page)
+-  op(0x65, read_zero_page, fp(adc))
+-  op(0x66, rmw_zero_page, fp(ror))
+-  op(0x68, pull, regs.a)
+-  op(0x69, read_immediate, fp(adc))
+-  op(0x6a, shift, fp(rra))
+-I op(0x6b, arr_immediate)
+-  op(0x6c, jmp_indirect_absolute)
+-  op(0x6d, read_absolute, fp(adc))
+-  op(0x6e, rmw_absolute, fp(ror))
+-  op(0x70, branch, regs.p.v == 1)
+-  op(0x71, read_indirect_zero_page_y, fp(adc))
+-I op(0x74, nop_zero_page_x)
+-  op(0x75, read_zero_page_x, fp(adc))
+-  op(0x76, rmw_zero_page_x, fp(ror))
+-  op(0x78, set_flag, regs.p.i.bit)
+-  op(0x79, read_absolute_y, fp(adc))
+-I op(0x7a, nop_implied)
+-I op(0x7c, nop_absolute_x)
+-  op(0x7d, read_absolute_x, fp(adc))
+-  op(0x7e, rmw_absolute_x, fp(ror))
+-I case 0x80: return op_nop_absolute();
+-  case 0x81: return op_store_indirect_zero_page_x(regs.a);
+-I case 0x82: return op_nop_immediate();
+-  case 0x84: return op_store_zero_page(regs.y);
+-  case 0x85: return op_store_zero_page(regs.a);
+-  case 0x86: return op_store_zero_page(regs.x);
+-  case 0x88: return op_decrement(regs.y);
+-I case 0x89: return op_nop_immediate();
+-  case 0x8a: return op_transfer(regs.x, regs.a, 1);
+-  case 0x8c: return op_store_absolute(regs.y);
+-  case 0x8d: return op_store_absolute(regs.a);
+-  case 0x8e: return op_store_absolute(regs.x);
+-  case 0x90: return op_branch(regs.p.c == 0);
+-  case 0x91: return op_store_indirect_zero_page_y(regs.a);
+-  case 0x94: return op_store_zero_page_x(regs.y);
+-  case 0x95: return op_store_zero_page_x(regs.a);
+-  case 0x96: return op_store_zero_page_y(regs.x);
+-  case 0x98: return op_transfer(regs.y, regs.a, 1);
+-  case 0x99: return op_store_absolute_y(regs.a);
+-  case 0x9a: return op_transfer(regs.x, regs.s, 0);
+-  case 0x9d: return op_store_absolute_x(regs.a);
+-  case 0xa0: return op_read_immediate(fp(ldy));
+-  case 0xa1: return op_read_indirect_zero_page_x(fp(lda));
+-  case 0xa2: return op_read_immediate(fp(ldx));
+-  case 0xa4: return op_read_zero_page(fp(ldy));
+-  case 0xa5: return op_read_zero_page(fp(lda));
+-  case 0xa6: return op_read_zero_page(fp(ldx));
+-  case 0xa8: return op_transfer(regs.a, regs.y, 1);
+-  case 0xa9: return op_read_immediate(fp(lda));
+-  case 0xaa: return op_transfer(regs.a, regs.x, 1);
+-  case 0xac: return op_read_absolute(fp(ldy));
+-  case 0xad: return op_read_absolute(fp(lda));
+-  case 0xae: return op_read_absolute(fp(ldx));
+-  case 0xb0: return op_branch(regs.p.c == 1);
+-  case 0xb1: return op_read_indirect_zero_page_y(fp(lda));
+-  case 0xb4: return op_read_zero_page_x(fp(ldy));
+-  case 0xb5: return op_read_zero_page_x(fp(lda));
+-  case 0xb6: return op_read_zero_page_y(fp(ldx));
+-  case 0xb8: return op_clear_flag(regs.p.v.bit);
+-  case 0xb9: return op_read_absolute_y(fp(lda));
+-  case 0xba: return op_transfer(regs.s, regs.x, 1);
+-  case 0xbc: return op_read_absolute_x(fp(ldy));
+-  case 0xbd: return op_read_absolute_x(fp(lda));
+-  case 0xbe: return op_read_absolute_y(fp(ldx));
+-  case 0xc0: return op_read_immediate(fp(cpy));
+-  case 0xc1: return op_read_indirect_zero_page_x(fp(cmp));
+-I case 0xc2: return op_nop_immediate();
+-  case 0xc4: return op_read_zero_page(fp(cpy));
+-  case 0xc5: return op_read_zero_page(fp(cmp));
+-  case 0xc6: return op_rmw_zero_page(fp(dec));
+-  case 0xc8: return op_increment(regs.y);
+-  case 0xc9: return op_read_immediate(fp(cmp));
+-  case 0xca: return op_decrement(regs.x);
+-  case 0xcc: return op_read_absolute(fp(cpy));
+-  case 0xcd: return op_read_absolute(fp(cmp));
+-  case 0xce: return op_rmw_absolute(fp(dec));
+-  case 0xd0: return op_branch(regs.p.z == 0);
+-  case 0xd1: return op_read_indirect_zero_page_y(fp(cmp));
+-I case 0xd4: return op_nop_zero_page_x();
+-  case 0xd5: return op_read_zero_page_x(fp(cmp));
+-  case 0xd6: return op_rmw_zero_page_x(fp(dec));
+-  case 0xd8: return op_clear_flag(regs.p.d.bit);
+-  case 0xd9: return op_read_absolute_y(fp(cmp));
+-I case 0xda: return op_nop_implied();
+-I case 0xdc: return op_nop_absolute_x();
+-  case 0xdd: return op_read_absolute_x(fp(cmp));
+-  case 0xde: return op_rmw_absolute_x(fp(dec));
+-  case 0xe0: return op_read_immediate(fp(cpx));
+-  case 0xe1: return op_read_indirect_zero_page_x(fp(sbc));
+-I case 0xe2: return op_nop_immediate();
+-  case 0xe4: return op_read_zero_page(fp(cpx));
+-  case 0xe5: return op_read_zero_page(fp(sbc));
+-  case 0xe6: return op_rmw_zero_page(fp(inc));
+-  case 0xe8: return op_increment(regs.x);
+-  case 0xe9: return op_read_immediate(fp(sbc));
+-  case 0xea: return op_nop();
+-I case 0xeb: return op_read_immediate(fp(sbc));
+-  case 0xec: return op_read_absolute(fp(cpx));
+-  case 0xed: return op_read_absolute(fp(sbc));
+-  case 0xee: return op_rmw_absolute(fp(inc));
+-  case 0xf0: return op_branch(regs.p.z == 1);
+-  case 0xf1: return op_read_indirect_zero_page_y(fp(sbc));
+-I case 0xf4: return op_nop_zero_page_x();
+-  case 0xf5: return op_read_zero_page_x(fp(sbc));
+-  case 0xf6: return op_rmw_zero_page_x(fp(inc));
+-  case 0xf8: return op_set_flag(regs.p.d.bit);
+-  case 0xf9: return op_read_absolute_y(fp(sbc));
+-I case 0xfa: return op_nop_implied();
+-I case 0xfc: return op_nop_absolute_x();
+-  case 0xfd: return op_read_absolute_x(fp(sbc));
+-  case 0xfe: return op_rmw_absolute_x(fp(inc));
+-  }
+-
+-  //unimplemented opcode
+-  return op_nop();
+-}
+-
+-#undef I
+-#undef op
+-#undef fp
+diff --git a/higan/higan/processor/r65816/algorithms.cpp b/nSide/higan/processor/wdc65816/algorithms.cpp
+similarity index 83%
+rename from higan/higan/processor/r65816/algorithms.cpp
+rename to nSide/higan/processor/wdc65816/algorithms.cpp
+index f6e691c..cce3ad3 100644
+--- a/higan/higan/processor/r65816/algorithms.cpp
++++ b/nSide/higan/processor/wdc65816/algorithms.cpp
+@@ -1,4 +1,4 @@
+-auto R65816::op_adc_b() {
++auto WDC65816::op_adc_b() {
+   int result;
+ 
+   if(!r.p.d) {
+@@ -19,7 +19,7 @@ auto R65816::op_adc_b() {
+   r.a.l = result;
+ }
+ 
+-auto R65816::op_adc_w() {
++auto WDC65816::op_adc_w() {
+   int result;
+ 
+   if(!r.p.d) {
+@@ -46,133 +46,133 @@ auto R65816::op_adc_w() {
+   r.a.w = result;
+ }
+ 
+-auto R65816::op_and_b() {
++auto WDC65816::op_and_b() {
+   r.a.l &= rd.l;
+   r.p.n = r.a.l & 0x80;
+   r.p.z = r.a.l == 0;
+ }
+ 
+-auto R65816::op_and_w() {
++auto WDC65816::op_and_w() {
+   r.a.w &= rd.w;
+   r.p.n = r.a.w & 0x8000;
+   r.p.z = r.a.w == 0;
+ }
+ 
+-auto R65816::op_bit_b() {
++auto WDC65816::op_bit_b() {
+   r.p.n = rd.l & 0x80;
+   r.p.v = rd.l & 0x40;
+   r.p.z = (rd.l & r.a.l) == 0;
+ }
+ 
+-auto R65816::op_bit_w() {
++auto WDC65816::op_bit_w() {
+   r.p.n = rd.w & 0x8000;
+   r.p.v = rd.w & 0x4000;
+   r.p.z = (rd.w & r.a.w) == 0;
+ }
+ 
+-auto R65816::op_cmp_b() {
++auto WDC65816::op_cmp_b() {
+   int result = r.a.l - rd.l;
+   r.p.n = result & 0x80;
+   r.p.z = (uint8)result == 0;
+   r.p.c = result >= 0;
+ }
+ 
+-auto R65816::op_cmp_w() {
++auto WDC65816::op_cmp_w() {
+   int result = r.a.w - rd.w;
+   r.p.n = result & 0x8000;
+   r.p.z = (uint16)result == 0;
+   r.p.c = result >= 0;
+ }
+ 
+-auto R65816::op_cpx_b() {
++auto WDC65816::op_cpx_b() {
+   int result = r.x.l - rd.l;
+   r.p.n = result & 0x80;
+   r.p.z = (uint8)result == 0;
+   r.p.c = result >= 0;
+ }
+ 
+-auto R65816::op_cpx_w() {
++auto WDC65816::op_cpx_w() {
+   int result = r.x.w - rd.w;
+   r.p.n = result & 0x8000;
+   r.p.z = (uint16)result == 0;
+   r.p.c = result >= 0;
+ }
+ 
+-auto R65816::op_cpy_b() {
++auto WDC65816::op_cpy_b() {
+   int result = r.y.l - rd.l;
+   r.p.n = result & 0x80;
+   r.p.z = (uint8)result == 0;
+   r.p.c = result >= 0;
+ }
+ 
+-auto R65816::op_cpy_w() {
++auto WDC65816::op_cpy_w() {
+   int result = r.y.w - rd.w;
+   r.p.n = result & 0x8000;
+   r.p.z = (uint16)result == 0;
+   r.p.c = result >= 0;
+ }
+ 
+-auto R65816::op_eor_b() {
++auto WDC65816::op_eor_b() {
+   r.a.l ^= rd.l;
+   r.p.n = r.a.l & 0x80;
+   r.p.z = r.a.l == 0;
+ }
+ 
+-auto R65816::op_eor_w() {
++auto WDC65816::op_eor_w() {
+   r.a.w ^= rd.w;
+   r.p.n = r.a.w & 0x8000;
+   r.p.z = r.a.w == 0;
+ }
+ 
+-auto R65816::op_lda_b() {
++auto WDC65816::op_lda_b() {
+   r.a.l = rd.l;
+   r.p.n = r.a.l & 0x80;
+   r.p.z = r.a.l == 0;
+ }
+ 
+-auto R65816::op_lda_w() {
++auto WDC65816::op_lda_w() {
+   r.a.w = rd.w;
+   r.p.n = r.a.w & 0x8000;
+   r.p.z = r.a.w == 0;
+ }
+ 
+-auto R65816::op_ldx_b() {
++auto WDC65816::op_ldx_b() {
+   r.x.l = rd.l;
+   r.p.n = r.x.l & 0x80;
+   r.p.z = r.x.l == 0;
+ }
+ 
+-auto R65816::op_ldx_w() {
++auto WDC65816::op_ldx_w() {
+   r.x.w = rd.w;
+   r.p.n = r.x.w & 0x8000;
+   r.p.z = r.x.w == 0;
+ }
+ 
+-auto R65816::op_ldy_b() {
++auto WDC65816::op_ldy_b() {
+   r.y.l = rd.l;
+   r.p.n = r.y.l & 0x80;
+   r.p.z = r.y.l == 0;
+ }
+ 
+-auto R65816::op_ldy_w() {
++auto WDC65816::op_ldy_w() {
+   r.y.w = rd.w;
+   r.p.n = r.y.w & 0x8000;
+   r.p.z = r.y.w == 0;
+ }
+ 
+-auto R65816::op_ora_b() {
++auto WDC65816::op_ora_b() {
+   r.a.l |= rd.l;
+   r.p.n = r.a.l & 0x80;
+   r.p.z = r.a.l == 0;
+ }
+ 
+-auto R65816::op_ora_w() {
++auto WDC65816::op_ora_w() {
+   r.a.w |= rd.w;
+   r.p.n = r.a.w & 0x8000;
+   r.p.z = r.a.w == 0;
+ }
+ 
+-auto R65816::op_sbc_b() {
++auto WDC65816::op_sbc_b() {
+   int result;
+   rd.l ^= 0xff;
+ 
+@@ -194,7 +194,7 @@ auto R65816::op_sbc_b() {
+   r.a.l = result;
+ }
+ 
+-auto R65816::op_sbc_w() {
++auto WDC65816::op_sbc_w() {
+   int result;
+   rd.w ^= 0xffff;
+ 
+@@ -222,59 +222,59 @@ auto R65816::op_sbc_w() {
+   r.a.w = result;
+ }
+ 
+-auto R65816::op_inc_b() {
++auto WDC65816::op_inc_b() {
+   rd.l++;
+   r.p.n = rd.l & 0x80;
+   r.p.z = rd.l == 0;
+ }
+ 
+-auto R65816::op_inc_w() {
++auto WDC65816::op_inc_w() {
+   rd.w++;
+   r.p.n = rd.w & 0x8000;
+   r.p.z = rd.w == 0;
+ }
+ 
+-auto R65816::op_dec_b() {
++auto WDC65816::op_dec_b() {
+   rd.l--;
+   r.p.n = rd.l & 0x80;
+   r.p.z = rd.l == 0;
+ }
+ 
+-auto R65816::op_dec_w() {
++auto WDC65816::op_dec_w() {
+   rd.w--;
+   r.p.n = rd.w & 0x8000;
+   r.p.z = rd.w == 0;
+ }
+ 
+-auto R65816::op_asl_b() {
++auto WDC65816::op_asl_b() {
+   r.p.c = rd.l & 0x80;
+   rd.l <<= 1;
+   r.p.n = rd.l & 0x80;
+   r.p.z = rd.l == 0;
+ }
+ 
+-auto R65816::op_asl_w() {
++auto WDC65816::op_asl_w() {
+   r.p.c = rd.w & 0x8000;
+   rd.w <<= 1;
+   r.p.n = rd.w & 0x8000;
+   r.p.z = rd.w == 0;
+ }
+ 
+-auto R65816::op_lsr_b() {
++auto WDC65816::op_lsr_b() {
+   r.p.c = rd.l & 1;
+   rd.l >>= 1;
+   r.p.n = rd.l & 0x80;
+   r.p.z = rd.l == 0;
+ }
+ 
+-auto R65816::op_lsr_w() {
++auto WDC65816::op_lsr_w() {
+   r.p.c = rd.w & 1;
+   rd.w >>= 1;
+   r.p.n = rd.w & 0x8000;
+   r.p.z = rd.w == 0;
+ }
+ 
+-auto R65816::op_rol_b() {
++auto WDC65816::op_rol_b() {
+   auto carry = (uint)r.p.c;
+   r.p.c = rd.l & 0x80;
+   rd.l = (rd.l << 1) | carry;
+@@ -282,7 +282,7 @@ auto R65816::op_rol_b() {
+   r.p.z = rd.l == 0;
+ }
+ 
+-auto R65816::op_rol_w() {
++auto WDC65816::op_rol_w() {
+   auto carry = (uint)r.p.c;
+   r.p.c = rd.w & 0x8000;
+   rd.w = (rd.w << 1) | carry;
+@@ -290,7 +290,7 @@ auto R65816::op_rol_w() {
+   r.p.z = rd.w == 0;
+ }
+ 
+-auto R65816::op_ror_b() {
++auto WDC65816::op_ror_b() {
+   auto carry = (uint)r.p.c << 7;
+   r.p.c = rd.l & 1;
+   rd.l = carry | (rd.l >> 1);
+@@ -298,7 +298,7 @@ auto R65816::op_ror_b() {
+   r.p.z = rd.l == 0;
+ }
+ 
+-auto R65816::op_ror_w() {
++auto WDC65816::op_ror_w() {
+   auto carry = (uint)r.p.c << 15;
+   r.p.c = rd.w & 1;
+   rd.w = carry | (rd.w >> 1);
+@@ -306,22 +306,22 @@ auto R65816::op_ror_w() {
+   r.p.z = rd.w == 0;
+ }
+ 
+-auto R65816::op_trb_b() {
++auto WDC65816::op_trb_b() {
+   r.p.z = (rd.l & r.a.l) == 0;
+   rd.l &= ~r.a.l;
+ }
+ 
+-auto R65816::op_trb_w() {
++auto WDC65816::op_trb_w() {
+   r.p.z = (rd.w & r.a.w) == 0;
+   rd.w &= ~r.a.w;
+ }
+ 
+-auto R65816::op_tsb_b() {
++auto WDC65816::op_tsb_b() {
+   r.p.z = (rd.l & r.a.l) == 0;
+   rd.l |= r.a.l;
+ }
+ 
+-auto R65816::op_tsb_w() {
++auto WDC65816::op_tsb_w() {
+   r.p.z = (rd.w & r.a.w) == 0;
+   rd.w |= r.a.w;
+ }
+diff --git a/higan/higan/processor/r65816/disassembler.cpp b/nSide/higan/processor/wdc65816/disassembler.cpp
+similarity index 72%
+rename from higan/higan/processor/r65816/disassembler.cpp
+rename to nSide/higan/processor/wdc65816/disassembler.cpp
+index c7c0c8a..028e499 100644
+--- a/higan/higan/processor/r65816/disassembler.cpp
++++ b/nSide/higan/processor/wdc65816/disassembler.cpp
+@@ -2,7 +2,7 @@ static auto hex(uintmax value, long precision = 0, char padchar = '0') -> string
+   return nall::hex(value, precision, padchar);
+ }
+ 
+-auto R65816::dreadb(uint24 addr) -> uint8 {
++auto WDC65816::dreadb(uint24 addr) -> uint8 {
+   if((addr & 0x40ffff) >= 0x2000 && (addr & 0x40ffff) <= 0x5fff) {
+     //$00-3f|80-bf:2000-5fff
+     //do not read MMIO registers within debugger
+@@ -11,14 +11,14 @@ auto R65816::dreadb(uint24 addr) -> uint8 {
+   return readDisassembler(addr);
+ }
+ 
+-auto R65816::dreadw(uint24 addr) -> uint16 {
++auto WDC65816::dreadw(uint24 addr) -> uint16 {
+   uint16 data;
+   data.byte(0) = dreadb(addr++);
+   data.byte(1) = dreadb(addr++);
+   return data;
+ }
+ 
+-auto R65816::dreadl(uint24 addr) -> uint24 {
++auto WDC65816::dreadl(uint24 addr) -> uint24 {
+   uint24 data;
+   data.byte(0) = dreadb(addr++);
+   data.byte(1) = dreadb(addr++);
+@@ -26,91 +26,91 @@ auto R65816::dreadl(uint24 addr) -> uint24 {
+   return data;
+ }
+ 
+-auto R65816::decode(uint8 mode, uint24 addr) -> uint24 {
++auto WDC65816::decode(uint8 mode, uint24 addr, uint24 arg) -> uint24 {
+   uint24 a = 0;
+ 
+   switch(mode) {
+   case OPTYPE_DP:
+-    a = (r.d + (addr & 0xffff)) & 0xffff;
++    a = (r.d + (arg & 0xffff)) & 0xffff;
+     break;
+   case OPTYPE_DPX:
+-    a = (r.d + r.x + (addr & 0xffff)) & 0xffff;
++    a = (r.d + r.x + (arg & 0xffff)) & 0xffff;
+     break;
+   case OPTYPE_DPY:
+-    a = (r.d + r.y + (addr & 0xffff)) & 0xffff;
++    a = (r.d + r.y + (arg & 0xffff)) & 0xffff;
+     break;
+   case OPTYPE_IDP:
+-    addr = (r.d + (addr & 0xffff)) & 0xffff;
+-    a = (r.db << 16) + dreadw(addr);
++    arg = (r.d + (arg & 0xffff)) & 0xffff;
++    a = (r.db << 16) + dreadw(arg);
+     break;
+   case OPTYPE_IDPX:
+-    addr = (r.d + r.x + (addr & 0xffff)) & 0xffff;
+-    a = (r.db << 16) + dreadw(addr);
++    arg = (r.d + r.x + (arg & 0xffff)) & 0xffff;
++    a = (r.db << 16) + dreadw(arg);
+     break;
+   case OPTYPE_IDPY:
+-    addr = (r.d + (addr & 0xffff)) & 0xffff;
+-    a = (r.db << 16) + dreadw(addr) + r.y;
++    arg = (r.d + (arg & 0xffff)) & 0xffff;
++    a = (r.db << 16) + dreadw(arg) + r.y;
+     break;
+   case OPTYPE_ILDP:
+-    addr = (r.d + (addr & 0xffff)) & 0xffff;
+-    a = dreadl(addr);
++    arg = (r.d + (arg & 0xffff)) & 0xffff;
++    a = dreadl(arg);
+     break;
+   case OPTYPE_ILDPY:
+-    addr = (r.d + (addr & 0xffff)) & 0xffff;
+-    a = dreadl(addr) + r.y;
++    arg = (r.d + (arg & 0xffff)) & 0xffff;
++    a = dreadl(arg) + r.y;
+     break;
+   case OPTYPE_ADDR:
+-    a = (r.db << 16) + (addr & 0xffff);
++    a = (r.db << 16) + (arg & 0xffff);
+     break;
+   case OPTYPE_ADDR_PC:
+-    a = (r.pc.b << 16) + (addr & 0xffff);
++    a = addr.bits(23,16) + (arg & 0xffff);
+     break;
+   case OPTYPE_ADDRX:
+-    a = (r.db << 16) + (addr & 0xffff) + r.x;
++    a = (r.db << 16) + (arg & 0xffff) + r.x;
+     break;
+   case OPTYPE_ADDRY:
+-    a = (r.db << 16) + (addr & 0xffff) + r.y;
++    a = (r.db << 16) + (arg & 0xffff) + r.y;
+     break;
+   case OPTYPE_IADDR_PC:
+-    a = (r.pc.b << 16) + (addr & 0xffff);
++    a = addr.bits(23,16) + (arg & 0xffff);
+     break;
+   case OPTYPE_IADDRX:
+-    a = (r.pc.b << 16) + ((addr + r.x) & 0xffff);
++    a = addr.bits(23,16) + ((arg + r.x) & 0xffff);
+     break;
+   case OPTYPE_ILADDR:
+-    a = addr;
++    a = arg;
+     break;
+   case OPTYPE_LONG:
+-    a = addr;
++    a = arg;
+     break;
+   case OPTYPE_LONGX:
+-    a = (addr + r.x);
++    a = (arg + r.x);
+     break;
+   case OPTYPE_SR:
+-    a = (r.s + (addr & 0xff)) & 0xffff;
++    a = (r.s + (arg & 0xff)) & 0xffff;
+     break;
+   case OPTYPE_ISRY:
+-    addr = (r.s + (addr & 0xff)) & 0xffff;
+-    a = (r.db << 16) + dreadw(addr) + r.y;
++    arg = (r.s + (arg & 0xff)) & 0xffff;
++    a = (r.db << 16) + dreadw(arg) + r.y;
+     break;
+   case OPTYPE_RELB:
+-    a  = (r.pc.b << 16) + ((r.pc.w + 2) & 0xffff);
+-    a += int8(addr);
++    a  = addr.bits(23,16) + ((addr + 2) & 0xffff);
++    a += int8(arg);
+     break;
+   case OPTYPE_RELW:
+-    a  = (r.pc.b << 16) + ((r.pc.w + 3) & 0xffff);
+-    a += (int16)addr;
++    a  = addr.bits(23,16) + ((addr + 3) & 0xffff);
++    a += (int16)arg;
+     break;
+   }
+ 
+   return a;
+ }
+ 
+-auto R65816::disassemble() -> string {
++auto WDC65816::disassemble() -> string {
+   return disassemble(r.pc.d, r.e, r.p.m, r.p.x);
+ }
+ 
+-auto R65816::disassemble(uint24 addr, bool e, bool m, bool x) -> string {
++auto WDC65816::disassemble(uint24 addr, bool e, bool m, bool x) -> string {
+   string s;
+ 
+   Reg24 pc;
+@@ -131,273 +131,273 @@ auto R65816::disassemble(uint24 addr, bool e, bool m, bool x) -> string {
+   char t[256];
+   switch(op) {
+   case 0x00: sprintf(t, "brk #$%.2x              ", op8); break;
+-  case 0x01: sprintf(t, "ora ($%.2x,x)   [%.6x]", op8, decode(OPTYPE_IDPX, op8)); break;
++  case 0x01: sprintf(t, "ora ($%.2x,x)   [%.6x]", op8, decode(OPTYPE_IDPX, addr, op8)); break;
+   case 0x02: sprintf(t, "cop #$%.2x              ", op8); break;
+-  case 0x03: sprintf(t, "ora $%.2x,s     [%.6x]", op8, decode(OPTYPE_SR, op8)); break;
+-  case 0x04: sprintf(t, "tsb $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0x05: sprintf(t, "ora $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0x06: sprintf(t, "asl $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0x07: sprintf(t, "ora [$%.2x]     [%.6x]", op8, decode(OPTYPE_ILDP, op8)); break;
++  case 0x03: sprintf(t, "ora $%.2x,s     [%.6x]", op8, decode(OPTYPE_SR, addr, op8)); break;
++  case 0x04: sprintf(t, "tsb $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0x05: sprintf(t, "ora $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0x06: sprintf(t, "asl $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0x07: sprintf(t, "ora [$%.2x]     [%.6x]", op8, decode(OPTYPE_ILDP, addr, op8)); break;
+   case 0x08: sprintf(t, "php                   "); break;
+   case 0x09: if(a8)sprintf(t, "ora #$%.2x              ", op8);
+              else  sprintf(t, "ora #$%.4x            ", op16); break;
+   case 0x0a: sprintf(t, "asl a                 "); break;
+   case 0x0b: sprintf(t, "phd                   "); break;
+-  case 0x0c: sprintf(t, "tsb $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0x0d: sprintf(t, "ora $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0x0e: sprintf(t, "asl $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0x0f: sprintf(t, "ora $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, op24)); break;
+-  case 0x10: sprintf(t, "bpl $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, op8)), decode(OPTYPE_RELB, op8)); break;
+-  case 0x11: sprintf(t, "ora ($%.2x),y   [%.6x]", op8, decode(OPTYPE_IDPY, op8)); break;
+-  case 0x12: sprintf(t, "ora ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, op8)); break;
+-  case 0x13: sprintf(t, "ora ($%.2x,s),y [%.6x]", op8, decode(OPTYPE_ISRY, op8)); break;
+-  case 0x14: sprintf(t, "trb $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0x15: sprintf(t, "ora $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0x16: sprintf(t, "asl $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0x17: sprintf(t, "ora [$%.2x],y   [%.6x]", op8, decode(OPTYPE_ILDPY, op8)); break;
++  case 0x0c: sprintf(t, "tsb $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0x0d: sprintf(t, "ora $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0x0e: sprintf(t, "asl $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0x0f: sprintf(t, "ora $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, addr, op24)); break;
++  case 0x10: sprintf(t, "bpl $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, addr, op8)), decode(OPTYPE_RELB, addr, op8)); break;
++  case 0x11: sprintf(t, "ora ($%.2x),y   [%.6x]", op8, decode(OPTYPE_IDPY, addr, op8)); break;
++  case 0x12: sprintf(t, "ora ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, addr, op8)); break;
++  case 0x13: sprintf(t, "ora ($%.2x,s),y [%.6x]", op8, decode(OPTYPE_ISRY, addr, op8)); break;
++  case 0x14: sprintf(t, "trb $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0x15: sprintf(t, "ora $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0x16: sprintf(t, "asl $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0x17: sprintf(t, "ora [$%.2x],y   [%.6x]", op8, decode(OPTYPE_ILDPY, addr, op8)); break;
+   case 0x18: sprintf(t, "clc                   "); break;
+-  case 0x19: sprintf(t, "ora $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, op16)); break;
++  case 0x19: sprintf(t, "ora $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, addr, op16)); break;
+   case 0x1a: sprintf(t, "inc                   "); break;
+   case 0x1b: sprintf(t, "tcs                   "); break;
+-  case 0x1c: sprintf(t, "trb $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0x1d: sprintf(t, "ora $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0x1e: sprintf(t, "asl $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0x1f: sprintf(t, "ora $%.6x,x [%.6x]", op24, decode(OPTYPE_LONGX, op24)); break;
+-  case 0x20: sprintf(t, "jsr $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR_PC, op16)); break;
+-  case 0x21: sprintf(t, "and ($%.2x,x)   [%.6x]", op8, decode(OPTYPE_IDPX, op8)); break;
+-  case 0x22: sprintf(t, "jsl $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, op24)); break;
+-  case 0x23: sprintf(t, "and $%.2x,s     [%.6x]", op8, decode(OPTYPE_SR, op8)); break;
+-  case 0x24: sprintf(t, "bit $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0x25: sprintf(t, "and $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0x26: sprintf(t, "rol $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0x27: sprintf(t, "and [$%.2x]     [%.6x]", op8, decode(OPTYPE_ILDP, op8)); break;
++  case 0x1c: sprintf(t, "trb $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0x1d: sprintf(t, "ora $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0x1e: sprintf(t, "asl $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0x1f: sprintf(t, "ora $%.6x,x [%.6x]", op24, decode(OPTYPE_LONGX, addr, op24)); break;
++  case 0x20: sprintf(t, "jsr $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR_PC, addr, op16)); break;
++  case 0x21: sprintf(t, "and ($%.2x,x)   [%.6x]", op8, decode(OPTYPE_IDPX, addr, op8)); break;
++  case 0x22: sprintf(t, "jsl $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, addr, op24)); break;
++  case 0x23: sprintf(t, "and $%.2x,s     [%.6x]", op8, decode(OPTYPE_SR, addr, op8)); break;
++  case 0x24: sprintf(t, "bit $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0x25: sprintf(t, "and $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0x26: sprintf(t, "rol $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0x27: sprintf(t, "and [$%.2x]     [%.6x]", op8, decode(OPTYPE_ILDP, addr, op8)); break;
+   case 0x28: sprintf(t, "plp                   "); break;
+   case 0x29: if(a8)sprintf(t, "and #$%.2x              ", op8);
+              else  sprintf(t, "and #$%.4x            ", op16); break;
+   case 0x2a: sprintf(t, "rol a                 "); break;
+   case 0x2b: sprintf(t, "pld                   "); break;
+-  case 0x2c: sprintf(t, "bit $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0x2d: sprintf(t, "and $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0x2e: sprintf(t, "rol $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0x2f: sprintf(t, "and $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, op24)); break;
+-  case 0x30: sprintf(t, "bmi $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, op8)), decode(OPTYPE_RELB, op8)); break;
+-  case 0x31: sprintf(t, "and ($%.2x),y   [%.6x]", op8, decode(OPTYPE_IDPY, op8)); break;
+-  case 0x32: sprintf(t, "and ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, op8)); break;
+-  case 0x33: sprintf(t, "and ($%.2x,s),y [%.6x]", op8, decode(OPTYPE_ISRY, op8)); break;
+-  case 0x34: sprintf(t, "bit $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0x35: sprintf(t, "and $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0x36: sprintf(t, "rol $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0x37: sprintf(t, "and [$%.2x],y   [%.6x]", op8, decode(OPTYPE_ILDPY, op8)); break;
++  case 0x2c: sprintf(t, "bit $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0x2d: sprintf(t, "and $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0x2e: sprintf(t, "rol $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0x2f: sprintf(t, "and $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, addr, op24)); break;
++  case 0x30: sprintf(t, "bmi $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, addr, op8)), decode(OPTYPE_RELB, addr, op8)); break;
++  case 0x31: sprintf(t, "and ($%.2x),y   [%.6x]", op8, decode(OPTYPE_IDPY, addr, op8)); break;
++  case 0x32: sprintf(t, "and ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, addr, op8)); break;
++  case 0x33: sprintf(t, "and ($%.2x,s),y [%.6x]", op8, decode(OPTYPE_ISRY, addr, op8)); break;
++  case 0x34: sprintf(t, "bit $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0x35: sprintf(t, "and $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0x36: sprintf(t, "rol $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0x37: sprintf(t, "and [$%.2x],y   [%.6x]", op8, decode(OPTYPE_ILDPY, addr, op8)); break;
+   case 0x38: sprintf(t, "sec                   "); break;
+-  case 0x39: sprintf(t, "and $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, op16)); break;
++  case 0x39: sprintf(t, "and $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, addr, op16)); break;
+   case 0x3a: sprintf(t, "dec                   "); break;
+   case 0x3b: sprintf(t, "tsc                   "); break;
+-  case 0x3c: sprintf(t, "bit $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0x3d: sprintf(t, "and $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0x3e: sprintf(t, "rol $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0x3f: sprintf(t, "and $%.6x,x [%.6x]", op24, decode(OPTYPE_LONGX, op24)); break;
++  case 0x3c: sprintf(t, "bit $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0x3d: sprintf(t, "and $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0x3e: sprintf(t, "rol $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0x3f: sprintf(t, "and $%.6x,x [%.6x]", op24, decode(OPTYPE_LONGX, addr, op24)); break;
+   case 0x40: sprintf(t, "rti                   "); break;
+-  case 0x41: sprintf(t, "eor ($%.2x,x)   [%.6x]", op8, decode(OPTYPE_IDPX, op8)); break;
++  case 0x41: sprintf(t, "eor ($%.2x,x)   [%.6x]", op8, decode(OPTYPE_IDPX, addr, op8)); break;
+   case 0x42: sprintf(t, "wdm                   "); break;
+-  case 0x43: sprintf(t, "eor $%.2x,s     [%.6x]", op8, decode(OPTYPE_SR, op8)); break;
++  case 0x43: sprintf(t, "eor $%.2x,s     [%.6x]", op8, decode(OPTYPE_SR, addr, op8)); break;
+   case 0x44: sprintf(t, "mvp $%.2x,$%.2x           ", op1, op8); break;
+-  case 0x45: sprintf(t, "eor $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0x46: sprintf(t, "lsr $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0x47: sprintf(t, "eor [$%.2x]     [%.6x]", op8, decode(OPTYPE_ILDP, op8)); break;
++  case 0x45: sprintf(t, "eor $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0x46: sprintf(t, "lsr $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0x47: sprintf(t, "eor [$%.2x]     [%.6x]", op8, decode(OPTYPE_ILDP, addr, op8)); break;
+   case 0x48: sprintf(t, "pha                   "); break;
+   case 0x49: if(a8)sprintf(t, "eor #$%.2x              ", op8);
+              else  sprintf(t, "eor #$%.4x            ", op16); break;
+   case 0x4a: sprintf(t, "lsr a                 "); break;
+   case 0x4b: sprintf(t, "phk                   "); break;
+-  case 0x4c: sprintf(t, "jmp $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR_PC, op16)); break;
+-  case 0x4d: sprintf(t, "eor $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0x4e: sprintf(t, "lsr $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0x4f: sprintf(t, "eor $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, op24)); break;
+-  case 0x50: sprintf(t, "bvc $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, op8)), decode(OPTYPE_RELB, op8)); break;
+-  case 0x51: sprintf(t, "eor ($%.2x),y   [%.6x]", op8, decode(OPTYPE_IDPY, op8)); break;
+-  case 0x52: sprintf(t, "eor ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, op8)); break;
+-  case 0x53: sprintf(t, "eor ($%.2x,s),y [%.6x]", op8, decode(OPTYPE_ISRY, op8)); break;
++  case 0x4c: sprintf(t, "jmp $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR_PC, addr, op16)); break;
++  case 0x4d: sprintf(t, "eor $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0x4e: sprintf(t, "lsr $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0x4f: sprintf(t, "eor $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, addr, op24)); break;
++  case 0x50: sprintf(t, "bvc $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, addr, op8)), decode(OPTYPE_RELB, addr, op8)); break;
++  case 0x51: sprintf(t, "eor ($%.2x),y   [%.6x]", op8, decode(OPTYPE_IDPY, addr, op8)); break;
++  case 0x52: sprintf(t, "eor ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, addr, op8)); break;
++  case 0x53: sprintf(t, "eor ($%.2x,s),y [%.6x]", op8, decode(OPTYPE_ISRY, addr, op8)); break;
+   case 0x54: sprintf(t, "mvn $%.2x,$%.2x           ", op1, op8); break;
+-  case 0x55: sprintf(t, "eor $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0x56: sprintf(t, "lsr $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0x57: sprintf(t, "eor [$%.2x],y   [%.6x]", op8, decode(OPTYPE_ILDPY, op8)); break;
++  case 0x55: sprintf(t, "eor $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0x56: sprintf(t, "lsr $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0x57: sprintf(t, "eor [$%.2x],y   [%.6x]", op8, decode(OPTYPE_ILDPY, addr, op8)); break;
+   case 0x58: sprintf(t, "cli                   "); break;
+-  case 0x59: sprintf(t, "eor $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, op16)); break;
++  case 0x59: sprintf(t, "eor $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, addr, op16)); break;
+   case 0x5a: sprintf(t, "phy                   "); break;
+   case 0x5b: sprintf(t, "tcd                   "); break;
+-  case 0x5c: sprintf(t, "jml $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, op24)); break;
+-  case 0x5d: sprintf(t, "eor $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0x5e: sprintf(t, "lsr $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0x5f: sprintf(t, "eor $%.6x,x [%.6x]", op24, decode(OPTYPE_LONGX, op24)); break;
++  case 0x5c: sprintf(t, "jml $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, addr, op24)); break;
++  case 0x5d: sprintf(t, "eor $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0x5e: sprintf(t, "lsr $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0x5f: sprintf(t, "eor $%.6x,x [%.6x]", op24, decode(OPTYPE_LONGX, addr, op24)); break;
+   case 0x60: sprintf(t, "rts                   "); break;
+-  case 0x61: sprintf(t, "adc ($%.2x,x)   [%.6x]", op8, decode(OPTYPE_IDPX, op8)); break;
+-  case 0x62: sprintf(t, "per $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0x63: sprintf(t, "adc $%.2x,s     [%.6x]", op8, decode(OPTYPE_SR, op8)); break;
+-  case 0x64: sprintf(t, "stz $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0x65: sprintf(t, "adc $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0x66: sprintf(t, "ror $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0x67: sprintf(t, "adc [$%.2x]     [%.6x]", op8, decode(OPTYPE_ILDP, op8)); break;
++  case 0x61: sprintf(t, "adc ($%.2x,x)   [%.6x]", op8, decode(OPTYPE_IDPX, addr, op8)); break;
++  case 0x62: sprintf(t, "per $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0x63: sprintf(t, "adc $%.2x,s     [%.6x]", op8, decode(OPTYPE_SR, addr, op8)); break;
++  case 0x64: sprintf(t, "stz $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0x65: sprintf(t, "adc $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0x66: sprintf(t, "ror $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0x67: sprintf(t, "adc [$%.2x]     [%.6x]", op8, decode(OPTYPE_ILDP, addr, op8)); break;
+   case 0x68: sprintf(t, "pla                   "); break;
+   case 0x69: if(a8)sprintf(t, "adc #$%.2x              ", op8);
+              else  sprintf(t, "adc #$%.4x            ", op16); break;
+   case 0x6a: sprintf(t, "ror a                 "); break;
+   case 0x6b: sprintf(t, "rtl                   "); break;
+-  case 0x6c: sprintf(t, "jmp ($%.4x)   [%.6x]", op16, decode(OPTYPE_IADDR_PC, op16)); break;
+-  case 0x6d: sprintf(t, "adc $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0x6e: sprintf(t, "ror $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0x6f: sprintf(t, "adc $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, op24)); break;
+-  case 0x70: sprintf(t, "bvs $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, op8)), decode(OPTYPE_RELB, op8)); break;
+-  case 0x71: sprintf(t, "adc ($%.2x),y   [%.6x]", op8, decode(OPTYPE_IDPY, op8)); break;
+-  case 0x72: sprintf(t, "adc ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, op8)); break;
+-  case 0x73: sprintf(t, "adc ($%.2x,s),y [%.6x]", op8, decode(OPTYPE_ISRY, op8)); break;
+-  case 0x74: sprintf(t, "stz $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0x75: sprintf(t, "adc $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0x76: sprintf(t, "ror $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0x77: sprintf(t, "adc [$%.2x],y   [%.6x]", op8, decode(OPTYPE_ILDPY, op8)); break;
++  case 0x6c: sprintf(t, "jmp ($%.4x)   [%.6x]", op16, decode(OPTYPE_IADDR_PC, addr, op16)); break;
++  case 0x6d: sprintf(t, "adc $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0x6e: sprintf(t, "ror $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0x6f: sprintf(t, "adc $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, addr, op24)); break;
++  case 0x70: sprintf(t, "bvs $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, addr, op8)), decode(OPTYPE_RELB, addr, op8)); break;
++  case 0x71: sprintf(t, "adc ($%.2x),y   [%.6x]", op8, decode(OPTYPE_IDPY, addr, op8)); break;
++  case 0x72: sprintf(t, "adc ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, addr, op8)); break;
++  case 0x73: sprintf(t, "adc ($%.2x,s),y [%.6x]", op8, decode(OPTYPE_ISRY, addr, op8)); break;
++  case 0x74: sprintf(t, "stz $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0x75: sprintf(t, "adc $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0x76: sprintf(t, "ror $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0x77: sprintf(t, "adc [$%.2x],y   [%.6x]", op8, decode(OPTYPE_ILDPY, addr, op8)); break;
+   case 0x78: sprintf(t, "sei                   "); break;
+-  case 0x79: sprintf(t, "adc $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, op16)); break;
++  case 0x79: sprintf(t, "adc $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, addr, op16)); break;
+   case 0x7a: sprintf(t, "ply                   "); break;
+   case 0x7b: sprintf(t, "tdc                   "); break;
+-  case 0x7c: sprintf(t, "jmp ($%.4x,x) [%.6x]", op16, decode(OPTYPE_IADDRX, op16)); break;
+-  case 0x7d: sprintf(t, "adc $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0x7e: sprintf(t, "ror $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0x7f: sprintf(t, "adc $%.6x,x [%.6x]", op24, decode(OPTYPE_LONGX, op24)); break;
+-  case 0x80: sprintf(t, "bra $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, op8)), decode(OPTYPE_RELB, op8)); break;
+-  case 0x81: sprintf(t, "sta ($%.2x,x)   [%.6x]", op8, decode(OPTYPE_IDPX, op8)); break;
+-  case 0x82: sprintf(t, "brl $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELW, op16)), decode(OPTYPE_RELW, op16)); break;
+-  case 0x83: sprintf(t, "sta $%.2x,s     [%.6x]", op8, decode(OPTYPE_SR, op8)); break;
+-  case 0x84: sprintf(t, "sty $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0x85: sprintf(t, "sta $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0x86: sprintf(t, "stx $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0x87: sprintf(t, "sta [$%.2x]     [%.6x]", op8, decode(OPTYPE_ILDP, op8)); break;
++  case 0x7c: sprintf(t, "jmp ($%.4x,x) [%.6x]", op16, decode(OPTYPE_IADDRX, addr, op16)); break;
++  case 0x7d: sprintf(t, "adc $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0x7e: sprintf(t, "ror $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0x7f: sprintf(t, "adc $%.6x,x [%.6x]", op24, decode(OPTYPE_LONGX, addr, op24)); break;
++  case 0x80: sprintf(t, "bra $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, addr, op8)), decode(OPTYPE_RELB, addr, op8)); break;
++  case 0x81: sprintf(t, "sta ($%.2x,x)   [%.6x]", op8, decode(OPTYPE_IDPX, addr, op8)); break;
++  case 0x82: sprintf(t, "brl $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELW, addr, op16)), decode(OPTYPE_RELW, addr, op16)); break;
++  case 0x83: sprintf(t, "sta $%.2x,s     [%.6x]", op8, decode(OPTYPE_SR, addr, op8)); break;
++  case 0x84: sprintf(t, "sty $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0x85: sprintf(t, "sta $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0x86: sprintf(t, "stx $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0x87: sprintf(t, "sta [$%.2x]     [%.6x]", op8, decode(OPTYPE_ILDP, addr, op8)); break;
+   case 0x88: sprintf(t, "dey                   "); break;
+   case 0x89: if(a8)sprintf(t, "bit #$%.2x              ", op8);
+              else  sprintf(t, "bit #$%.4x            ", op16); break;
+   case 0x8a: sprintf(t, "txa                   "); break;
+   case 0x8b: sprintf(t, "phb                   "); break;
+-  case 0x8c: sprintf(t, "sty $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0x8d: sprintf(t, "sta $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0x8e: sprintf(t, "stx $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0x8f: sprintf(t, "sta $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, op24)); break;
+-  case 0x90: sprintf(t, "bcc $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, op8)), decode(OPTYPE_RELB, op8)); break;
+-  case 0x91: sprintf(t, "sta ($%.2x),y   [%.6x]", op8, decode(OPTYPE_IDPY, op8)); break;
+-  case 0x92: sprintf(t, "sta ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, op8)); break;
+-  case 0x93: sprintf(t, "sta ($%.2x,s),y [%.6x]", op8, decode(OPTYPE_ISRY, op8)); break;
+-  case 0x94: sprintf(t, "sty $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0x95: sprintf(t, "sta $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0x96: sprintf(t, "stx $%.2x,y     [%.6x]", op8, decode(OPTYPE_DPY, op8)); break;
+-  case 0x97: sprintf(t, "sta [$%.2x],y   [%.6x]", op8, decode(OPTYPE_ILDPY, op8)); break;
++  case 0x8c: sprintf(t, "sty $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0x8d: sprintf(t, "sta $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0x8e: sprintf(t, "stx $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0x8f: sprintf(t, "sta $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, addr, op24)); break;
++  case 0x90: sprintf(t, "bcc $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, addr, op8)), decode(OPTYPE_RELB, addr, op8)); break;
++  case 0x91: sprintf(t, "sta ($%.2x),y   [%.6x]", op8, decode(OPTYPE_IDPY, addr, op8)); break;
++  case 0x92: sprintf(t, "sta ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, addr, op8)); break;
++  case 0x93: sprintf(t, "sta ($%.2x,s),y [%.6x]", op8, decode(OPTYPE_ISRY, addr, op8)); break;
++  case 0x94: sprintf(t, "sty $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0x95: sprintf(t, "sta $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0x96: sprintf(t, "stx $%.2x,y     [%.6x]", op8, decode(OPTYPE_DPY, addr, op8)); break;
++  case 0x97: sprintf(t, "sta [$%.2x],y   [%.6x]", op8, decode(OPTYPE_ILDPY, addr, op8)); break;
+   case 0x98: sprintf(t, "tya                   "); break;
+-  case 0x99: sprintf(t, "sta $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, op16)); break;
++  case 0x99: sprintf(t, "sta $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, addr, op16)); break;
+   case 0x9a: sprintf(t, "txs                   "); break;
+   case 0x9b: sprintf(t, "txy                   "); break;
+-  case 0x9c: sprintf(t, "stz $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0x9d: sprintf(t, "sta $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0x9e: sprintf(t, "stz $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0x9f: sprintf(t, "sta $%.6x,x [%.6x]", op24, decode(OPTYPE_LONGX, op24)); break;
++  case 0x9c: sprintf(t, "stz $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0x9d: sprintf(t, "sta $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0x9e: sprintf(t, "stz $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0x9f: sprintf(t, "sta $%.6x,x [%.6x]", op24, decode(OPTYPE_LONGX, addr, op24)); break;
+   case 0xa0: if(x8)sprintf(t, "ldy #$%.2x              ", op8);
+              else  sprintf(t, "ldy #$%.4x            ", op16); break;
+-  case 0xa1: sprintf(t, "lda ($%.2x,x)   [%.6x]", op8, decode(OPTYPE_IDPX, op8)); break;
++  case 0xa1: sprintf(t, "lda ($%.2x,x)   [%.6x]", op8, decode(OPTYPE_IDPX, addr, op8)); break;
+   case 0xa2: if(x8)sprintf(t, "ldx #$%.2x              ", op8);
+              else  sprintf(t, "ldx #$%.4x            ", op16); break;
+-  case 0xa3: sprintf(t, "lda $%.2x,s     [%.6x]", op8, decode(OPTYPE_SR, op8)); break;
+-  case 0xa4: sprintf(t, "ldy $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0xa5: sprintf(t, "lda $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0xa6: sprintf(t, "ldx $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0xa7: sprintf(t, "lda [$%.2x]     [%.6x]", op8, decode(OPTYPE_ILDP, op8)); break;
++  case 0xa3: sprintf(t, "lda $%.2x,s     [%.6x]", op8, decode(OPTYPE_SR, addr, op8)); break;
++  case 0xa4: sprintf(t, "ldy $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0xa5: sprintf(t, "lda $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0xa6: sprintf(t, "ldx $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0xa7: sprintf(t, "lda [$%.2x]     [%.6x]", op8, decode(OPTYPE_ILDP, addr, op8)); break;
+   case 0xa8: sprintf(t, "tay                   "); break;
+   case 0xa9: if(a8)sprintf(t, "lda #$%.2x              ", op8);
+              else  sprintf(t, "lda #$%.4x            ", op16); break;
+   case 0xaa: sprintf(t, "tax                   "); break;
+   case 0xab: sprintf(t, "plb                   "); break;
+-  case 0xac: sprintf(t, "ldy $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0xad: sprintf(t, "lda $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0xae: sprintf(t, "ldx $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0xaf: sprintf(t, "lda $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, op24)); break;
+-  case 0xb0: sprintf(t, "bcs $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, op8)), decode(OPTYPE_RELB, op8)); break;
+-  case 0xb1: sprintf(t, "lda ($%.2x),y   [%.6x]", op8, decode(OPTYPE_IDPY, op8)); break;
+-  case 0xb2: sprintf(t, "lda ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, op8)); break;
+-  case 0xb3: sprintf(t, "lda ($%.2x,s),y [%.6x]", op8, decode(OPTYPE_ISRY, op8)); break;
+-  case 0xb4: sprintf(t, "ldy $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0xb5: sprintf(t, "lda $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0xb6: sprintf(t, "ldx $%.2x,y     [%.6x]", op8, decode(OPTYPE_DPY, op8)); break;
+-  case 0xb7: sprintf(t, "lda [$%.2x],y   [%.6x]", op8, decode(OPTYPE_ILDPY, op8)); break;
++  case 0xac: sprintf(t, "ldy $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0xad: sprintf(t, "lda $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0xae: sprintf(t, "ldx $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0xaf: sprintf(t, "lda $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, addr, op24)); break;
++  case 0xb0: sprintf(t, "bcs $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, addr, op8)), decode(OPTYPE_RELB, addr, op8)); break;
++  case 0xb1: sprintf(t, "lda ($%.2x),y   [%.6x]", op8, decode(OPTYPE_IDPY, addr, op8)); break;
++  case 0xb2: sprintf(t, "lda ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, addr, op8)); break;
++  case 0xb3: sprintf(t, "lda ($%.2x,s),y [%.6x]", op8, decode(OPTYPE_ISRY, addr, op8)); break;
++  case 0xb4: sprintf(t, "ldy $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0xb5: sprintf(t, "lda $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0xb6: sprintf(t, "ldx $%.2x,y     [%.6x]", op8, decode(OPTYPE_DPY, addr, op8)); break;
++  case 0xb7: sprintf(t, "lda [$%.2x],y   [%.6x]", op8, decode(OPTYPE_ILDPY, addr, op8)); break;
+   case 0xb8: sprintf(t, "clv                   "); break;
+-  case 0xb9: sprintf(t, "lda $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, op16)); break;
++  case 0xb9: sprintf(t, "lda $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, addr, op16)); break;
+   case 0xba: sprintf(t, "tsx                   "); break;
+   case 0xbb: sprintf(t, "tyx                   "); break;
+-  case 0xbc: sprintf(t, "ldy $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0xbd: sprintf(t, "lda $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0xbe: sprintf(t, "ldx $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, op16)); break;
+-  case 0xbf: sprintf(t, "lda $%.6x,x [%.6x]", op24, decode(OPTYPE_LONGX, op24)); break;
++  case 0xbc: sprintf(t, "ldy $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0xbd: sprintf(t, "lda $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0xbe: sprintf(t, "ldx $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, addr, op16)); break;
++  case 0xbf: sprintf(t, "lda $%.6x,x [%.6x]", op24, decode(OPTYPE_LONGX, addr, op24)); break;
+   case 0xc0: if(x8)sprintf(t, "cpy #$%.2x              ", op8);
+              else  sprintf(t, "cpy #$%.4x            ", op16); break;
+-  case 0xc1: sprintf(t, "cmp ($%.2x,x)   [%.6x]", op8, decode(OPTYPE_IDPX, op8)); break;
++  case 0xc1: sprintf(t, "cmp ($%.2x,x)   [%.6x]", op8, decode(OPTYPE_IDPX, addr, op8)); break;
+   case 0xc2: sprintf(t, "rep #$%.2x              ", op8); break;
+-  case 0xc3: sprintf(t, "cmp $%.2x,s     [%.6x]", op8, decode(OPTYPE_SR, op8)); break;
+-  case 0xc4: sprintf(t, "cpy $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0xc5: sprintf(t, "cmp $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0xc6: sprintf(t, "dec $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0xc7: sprintf(t, "cmp [$%.2x]     [%.6x]", op8, decode(OPTYPE_ILDP, op8)); break;
++  case 0xc3: sprintf(t, "cmp $%.2x,s     [%.6x]", op8, decode(OPTYPE_SR, addr, op8)); break;
++  case 0xc4: sprintf(t, "cpy $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0xc5: sprintf(t, "cmp $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0xc6: sprintf(t, "dec $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0xc7: sprintf(t, "cmp [$%.2x]     [%.6x]", op8, decode(OPTYPE_ILDP, addr, op8)); break;
+   case 0xc8: sprintf(t, "iny                   "); break;
+   case 0xc9: if(a8)sprintf(t, "cmp #$%.2x              ", op8);
+              else  sprintf(t, "cmp #$%.4x            ", op16); break;
+   case 0xca: sprintf(t, "dex                   "); break;
+   case 0xcb: sprintf(t, "wai                   "); break;
+-  case 0xcc: sprintf(t, "cpy $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0xcd: sprintf(t, "cmp $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0xce: sprintf(t, "dec $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0xcf: sprintf(t, "cmp $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, op24)); break;
+-  case 0xd0: sprintf(t, "bne $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, op8)), decode(OPTYPE_RELB, op8)); break;
+-  case 0xd1: sprintf(t, "cmp ($%.2x),y   [%.6x]", op8, decode(OPTYPE_IDPY, op8)); break;
+-  case 0xd2: sprintf(t, "cmp ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, op8)); break;
+-  case 0xd3: sprintf(t, "cmp ($%.2x,s),y [%.6x]", op8, decode(OPTYPE_ISRY, op8)); break;
+-  case 0xd4: sprintf(t, "pei ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, op8)); break;
+-  case 0xd5: sprintf(t, "cmp $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0xd6: sprintf(t, "dec $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0xd7: sprintf(t, "cmp [$%.2x],y   [%.6x]", op8, decode(OPTYPE_ILDPY, op8)); break;
++  case 0xcc: sprintf(t, "cpy $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0xcd: sprintf(t, "cmp $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0xce: sprintf(t, "dec $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0xcf: sprintf(t, "cmp $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, addr, op24)); break;
++  case 0xd0: sprintf(t, "bne $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, addr, op8)), decode(OPTYPE_RELB, addr, op8)); break;
++  case 0xd1: sprintf(t, "cmp ($%.2x),y   [%.6x]", op8, decode(OPTYPE_IDPY, addr, op8)); break;
++  case 0xd2: sprintf(t, "cmp ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, addr, op8)); break;
++  case 0xd3: sprintf(t, "cmp ($%.2x,s),y [%.6x]", op8, decode(OPTYPE_ISRY, addr, op8)); break;
++  case 0xd4: sprintf(t, "pei ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, addr, op8)); break;
++  case 0xd5: sprintf(t, "cmp $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0xd6: sprintf(t, "dec $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0xd7: sprintf(t, "cmp [$%.2x],y   [%.6x]", op8, decode(OPTYPE_ILDPY, addr, op8)); break;
+   case 0xd8: sprintf(t, "cld                   "); break;
+-  case 0xd9: sprintf(t, "cmp $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, op16)); break;
++  case 0xd9: sprintf(t, "cmp $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, addr, op16)); break;
+   case 0xda: sprintf(t, "phx                   "); break;
+   case 0xdb: sprintf(t, "stp                   "); break;
+-  case 0xdc: sprintf(t, "jmp [$%.4x]   [%.6x]", op16, decode(OPTYPE_ILADDR, op16)); break;
+-  case 0xdd: sprintf(t, "cmp $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0xde: sprintf(t, "dec $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0xdf: sprintf(t, "cmp $%.6x,x [%.6x]", op24, decode(OPTYPE_LONGX, op24)); break;
++  case 0xdc: sprintf(t, "jmp [$%.4x]   [%.6x]", op16, decode(OPTYPE_ILADDR, addr, op16)); break;
++  case 0xdd: sprintf(t, "cmp $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0xde: sprintf(t, "dec $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0xdf: sprintf(t, "cmp $%.6x,x [%.6x]", op24, decode(OPTYPE_LONGX, addr, op24)); break;
+   case 0xe0: if(x8)sprintf(t, "cpx #$%.2x              ", op8);
+              else  sprintf(t, "cpx #$%.4x            ", op16); break;
+-  case 0xe1: sprintf(t, "sbc ($%.2x,x)   [%.6x]", op8, decode(OPTYPE_IDPX, op8)); break;
++  case 0xe1: sprintf(t, "sbc ($%.2x,x)   [%.6x]", op8, decode(OPTYPE_IDPX, addr, op8)); break;
+   case 0xe2: sprintf(t, "sep #$%.2x              ", op8); break;
+-  case 0xe3: sprintf(t, "sbc $%.2x,s     [%.6x]", op8, decode(OPTYPE_SR, op8)); break;
+-  case 0xe4: sprintf(t, "cpx $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0xe5: sprintf(t, "sbc $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0xe6: sprintf(t, "inc $%.2x       [%.6x]", op8, decode(OPTYPE_DP, op8)); break;
+-  case 0xe7: sprintf(t, "sbc [$%.2x]     [%.6x]", op8, decode(OPTYPE_ILDP, op8)); break;
++  case 0xe3: sprintf(t, "sbc $%.2x,s     [%.6x]", op8, decode(OPTYPE_SR, addr, op8)); break;
++  case 0xe4: sprintf(t, "cpx $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0xe5: sprintf(t, "sbc $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0xe6: sprintf(t, "inc $%.2x       [%.6x]", op8, decode(OPTYPE_DP, addr, op8)); break;
++  case 0xe7: sprintf(t, "sbc [$%.2x]     [%.6x]", op8, decode(OPTYPE_ILDP, addr, op8)); break;
+   case 0xe8: sprintf(t, "inx                   "); break;
+   case 0xe9: if(a8)sprintf(t, "sbc #$%.2x              ", op8);
+              else  sprintf(t, "sbc #$%.4x            ", op16); break;
+   case 0xea: sprintf(t, "nop                   "); break;
+   case 0xeb: sprintf(t, "xba                   "); break;
+-  case 0xec: sprintf(t, "cpx $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0xed: sprintf(t, "sbc $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0xee: sprintf(t, "inc $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0xef: sprintf(t, "sbc $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, op24)); break;
+-  case 0xf0: sprintf(t, "beq $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, op8)), decode(OPTYPE_RELB, op8)); break;
+-  case 0xf1: sprintf(t, "sbc ($%.2x),y   [%.6x]", op8, decode(OPTYPE_IDPY, op8)); break;
+-  case 0xf2: sprintf(t, "sbc ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, op8)); break;
+-  case 0xf3: sprintf(t, "sbc ($%.2x,s),y [%.6x]", op8, decode(OPTYPE_ISRY, op8)); break;
+-  case 0xf4: sprintf(t, "pea $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, op16)); break;
+-  case 0xf5: sprintf(t, "sbc $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0xf6: sprintf(t, "inc $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, op8)); break;
+-  case 0xf7: sprintf(t, "sbc [$%.2x],y   [%.6x]", op8, decode(OPTYPE_ILDPY, op8)); break;
++  case 0xec: sprintf(t, "cpx $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0xed: sprintf(t, "sbc $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0xee: sprintf(t, "inc $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0xef: sprintf(t, "sbc $%.6x   [%.6x]", op24, decode(OPTYPE_LONG, addr, op24)); break;
++  case 0xf0: sprintf(t, "beq $%.4x     [%.6x]", uint16_t(decode(OPTYPE_RELB, addr, op8)), decode(OPTYPE_RELB, addr, op8)); break;
++  case 0xf1: sprintf(t, "sbc ($%.2x),y   [%.6x]", op8, decode(OPTYPE_IDPY, addr, op8)); break;
++  case 0xf2: sprintf(t, "sbc ($%.2x)     [%.6x]", op8, decode(OPTYPE_IDP, addr, op8)); break;
++  case 0xf3: sprintf(t, "sbc ($%.2x,s),y [%.6x]", op8, decode(OPTYPE_ISRY, addr, op8)); break;
++  case 0xf4: sprintf(t, "pea $%.4x     [%.6x]", op16, decode(OPTYPE_ADDR, addr, op16)); break;
++  case 0xf5: sprintf(t, "sbc $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0xf6: sprintf(t, "inc $%.2x,x     [%.6x]", op8, decode(OPTYPE_DPX, addr, op8)); break;
++  case 0xf7: sprintf(t, "sbc [$%.2x],y   [%.6x]", op8, decode(OPTYPE_ILDPY, addr, op8)); break;
+   case 0xf8: sprintf(t, "sed                   "); break;
+-  case 0xf9: sprintf(t, "sbc $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, op16)); break;
++  case 0xf9: sprintf(t, "sbc $%.4x,y   [%.6x]", op16, decode(OPTYPE_ADDRY, addr, op16)); break;
+   case 0xfa: sprintf(t, "plx                   "); break;
+   case 0xfb: sprintf(t, "xce                   "); break;
+-  case 0xfc: sprintf(t, "jsr ($%.4x,x) [%.6x]", op16, decode(OPTYPE_IADDRX, op16)); break;
+-  case 0xfd: sprintf(t, "sbc $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0xfe: sprintf(t, "inc $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, op16)); break;
+-  case 0xff: sprintf(t, "sbc $%.6x,x [%.6x]", op24, decode(OPTYPE_LONGX, op24)); break;
++  case 0xfc: sprintf(t, "jsr ($%.4x,x) [%.6x]", op16, decode(OPTYPE_IADDRX, addr, op16)); break;
++  case 0xfd: sprintf(t, "sbc $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0xfe: sprintf(t, "inc $%.4x,x   [%.6x]", op16, decode(OPTYPE_ADDRX, addr, op16)); break;
++  case 0xff: sprintf(t, "sbc $%.6x,x [%.6x]", op24, decode(OPTYPE_LONGX, addr, op24)); break;
+   }
+ 
+   #undef op8
+diff --git a/higan/higan/processor/r65816/disassembler.hpp b/nSide/higan/processor/wdc65816/disassembler.hpp
+similarity index 93%
+rename from higan/higan/processor/r65816/disassembler.hpp
+rename to nSide/higan/processor/wdc65816/disassembler.hpp
+index 3d1e44d..662e668 100644
+--- a/higan/higan/processor/r65816/disassembler.hpp
++++ b/nSide/higan/processor/wdc65816/disassembler.hpp
+@@ -27,4 +27,4 @@ auto disassemble(uint24 addr, bool e, bool m, bool x) -> string;
+ auto dreadb(uint24 addr) -> uint8;
+ auto dreadw(uint24 addr) -> uint16;
+ auto dreadl(uint24 addr) -> uint24;
+-auto decode(uint8 mode, uint24 addr) -> uint24;
++auto decode(uint8 mode, uint24 addr, uint24 arg) -> uint24;
+diff --git a/higan/higan/processor/r65816/instructions-misc.cpp b/nSide/higan/processor/wdc65816/instructions-misc.cpp
+similarity index 73%
+rename from higan/higan/processor/r65816/instructions-misc.cpp
+rename to nSide/higan/processor/wdc65816/instructions-misc.cpp
+index 58b383f..60fd8c2 100644
+--- a/higan/higan/processor/r65816/instructions-misc.cpp
++++ b/nSide/higan/processor/wdc65816/instructions-misc.cpp
+@@ -1,12 +1,12 @@
+-auto R65816::op_nop() {
++auto WDC65816::op_nop() {
+ L idleIRQ();
+ }
+ 
+-auto R65816::op_wdm() {
++auto WDC65816::op_wdm() {
+ L readPC();
+ }
+ 
+-auto R65816::op_xba() {
++auto WDC65816::op_xba() {
+   idle();
+ L idle();
+   r.a.w = r.a.w >> 8 | r.a.w << 8;
+@@ -14,7 +14,7 @@ L idle();
+   r.p.z = (r.a.l == 0);
+ }
+ 
+-auto R65816::op_move_b(int adjust) {
++auto WDC65816::op_move_b(int adjust) {
+   dp = readPC();
+   sp = readPC();
+   r.db = dp;
+@@ -27,7 +27,7 @@ L idle();
+   if(r.a.w--) r.pc.w -= 3;
+ }
+ 
+-auto R65816::op_move_w(int adjust) {
++auto WDC65816::op_move_w(int adjust) {
+   dp = readPC();
+   sp = readPC();
+   r.db = dp;
+@@ -40,7 +40,7 @@ L idle();
+   if(r.a.w--) r.pc.w -= 3;
+ }
+ 
+-auto R65816::op_interrupt(uint16 vector) {
++auto WDC65816::op_interrupt(uint16 vector) {
+   readPC();
+ N writeSP(r.pc.b);
+   writeSP(r.pc.h);
+@@ -53,13 +53,13 @@ L r.pc.h = readLong(vector + 1);
+   r.pc.b = 0x00;
+ }
+ 
+-auto R65816::op_stp() {
++auto WDC65816::op_stp() {
+   while(r.wai = true) {
+ L   idle();
+   }
+ }
+ 
+-auto R65816::op_wai() {
++auto WDC65816::op_wai() {
+   r.wai = true;
+   while(r.wai) {
+ L   idle();
+@@ -67,7 +67,7 @@ L   idle();
+   idle();
+ }
+ 
+-auto R65816::op_xce() {
++auto WDC65816::op_xce() {
+ L idleIRQ();
+   bool carry = r.p.c;
+   r.p.c = r.e;
+@@ -81,17 +81,17 @@ L idleIRQ();
+   }
+ }
+ 
+-auto R65816::op_set_flag(uint bit) {
++auto WDC65816::op_set_flag(uint bit) {
+ L idleIRQ();
+   r.p |= 1 << bit;
+ }
+ 
+-auto R65816::op_clear_flag(uint bit) {
++auto WDC65816::op_clear_flag(uint bit) {
+ L idleIRQ();
+   r.p &= ~(1 << bit);
+ }
+ 
+-auto R65816::op_pflag(bool mode) {
++auto WDC65816::op_pflag(bool mode) {
+   rd.l = readPC();
+ L idle();
+   r.p = (mode ? r.p | rd.l : r.p & ~rd.l);
+@@ -102,80 +102,80 @@ E r.p.m = 1, r.p.x = 1;
+   }
+ }
+ 
+-auto R65816::op_transfer_b(Reg16& from, Reg16& to) {
++auto WDC65816::op_transfer_b(Reg16& from, Reg16& to) {
+ L idleIRQ();
+   to.l = from.l;
+   r.p.n = (to.l & 0x80);
+   r.p.z = (to.l == 0);
+ }
+ 
+-auto R65816::op_transfer_w(Reg16& from, Reg16& to) {
++auto WDC65816::op_transfer_w(Reg16& from, Reg16& to) {
+ L idleIRQ();
+   to.w = from.w;
+   r.p.n = (to.w & 0x8000);
+   r.p.z = (to.w == 0);
+ }
+ 
+-auto R65816::op_tcs() {
++auto WDC65816::op_tcs() {
+ L idleIRQ();
+   r.s.w = r.a.w;
+ E r.s.h = 0x01;
+ }
+ 
+-auto R65816::op_tsx_b() {
++auto WDC65816::op_tsx_b() {
+ L idleIRQ();
+   r.x.l = r.s.l;
+   r.p.n = (r.x.l & 0x80);
+   r.p.z = (r.x.l == 0);
+ }
+ 
+-auto R65816::op_tsx_w() {
++auto WDC65816::op_tsx_w() {
+ L idleIRQ();
+   r.x.w = r.s.w;
+   r.p.n = (r.x.w & 0x8000);
+   r.p.z = (r.x.w == 0);
+ }
+ 
+-auto R65816::op_txs() {
++auto WDC65816::op_txs() {
+ L idleIRQ();
+ E r.s.l = r.x.l;
+ N r.s.w = r.x.w;
+ }
+ 
+-auto R65816::op_push_b(Reg16& reg) {
++auto WDC65816::op_push_b(Reg16& reg) {
+   idle();
+ L writeSP(reg.l);
+ }
+ 
+-auto R65816::op_push_w(Reg16& reg) {
++auto WDC65816::op_push_w(Reg16& reg) {
+   idle();
+   writeSP(reg.h);
+ L writeSP(reg.l);
+ }
+ 
+-auto R65816::op_phd() {
++auto WDC65816::op_phd() {
+   idle();
+   writeSPn(r.d.h);
+ L writeSPn(r.d.l);
+ E r.s.h = 0x01;
+ }
+ 
+-auto R65816::op_phb() {
++auto WDC65816::op_phb() {
+   idle();
+ L writeSP(r.db);
+ }
+ 
+-auto R65816::op_phk() {
++auto WDC65816::op_phk() {
+   idle();
+ L writeSP(r.pc.b);
+ }
+ 
+-auto R65816::op_php() {
++auto WDC65816::op_php() {
+   idle();
+ L writeSP(r.p);
+ }
+ 
+-auto R65816::op_pull_b(Reg16& reg) {
++auto WDC65816::op_pull_b(Reg16& reg) {
+   idle();
+   idle();
+ L reg.l = readSP();
+@@ -183,7 +183,7 @@ L reg.l = readSP();
+   r.p.z = (reg.l == 0);
+ }
+ 
+-auto R65816::op_pull_w(Reg16& reg) {
++auto WDC65816::op_pull_w(Reg16& reg) {
+   idle();
+   idle();
+   reg.l = readSP();
+@@ -192,7 +192,7 @@ L reg.h = readSP();
+   r.p.z = (reg.w == 0);
+ }
+ 
+-auto R65816::op_pld() {
++auto WDC65816::op_pld() {
+   idle();
+   idle();
+   r.d.l = readSPn();
+@@ -202,7 +202,7 @@ L r.d.h = readSPn();
+ E r.s.h = 0x01;
+ }
+ 
+-auto R65816::op_plb() {
++auto WDC65816::op_plb() {
+   idle();
+   idle();
+ L r.db = readSP();
+@@ -210,7 +210,7 @@ L r.db = readSP();
+   r.p.z = (r.db == 0);
+ }
+ 
+-auto R65816::op_plp() {
++auto WDC65816::op_plp() {
+   idle();
+   idle();
+ L r.p = readSP();
+@@ -221,7 +221,7 @@ E r.p.m = 1, r.p.x = 1;
+   }
+ }
+ 
+-auto R65816::op_pea() {
++auto WDC65816::op_pea() {
+   aa.l = readPC();
+   aa.h = readPC();
+   writeSPn(aa.h);
+@@ -229,7 +229,7 @@ L writeSPn(aa.l);
+ E r.s.h = 0x01;
+ }
+ 
+-auto R65816::op_pei() {
++auto WDC65816::op_pei() {
+   dp = readPC();
+   idle2();
+   aa.l = readDPn(dp + 0);
+@@ -239,7 +239,7 @@ L writeSPn(aa.l);
+ E r.s.h = 0x01;
+ }
+ 
+-auto R65816::op_per() {
++auto WDC65816::op_per() {
+   aa.l = readPC();
+   aa.h = readPC();
+   idle();
+diff --git a/higan/higan/processor/r65816/instructions-pc.cpp b/nSide/higan/processor/wdc65816/instructions-pc.cpp
+similarity index 80%
+rename from higan/higan/processor/r65816/instructions-pc.cpp
+rename to nSide/higan/processor/wdc65816/instructions-pc.cpp
+index e1cfb32..24aef8e 100644
+--- a/higan/higan/processor/r65816/instructions-pc.cpp
++++ b/nSide/higan/processor/wdc65816/instructions-pc.cpp
+@@ -1,4 +1,4 @@
+-auto R65816::op_branch(bool flag, bool value) {
++auto WDC65816::op_branch(bool flag, bool value) {
+   if(flag != value) {
+ L   rd.l = readPC();
+   } else {
+@@ -10,7 +10,7 @@ L   idle();
+   }
+ }
+ 
+-auto R65816::op_bra() {
++auto WDC65816::op_bra() {
+   rd.l = readPC();
+   aa.w = r.pc.d + (int8)rd.l;
+   idle6(aa.w);
+@@ -18,27 +18,27 @@ L idle();
+   r.pc.w = aa.w;
+ }
+ 
+-auto R65816::op_brl() {
++auto WDC65816::op_brl() {
+   rd.l = readPC();
+   rd.h = readPC();
+ L idle();
+   r.pc.w = r.pc.d + (int16)rd.w;
+ }
+ 
+-auto R65816::op_jmp_addr() {
++auto WDC65816::op_jmp_addr() {
+   rd.l = readPC();
+ L rd.h = readPC();
+   r.pc.w = rd.w;
+ }
+ 
+-auto R65816::op_jmp_long() {
++auto WDC65816::op_jmp_long() {
+   rd.l = readPC();
+   rd.h = readPC();
+ L rd.b = readPC();
+   r.pc.d = rd.d;
+ }
+ 
+-auto R65816::op_jmp_iaddr() {
++auto WDC65816::op_jmp_iaddr() {
+   aa.l = readPC();
+   aa.h = readPC();
+   rd.l = readAddr(aa.w + 0);
+@@ -46,7 +46,7 @@ L rd.h = readAddr(aa.w + 1);
+   r.pc.w = rd.w;
+ }
+ 
+-auto R65816::op_jmp_iaddrx() {
++auto WDC65816::op_jmp_iaddrx() {
+   aa.l = readPC();
+   aa.h = readPC();
+   idle();
+@@ -55,7 +55,7 @@ L rd.h = readPB(aa.w + r.x.w + 1);
+   r.pc.w = rd.w;
+ }
+ 
+-auto R65816::op_jmp_iladdr() {
++auto WDC65816::op_jmp_iladdr() {
+   aa.l = readPC();
+   aa.h = readPC();
+   rd.l = readAddr(aa.w + 0);
+@@ -64,7 +64,7 @@ L rd.b = readAddr(aa.w + 2);
+   r.pc.d = rd.d;
+ }
+ 
+-auto R65816::op_jsr_addr() {
++auto WDC65816::op_jsr_addr() {
+   aa.l = readPC();
+   aa.h = readPC();
+   idle();
+@@ -74,7 +74,7 @@ L writeSP(r.pc.l);
+   r.pc.w = aa.w;
+ }
+ 
+-auto R65816::op_jsr_long() {
++auto WDC65816::op_jsr_long() {
+   aa.l = readPC();
+   aa.h = readPC();
+   writeSPn(r.pc.b);
+@@ -87,7 +87,7 @@ L writeSPn(r.pc.l);
+ E r.s.h = 0x01;
+ }
+ 
+-auto R65816::op_jsr_iaddrx() {
++auto WDC65816::op_jsr_iaddrx() {
+   aa.l = readPC();
+   writeSPn(r.pc.h);
+   writeSPn(r.pc.l);
+@@ -99,7 +99,7 @@ L rd.h = readPB(aa.w + r.x.w + 1);
+ E r.s.h = 0x01;
+ }
+ 
+-auto R65816::op_rti() {
++auto WDC65816::op_rti() {
+   idle();
+   idle();
+   r.p = readSP();
+@@ -117,7 +117,7 @@ E r.p.m = 1, r.p.x = 1;
+   }
+ }
+ 
+-auto R65816::op_rts() {
++auto WDC65816::op_rts() {
+   idle();
+   idle();
+   rd.l = readSP();
+@@ -126,7 +126,7 @@ L idle();
+   r.pc.w = ++rd.w;
+ }
+ 
+-auto R65816::op_rtl() {
++auto WDC65816::op_rtl() {
+   idle();
+   idle();
+   rd.l = readSPn();
+diff --git a/higan/higan/processor/r65816/instructions-read.cpp b/nSide/higan/processor/wdc65816/instructions-read.cpp
+similarity index 75%
+rename from higan/higan/processor/r65816/instructions-read.cpp
+rename to nSide/higan/processor/wdc65816/instructions-read.cpp
+index 5644717..ba18ecf 100644
+--- a/higan/higan/processor/r65816/instructions-read.cpp
++++ b/nSide/higan/processor/wdc65816/instructions-read.cpp
+@@ -1,33 +1,33 @@
+-auto R65816::op_read_const_b(fp op) {
++auto WDC65816::op_read_const_b(fp op) {
+ L rd.l = readPC();
+   call(op);
+ }
+ 
+-auto R65816::op_read_const_w(fp op) {
++auto WDC65816::op_read_const_w(fp op) {
+   rd.l = readPC();
+ L rd.h = readPC();
+   call(op);
+ }
+ 
+-auto R65816::op_read_bit_const_b() {
++auto WDC65816::op_read_bit_const_b() {
+ L rd.l = readPC();
+   r.p.z = ((rd.l & r.a.l) == 0);
+ }
+ 
+-auto R65816::op_read_bit_const_w() {
++auto WDC65816::op_read_bit_const_w() {
+   rd.l = readPC();
+ L rd.h = readPC();
+   r.p.z = ((rd.w & r.a.w) == 0);
+ }
+ 
+-auto R65816::op_read_addr_b(fp op) {
++auto WDC65816::op_read_addr_b(fp op) {
+   aa.l = readPC();
+   aa.h = readPC();
+ L rd.l = readDB(aa.w);
+   call(op);
+ }
+ 
+-auto R65816::op_read_addr_w(fp op) {
++auto WDC65816::op_read_addr_w(fp op) {
+   aa.l = readPC();
+   aa.h = readPC();
+   rd.l = readDB(aa.w + 0);
+@@ -35,7 +35,7 @@ L rd.h = readDB(aa.w + 1);
+   call(op);
+ }
+ 
+-auto R65816::op_read_addrx_b(fp op) {
++auto WDC65816::op_read_addrx_b(fp op) {
+   aa.l = readPC();
+   aa.h = readPC();
+   idle4(aa.w, aa.w + r.x.w);
+@@ -43,7 +43,7 @@ L rd.l = readDB(aa.w + r.x.w);
+   call(op);
+ }
+ 
+-auto R65816::op_read_addrx_w(fp op) {
++auto WDC65816::op_read_addrx_w(fp op) {
+   aa.l = readPC();
+   aa.h = readPC();
+   idle4(aa.w, aa.w + r.x.w);
+@@ -52,7 +52,7 @@ L rd.h = readDB(aa.w + r.x.w + 1);
+   call(op);
+ }
+ 
+-auto R65816::op_read_addry_b(fp op) {
++auto WDC65816::op_read_addry_b(fp op) {
+   aa.l = readPC();
+   aa.h = readPC();
+   idle4(aa.w, aa.w + r.y.w);
+@@ -60,7 +60,7 @@ L rd.l = readDB(aa.w + r.y.w);
+   call(op);
+ }
+ 
+-auto R65816::op_read_addry_w(fp op) {
++auto WDC65816::op_read_addry_w(fp op) {
+   aa.l = readPC();
+   aa.h = readPC();
+   idle4(aa.w, aa.w + r.y.w);
+@@ -69,7 +69,7 @@ L rd.h = readDB(aa.w + r.y.w + 1);
+   call(op);
+ }
+ 
+-auto R65816::op_read_long_b(fp op) {
++auto WDC65816::op_read_long_b(fp op) {
+   aa.l = readPC();
+   aa.h = readPC();
+   aa.b = readPC();
+@@ -77,7 +77,7 @@ L rd.l = readLong(aa.d);
+   call(op);
+ }
+ 
+-auto R65816::op_read_long_w(fp op) {
++auto WDC65816::op_read_long_w(fp op) {
+   aa.l = readPC();
+   aa.h = readPC();
+   aa.b = readPC();
+@@ -86,7 +86,7 @@ L rd.h = readLong(aa.d + 1);
+   call(op);
+ }
+ 
+-auto R65816::op_read_longx_b(fp op) {
++auto WDC65816::op_read_longx_b(fp op) {
+   aa.l = readPC();
+   aa.h = readPC();
+   aa.b = readPC();
+@@ -94,7 +94,7 @@ L rd.l = readLong(aa.d + r.x.w);
+   call(op);
+ }
+ 
+-auto R65816::op_read_longx_w(fp op) {
++auto WDC65816::op_read_longx_w(fp op) {
+   aa.l = readPC();
+   aa.h = readPC();
+   aa.b = readPC();
+@@ -103,14 +103,14 @@ L rd.h = readLong(aa.d + r.x.w + 1);
+   call(op);
+ }
+ 
+-auto R65816::op_read_dp_b(fp op) {
++auto WDC65816::op_read_dp_b(fp op) {
+   dp = readPC();
+   idle2();
+ L rd.l = readDP(dp);
+   call(op);
+ }
+ 
+-auto R65816::op_read_dp_w(fp op) {
++auto WDC65816::op_read_dp_w(fp op) {
+   dp = readPC();
+   idle2();
+   rd.l = readDP(dp + 0);
+@@ -118,7 +118,7 @@ L rd.h = readDP(dp + 1);
+   call(op);
+ }
+ 
+-auto R65816::op_read_dpr_b(fp op, Reg16& reg) {
++auto WDC65816::op_read_dpr_b(fp op, Reg16& reg) {
+   dp = readPC();
+   idle2();
+   idle();
+@@ -126,7 +126,7 @@ L rd.l = readDP(dp + reg.w);
+   call(op);
+ }
+ 
+-auto R65816::op_read_dpr_w(fp op, Reg16& reg) {
++auto WDC65816::op_read_dpr_w(fp op, Reg16& reg) {
+   dp = readPC();
+   idle2();
+   idle();
+@@ -135,7 +135,7 @@ L rd.h = readDP(dp + reg.w + 1);
+   call(op);
+ }
+ 
+-auto R65816::op_read_idp_b(fp op) {
++auto WDC65816::op_read_idp_b(fp op) {
+   dp = readPC();
+   idle2();
+   aa.l = readDP(dp + 0);
+@@ -144,7 +144,7 @@ L rd.l = readDB(aa.w);
+   call(op);
+ }
+ 
+-auto R65816::op_read_idp_w(fp op) {
++auto WDC65816::op_read_idp_w(fp op) {
+   dp = readPC();
+   idle2();
+   aa.l = readDP(dp + 0);
+@@ -154,7 +154,7 @@ L rd.h = readDB(aa.w + 1);
+   call(op);
+ }
+ 
+-auto R65816::op_read_idpx_b(fp op) {
++auto WDC65816::op_read_idpx_b(fp op) {
+   dp = readPC();
+   idle2();
+   idle();
+@@ -164,7 +164,7 @@ L rd.l = readDB(aa.w);
+   call(op);
+ }
+ 
+-auto R65816::op_read_idpx_w(fp op) {
++auto WDC65816::op_read_idpx_w(fp op) {
+   dp = readPC();
+   idle2();
+   idle();
+@@ -175,7 +175,7 @@ L rd.h = readDB(aa.w + 1);
+   call(op);
+ }
+ 
+-auto R65816::op_read_idpy_b(fp op) {
++auto WDC65816::op_read_idpy_b(fp op) {
+   dp = readPC();
+   idle2();
+   aa.l = readDP(dp + 0);
+@@ -185,7 +185,7 @@ L rd.l = readDB(aa.w + r.y.w);
+   call(op);
+ }
+ 
+-auto R65816::op_read_idpy_w(fp op) {
++auto WDC65816::op_read_idpy_w(fp op) {
+   dp = readPC();
+   idle2();
+   aa.l = readDP(dp + 0);
+@@ -196,7 +196,7 @@ L rd.h = readDB(aa.w + r.y.w + 1);
+   call(op);
+ }
+ 
+-auto R65816::op_read_ildp_b(fp op) {
++auto WDC65816::op_read_ildp_b(fp op) {
+   dp = readPC();
+   idle2();
+   aa.l = readDPn(dp + 0);
+@@ -206,7 +206,7 @@ L rd.l = readLong(aa.d);
+   call(op);
+ }
+ 
+-auto R65816::op_read_ildp_w(fp op) {
++auto WDC65816::op_read_ildp_w(fp op) {
+   dp = readPC();
+   idle2();
+   aa.l = readDPn(dp + 0);
+@@ -217,7 +217,7 @@ L rd.h = readLong(aa.d + 1);
+   call(op);
+ }
+ 
+-auto R65816::op_read_ildpy_b(fp op) {
++auto WDC65816::op_read_ildpy_b(fp op) {
+   dp = readPC();
+   idle2();
+   aa.l = readDPn(dp + 0);
+@@ -227,7 +227,7 @@ L rd.l = readLong(aa.d + r.y.w);
+   call(op);
+ }
+ 
+-auto R65816::op_read_ildpy_w(fp op) {
++auto WDC65816::op_read_ildpy_w(fp op) {
+   dp = readPC();
+   idle2();
+   aa.l = readDPn(dp + 0);
+@@ -238,14 +238,14 @@ L rd.h = readLong(aa.d + r.y.w + 1);
+   call(op);
+ }
+ 
+-auto R65816::op_read_sr_b(fp op) {
++auto WDC65816::op_read_sr_b(fp op) {
+   sp = readPC();
+   idle();
+ L rd.l = readSP(sp);
+   call(op);
+ }
+ 
+-auto R65816::op_read_sr_w(fp op) {
++auto WDC65816::op_read_sr_w(fp op) {
+   sp = readPC();
+   idle();
+   rd.l = readSP(sp + 0);
+@@ -253,7 +253,7 @@ L rd.h = readSP(sp + 1);
+   call(op);
+ }
+ 
+-auto R65816::op_read_isry_b(fp op) {
++auto WDC65816::op_read_isry_b(fp op) {
+   sp = readPC();
+   idle();
+   aa.l = readSP(sp + 0);
+@@ -263,7 +263,7 @@ L rd.l = readDB(aa.w + r.y.w);
+   call(op);
+ }
+ 
+-auto R65816::op_read_isry_w(fp op) {
++auto WDC65816::op_read_isry_w(fp op) {
+   sp = readPC();
+   idle();
+   aa.l = readSP(sp + 0);
+diff --git a/higan/higan/processor/r65816/instructions-rmw.cpp b/nSide/higan/processor/wdc65816/instructions-rmw.cpp
+similarity index 77%
+rename from higan/higan/processor/r65816/instructions-rmw.cpp
+rename to nSide/higan/processor/wdc65816/instructions-rmw.cpp
+index da9d11d..259c7c2 100644
+--- a/higan/higan/processor/r65816/instructions-rmw.cpp
++++ b/nSide/higan/processor/wdc65816/instructions-rmw.cpp
+@@ -1,18 +1,18 @@
+-auto R65816::op_adjust_imm_b(Reg16& reg, int adjust) {
++auto WDC65816::op_adjust_imm_b(Reg16& reg, int adjust) {
+ L idleIRQ();
+   reg.l += adjust;
+   r.p.n = (reg.l & 0x80);
+   r.p.z = (reg.l == 0);
+ }
+ 
+-auto R65816::op_adjust_imm_w(Reg16& reg, int adjust) {
++auto WDC65816::op_adjust_imm_w(Reg16& reg, int adjust) {
+ L idleIRQ();
+   reg.w += adjust;
+   r.p.n = (reg.w & 0x8000);
+   r.p.z = (reg.w == 0);
+ }
+ 
+-auto R65816::op_asl_imm_b() {
++auto WDC65816::op_asl_imm_b() {
+ L idleIRQ();
+   r.p.c = (r.a.l & 0x80);
+   r.a.l <<= 1;
+@@ -20,7 +20,7 @@ L idleIRQ();
+   r.p.z = (r.a.l == 0);
+ }
+ 
+-auto R65816::op_asl_imm_w() {
++auto WDC65816::op_asl_imm_w() {
+ L idleIRQ();
+   r.p.c = (r.a.w & 0x8000);
+   r.a.w <<= 1;
+@@ -28,7 +28,7 @@ L idleIRQ();
+   r.p.z = (r.a.w == 0);
+ }
+ 
+-auto R65816::op_lsr_imm_b() {
++auto WDC65816::op_lsr_imm_b() {
+ L idleIRQ();
+   r.p.c = (r.a.l & 0x01);
+   r.a.l >>= 1;
+@@ -36,7 +36,7 @@ L idleIRQ();
+   r.p.z = (r.a.l == 0);
+ }
+ 
+-auto R65816::op_lsr_imm_w() {
++auto WDC65816::op_lsr_imm_w() {
+ L idleIRQ();
+   r.p.c = (r.a.w & 0x0001);
+   r.a.w >>= 1;
+@@ -44,7 +44,7 @@ L idleIRQ();
+   r.p.z = (r.a.w == 0);
+ }
+ 
+-auto R65816::op_rol_imm_b() {
++auto WDC65816::op_rol_imm_b() {
+ L idleIRQ();
+   bool carry = r.p.c;
+   r.p.c = (r.a.l & 0x80);
+@@ -53,7 +53,7 @@ L idleIRQ();
+   r.p.z = (r.a.l == 0);
+ }
+ 
+-auto R65816::op_rol_imm_w() {
++auto WDC65816::op_rol_imm_w() {
+ L idleIRQ();
+   bool carry = r.p.c;
+   r.p.c = (r.a.w & 0x8000);
+@@ -62,7 +62,7 @@ L idleIRQ();
+   r.p.z = (r.a.w == 0);
+ }
+ 
+-auto R65816::op_ror_imm_b() {
++auto WDC65816::op_ror_imm_b() {
+ L idleIRQ();
+   bool carry = r.p.c;
+   r.p.c = (r.a.l & 0x01);
+@@ -71,7 +71,7 @@ L idleIRQ();
+   r.p.z = (r.a.l == 0);
+ }
+ 
+-auto R65816::op_ror_imm_w() {
++auto WDC65816::op_ror_imm_w() {
+ L idleIRQ();
+   bool carry = r.p.c;
+   r.p.c = (r.a.w & 0x0001);
+@@ -80,7 +80,7 @@ L idleIRQ();
+   r.p.z = (r.a.w == 0);
+ }
+ 
+-auto R65816::op_adjust_addr_b(fp op) {
++auto WDC65816::op_adjust_addr_b(fp op) {
+   aa.l = readPC();
+   aa.h = readPC();
+   rd.l = readDB(aa.w);
+@@ -89,7 +89,7 @@ auto R65816::op_adjust_addr_b(fp op) {
+ L writeDB(aa.w, rd.l);
+ }
+ 
+-auto R65816::op_adjust_addr_w(fp op) {
++auto WDC65816::op_adjust_addr_w(fp op) {
+   aa.l = readPC();
+   aa.h = readPC();
+   rd.l = readDB(aa.w + 0);
+@@ -100,7 +100,7 @@ auto R65816::op_adjust_addr_w(fp op) {
+ L writeDB(aa.w + 0, rd.l);
+ }
+ 
+-auto R65816::op_adjust_addrx_b(fp op) {
++auto WDC65816::op_adjust_addrx_b(fp op) {
+   aa.l = readPC();
+   aa.h = readPC();
+   idle();
+@@ -110,7 +110,7 @@ auto R65816::op_adjust_addrx_b(fp op) {
+ L writeDB(aa.w + r.x.w, rd.l);
+ }
+ 
+-auto R65816::op_adjust_addrx_w(fp op) {
++auto WDC65816::op_adjust_addrx_w(fp op) {
+   aa.l = readPC();
+   aa.h = readPC();
+   idle();
+@@ -122,7 +122,7 @@ auto R65816::op_adjust_addrx_w(fp op) {
+ L writeDB(aa.w + r.x.w + 0, rd.l);
+ }
+ 
+-auto R65816::op_adjust_dp_b(fp op) {
++auto WDC65816::op_adjust_dp_b(fp op) {
+   dp = readPC();
+   idle2();
+   rd.l = readDP(dp);
+@@ -131,7 +131,7 @@ auto R65816::op_adjust_dp_b(fp op) {
+ L writeDP(dp, rd.l);
+ }
+ 
+-auto R65816::op_adjust_dp_w(fp op) {
++auto WDC65816::op_adjust_dp_w(fp op) {
+   dp = readPC();
+   idle2();
+   rd.l = readDP(dp + 0);
+@@ -142,7 +142,7 @@ auto R65816::op_adjust_dp_w(fp op) {
+ L writeDP(dp + 0, rd.l);
+ }
+ 
+-auto R65816::op_adjust_dpx_b(fp op) {
++auto WDC65816::op_adjust_dpx_b(fp op) {
+   dp = readPC();
+   idle2();
+   idle();
+@@ -152,7 +152,7 @@ auto R65816::op_adjust_dpx_b(fp op) {
+ L writeDP(dp + r.x.w, rd.l);
+ }
+ 
+-auto R65816::op_adjust_dpx_w(fp op) {
++auto WDC65816::op_adjust_dpx_w(fp op) {
+   dp = readPC();
+   idle2();
+   idle();
+diff --git a/higan/higan/processor/r65816/instructions-write.cpp b/nSide/higan/processor/wdc65816/instructions-write.cpp
+similarity index 74%
+rename from higan/higan/processor/r65816/instructions-write.cpp
+rename to nSide/higan/processor/wdc65816/instructions-write.cpp
+index 0a63af6..3b0f6c9 100644
+--- a/higan/higan/processor/r65816/instructions-write.cpp
++++ b/nSide/higan/processor/wdc65816/instructions-write.cpp
+@@ -1,24 +1,24 @@
+-auto R65816::op_write_addr_b(Reg16& reg) {
++auto WDC65816::op_write_addr_b(Reg16& reg) {
+   aa.l = readPC();
+   aa.h = readPC();
+ L writeDB(aa.w, reg);
+ }
+ 
+-auto R65816::op_write_addr_w(Reg16& reg) {
++auto WDC65816::op_write_addr_w(Reg16& reg) {
+   aa.l = readPC();
+   aa.h = readPC();
+   writeDB(aa.w + 0, reg >> 0);
+ L writeDB(aa.w + 1, reg >> 8);
+ }
+ 
+-auto R65816::op_write_addrr_b(Reg16& reg, Reg16& idx) {
++auto WDC65816::op_write_addrr_b(Reg16& reg, Reg16& idx) {
+   aa.l = readPC();
+   aa.h = readPC();
+   idle();
+ L writeDB(aa.w + idx, reg);
+ }
+ 
+-auto R65816::op_write_addrr_w(Reg16& reg, Reg16& idx) {
++auto WDC65816::op_write_addrr_w(Reg16& reg, Reg16& idx) {
+   aa.l = readPC();
+   aa.h = readPC();
+   idle();
+@@ -26,14 +26,14 @@ auto R65816::op_write_addrr_w(Reg16& reg, Reg16& idx) {
+ L writeDB(aa.w + idx + 1, reg >> 8);
+ }
+ 
+-auto R65816::op_write_longr_b(Reg16& idx) {
++auto WDC65816::op_write_longr_b(Reg16& idx) {
+   aa.l = readPC();
+   aa.h = readPC();
+   aa.b = readPC();
+ L writeLong(aa.d + idx, r.a.l);
+ }
+ 
+-auto R65816::op_write_longr_w(Reg16& idx) {
++auto WDC65816::op_write_longr_w(Reg16& idx) {
+   aa.l = readPC();
+   aa.h = readPC();
+   aa.b = readPC();
+@@ -41,27 +41,27 @@ auto R65816::op_write_longr_w(Reg16& idx) {
+ L writeLong(aa.d + idx + 1, r.a.h);
+ }
+ 
+-auto R65816::op_write_dp_b(Reg16& reg) {
++auto WDC65816::op_write_dp_b(Reg16& reg) {
+   dp = readPC();
+   idle2();
+ L writeDP(dp, reg);
+ }
+ 
+-auto R65816::op_write_dp_w(Reg16& reg) {
++auto WDC65816::op_write_dp_w(Reg16& reg) {
+   dp = readPC();
+   idle2();
+   writeDP(dp + 0, reg >> 0);
+ L writeDP(dp + 1, reg >> 8);
+ }
+ 
+-auto R65816::op_write_dpr_b(Reg16& reg, Reg16& idx) {
++auto WDC65816::op_write_dpr_b(Reg16& reg, Reg16& idx) {
+   dp = readPC();
+   idle2();
+   idle();
+ L writeDP(dp + idx, reg);
+ }
+ 
+-auto R65816::op_write_dpr_w(Reg16& reg, Reg16& idx) {
++auto WDC65816::op_write_dpr_w(Reg16& reg, Reg16& idx) {
+   dp = readPC();
+   idle2();
+   idle();
+@@ -69,7 +69,7 @@ auto R65816::op_write_dpr_w(Reg16& reg, Reg16& idx) {
+ L writeDP(dp + idx + 1, reg >> 8);
+ }
+ 
+-auto R65816::op_sta_idp_b() {
++auto WDC65816::op_sta_idp_b() {
+   dp = readPC();
+   idle2();
+   aa.l = readDP(dp + 0);
+@@ -77,7 +77,7 @@ auto R65816::op_sta_idp_b() {
+ L writeDB(aa.w, r.a.l);
+ }
+ 
+-auto R65816::op_sta_idp_w() {
++auto WDC65816::op_sta_idp_w() {
+   dp = readPC();
+   idle2();
+   aa.l = readDP(dp + 0);
+@@ -86,7 +86,7 @@ auto R65816::op_sta_idp_w() {
+ L writeDB(aa.w + 1, r.a.h);
+ }
+ 
+-auto R65816::op_sta_ildp_b() {
++auto WDC65816::op_sta_ildp_b() {
+   dp = readPC();
+   idle2();
+   aa.l = readDPn(dp + 0);
+@@ -95,7 +95,7 @@ auto R65816::op_sta_ildp_b() {
+ L writeLong(aa.d, r.a.l);
+ }
+ 
+-auto R65816::op_sta_ildp_w() {
++auto WDC65816::op_sta_ildp_w() {
+   dp = readPC();
+   idle2();
+   aa.l = readDPn(dp + 0);
+@@ -105,7 +105,7 @@ auto R65816::op_sta_ildp_w() {
+ L writeLong(aa.d + 1, r.a.h);
+ }
+ 
+-auto R65816::op_sta_idpx_b() {
++auto WDC65816::op_sta_idpx_b() {
+   dp = readPC();
+   idle2();
+   idle();
+@@ -114,7 +114,7 @@ auto R65816::op_sta_idpx_b() {
+ L writeDB(aa.w, r.a.l);
+ }
+ 
+-auto R65816::op_sta_idpx_w() {
++auto WDC65816::op_sta_idpx_w() {
+   dp = readPC();
+   idle2();
+   idle();
+@@ -124,7 +124,7 @@ auto R65816::op_sta_idpx_w() {
+ L writeDB(aa.w + 1, r.a.h);
+ }
+ 
+-auto R65816::op_sta_idpy_b() {
++auto WDC65816::op_sta_idpy_b() {
+   dp = readPC();
+   idle2();
+   aa.l = readDP(dp + 0);
+@@ -133,7 +133,7 @@ auto R65816::op_sta_idpy_b() {
+ L writeDB(aa.w + r.y.w, r.a.l);
+ }
+ 
+-auto R65816::op_sta_idpy_w() {
++auto WDC65816::op_sta_idpy_w() {
+   dp = readPC();
+   idle2();
+   aa.l = readDP(dp + 0);
+@@ -143,7 +143,7 @@ auto R65816::op_sta_idpy_w() {
+ L writeDB(aa.w + r.y.w + 1, r.a.h);
+ }
+ 
+-auto R65816::op_sta_ildpy_b() {
++auto WDC65816::op_sta_ildpy_b() {
+   dp = readPC();
+   idle2();
+   aa.l = readDPn(dp + 0);
+@@ -152,7 +152,7 @@ auto R65816::op_sta_ildpy_b() {
+ L writeLong(aa.d + r.y.w, r.a.l);
+ }
+ 
+-auto R65816::op_sta_ildpy_w() {
++auto WDC65816::op_sta_ildpy_w() {
+   dp = readPC();
+   idle2();
+   aa.l = readDPn(dp + 0);
+@@ -162,20 +162,20 @@ auto R65816::op_sta_ildpy_w() {
+ L writeLong(aa.d + r.y.w + 1, r.a.h);
+ }
+ 
+-auto R65816::op_sta_sr_b() {
++auto WDC65816::op_sta_sr_b() {
+   sp = readPC();
+   idle();
+ L writeSP(sp, r.a.l);
+ }
+ 
+-auto R65816::op_sta_sr_w() {
++auto WDC65816::op_sta_sr_w() {
+   sp = readPC();
+   idle();
+   writeSP(sp + 0, r.a.l);
+ L writeSP(sp + 1, r.a.h);
+ }
+ 
+-auto R65816::op_sta_isry_b() {
++auto WDC65816::op_sta_isry_b() {
+   sp = readPC();
+   idle();
+   aa.l = readSP(sp + 0);
+@@ -184,7 +184,7 @@ auto R65816::op_sta_isry_b() {
+ L writeDB(aa.w + r.y.w, r.a.l);
+ }
+ 
+-auto R65816::op_sta_isry_w() {
++auto WDC65816::op_sta_isry_w() {
+   sp = readPC();
+   idle();
+   aa.l = readSP(sp + 0);
+diff --git a/higan/higan/processor/r65816/memory.hpp b/nSide/higan/processor/wdc65816/memory.hpp
+similarity index 100%
+rename from higan/higan/processor/r65816/memory.hpp
+rename to nSide/higan/processor/wdc65816/memory.hpp
+diff --git a/higan/higan/processor/r65816/registers.hpp b/nSide/higan/processor/wdc65816/registers.hpp
+similarity index 100%
+rename from higan/higan/processor/r65816/registers.hpp
+rename to nSide/higan/processor/wdc65816/registers.hpp
+diff --git a/higan/higan/processor/r65816/serialization.cpp b/nSide/higan/processor/wdc65816/serialization.cpp
+similarity index 87%
+rename from higan/higan/processor/r65816/serialization.cpp
+rename to nSide/higan/processor/wdc65816/serialization.cpp
+index d3f20a9..f62266b 100644
+--- a/higan/higan/processor/r65816/serialization.cpp
++++ b/nSide/higan/processor/wdc65816/serialization.cpp
+@@ -1,4 +1,4 @@
+-auto R65816::serialize(serializer& s) -> void {
++auto WDC65816::serialize(serializer& s) -> void {
+   s.integer(r.pc.d);
+ 
+   s.integer(r.a.w);
+diff --git a/higan/higan/processor/r65816/switch.cpp b/nSide/higan/processor/wdc65816/switch.cpp
+similarity index 94%
+rename from higan/higan/processor/r65816/switch.cpp
+rename to nSide/higan/processor/wdc65816/switch.cpp
+index 9168754..897ee8e 100644
+--- a/higan/higan/processor/r65816/switch.cpp
++++ b/nSide/higan/processor/wdc65816/switch.cpp
+@@ -1,15 +1,15 @@
+-auto R65816::instruction() -> void {
++auto WDC65816::instruction() -> void {
+   #define opA(  n, o      ) case n: return op_##o();
+   #define opAI( n, o, i   ) case n: return op_##o(i);
+   #define opAII(n, o, i, j) case n: return op_##o(i, j);
+   #define opM(  n, o      ) case n: return r.p.m ? op_##o##_b() : op_##o##_w();
+-  #define opMF( n, o, f   ) case n: return r.p.m ? op_##o##_b(&R65816::op_##f##_b) : op_##o##_w(&R65816::op_##f##_w);
+-  #define opMFI(n, o, f, i) case n: return r.p.m ? op_##o##_b(&R65816::op_##f##_b, i) : op_##o##_w(&R65816::op_##f##_w, i);
++  #define opMF( n, o, f   ) case n: return r.p.m ? op_##o##_b(&WDC65816::op_##f##_b) : op_##o##_w(&WDC65816::op_##f##_w);
++  #define opMFI(n, o, f, i) case n: return r.p.m ? op_##o##_b(&WDC65816::op_##f##_b, i) : op_##o##_w(&WDC65816::op_##f##_w, i);
+   #define opMI( n, o, i   ) case n: return r.p.m ? op_##o##_b(i) : op_##o##_w(i);
+   #define opMII(n, o, i, j) case n: return r.p.m ? op_##o##_b(i, j) : op_##o##_w(i, j);
+   #define opX(  n, o)       case n: return r.p.x ? op_##o##_b() : op_##o##_w();
+-  #define opXF( n, o, f   ) case n: return r.p.x ? op_##o##_b(&R65816::op_##f##_b) : op_##o##_w(&R65816::op_##f##_w);
+-  #define opXFI(n, o, f, i) case n: return r.p.x ? op_##o##_b(&R65816::op_##f##_b, i) : op_##o##_w(&R65816::op_##f##_w, i);
++  #define opXF( n, o, f   ) case n: return r.p.x ? op_##o##_b(&WDC65816::op_##f##_b) : op_##o##_w(&WDC65816::op_##f##_w);
++  #define opXFI(n, o, f, i) case n: return r.p.x ? op_##o##_b(&WDC65816::op_##f##_b, i) : op_##o##_w(&WDC65816::op_##f##_w, i);
+   #define opXI( n, o, i   ) case n: return r.p.x ? op_##o##_b(i) : op_##o##_w(i);
+   #define opXII(n, o, i, j) case n: return r.p.x ? op_##o##_b(i, j) : op_##o##_w(i, j);
+ 
+diff --git a/higan/higan/processor/r65816/r65816.cpp b/nSide/higan/processor/wdc65816/wdc65816.cpp
+similarity index 85%
+rename from higan/higan/processor/r65816/r65816.cpp
+rename to nSide/higan/processor/wdc65816/wdc65816.cpp
+index e261a1d..64362dc 100644
+--- a/higan/higan/processor/r65816/r65816.cpp
++++ b/nSide/higan/processor/wdc65816/wdc65816.cpp
+@@ -1,5 +1,5 @@
+ #include <processor/processor.hpp>
+-#include "r65816.hpp"
++#include "wdc65816.hpp"
+ 
+ namespace Processor {
+ 
+@@ -19,7 +19,7 @@ namespace Processor {
+ #include "instructions-misc.cpp"
+ #include "switch.cpp"
+ 
+-auto R65816::interrupt() -> void {
++auto WDC65816::interrupt() -> void {
+   read(r.pc.d);
+   idle();
+ N writeSP(r.pc.b);
+@@ -41,7 +41,7 @@ N writeSP(r.pc.b);
+ //  tcd, tcs, tdc, tsc, tsx, txs,
+ //  inc, inx, iny, dec, dex, dey,
+ //  asl, lsr, rol, ror, nop, xce.
+-auto R65816::idleIRQ() -> void {
++auto WDC65816::idleIRQ() -> void {
+   if(interruptPending()) {
+     //modify I/O cycle to bus read cycle, do not increment PC
+     read(r.pc.d);
+@@ -50,19 +50,19 @@ auto R65816::idleIRQ() -> void {
+   }
+ }
+ 
+-auto R65816::idle2() -> void {
++auto WDC65816::idle2() -> void {
+   if(r.d.l != 0x00) {
+     idle();
+   }
+ }
+ 
+-auto R65816::idle4(uint16 x, uint16 y) -> void {
++auto WDC65816::idle4(uint16 x, uint16 y) -> void {
+   if(!r.p.x || (x & 0xff00) != (y & 0xff00)) {
+     idle();
+   }
+ }
+ 
+-auto R65816::idle6(uint16 addr) -> void {
++auto WDC65816::idle6(uint16 addr) -> void {
+   if(r.e && (r.pc.w & 0xff00) != (addr & 0xff00)) {
+     idle();
+   }
+diff --git a/higan/higan/processor/r65816/r65816.hpp b/nSide/higan/processor/wdc65816/wdc65816.hpp
+similarity index 98%
+rename from higan/higan/processor/r65816/r65816.hpp
+rename to nSide/higan/processor/wdc65816/wdc65816.hpp
+index c1827a6..023695f 100644
+--- a/higan/higan/processor/r65816/r65816.hpp
++++ b/nSide/higan/processor/wdc65816/wdc65816.hpp
+@@ -6,12 +6,12 @@
+ 
+ namespace Processor {
+ 
+-struct R65816 {
++struct WDC65816 {
+   #include "registers.hpp"
+   #include "memory.hpp"
+   #include "disassembler.hpp"
+ 
+-  using fp = auto (R65816::*)() -> void;
++  using fp = auto (WDC65816::*)() -> void;
+ 
+   virtual auto idle() -> void = 0;
+   virtual auto read(uint24 addr) -> uint8 = 0;
+@@ -22,7 +22,7 @@ struct R65816 {
+ 
+   virtual auto readDisassembler(uint24 addr) -> uint8 { return 0; }
+ 
+-  //r65816.cpp
++  //wdc65816.cpp
+   alwaysinline auto idleIRQ() -> void;
+   alwaysinline auto idle2() -> void;
+   alwaysinline auto idle4(uint16 x, uint16 y) -> void;
+diff --git a/nSide/higan/processor/z80/serialization.cpp b/nSide/higan/processor/z80/serialization.cpp
+new file mode 100644
+index 0000000..e621e87
+--- /dev/null
++++ b/nSide/higan/processor/z80/serialization.cpp
+@@ -0,0 +1,16 @@
++void Z80::serialize(serializer& s) {
++  s.integer(r.af.word); s.integer(r.af_.word);
++  s.integer(r.bc.word); s.integer(r.bc_.word);
++  s.integer(r.de.word); s.integer(r.de_.word);
++  s.integer(r.hl.word); s.integer(r.hl_.word);
++  s.integer(r.ix.word);
++  s.integer(r.iy.word);
++  s.integer(r.ir.word);
++  s.integer(r.sp);
++  s.integer(r.pc);
++
++  r.halt.serialize(s);
++  r.iff1.serialize(s);
++  r.iff2.serialize(s);
++  s.integer(r.im);
++}
+diff --git a/higan/higan/processor/z80/z80.cpp b/nSide/higan/processor/z80/z80.cpp
+index 7c5117c..aded2bc 100644
+--- a/higan/higan/processor/z80/z80.cpp
++++ b/nSide/higan/processor/z80/z80.cpp
+@@ -8,6 +8,7 @@ namespace Processor {
+ #include "memory.cpp"
+ #include "instruction.cpp"
+ #include "instructions.cpp"
++#include "serialization.cpp"
+ 
+ auto Z80::power() -> void {
+ }
+diff --git a/higan/higan/processor/z80/z80.hpp b/nSide/higan/processor/z80/z80.hpp
+index 3942ed3..339ca59 100644
+--- a/higan/higan/processor/z80/z80.hpp
++++ b/nSide/higan/processor/z80/z80.hpp
+@@ -186,6 +186,8 @@ struct Z80 {
+   auto disassembleCB(uint16 pc, uint8 prefix, uint8 code) -> string;
+   auto disassembleED(uint16 pc, uint8 prefix, uint8 code) -> string;
+ 
++  auto serialize(serializer&) -> void;
++
+   struct Registers {
+     union Pair {
+       Pair() : word(0) {}
+

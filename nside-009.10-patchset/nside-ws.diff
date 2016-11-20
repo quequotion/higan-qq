@@ -1,0 +1,274 @@
+diff --git a/higan-hack/higan/ws/interface/interface.cpp b/nSide/higan/ws/interface/interface.cpp
+index be37624..344bfc9 100644
+--- a/higan-hack/higan/ws/interface/interface.cpp
++++ b/nSide/higan/ws/interface/interface.cpp
+@@ -8,6 +8,7 @@ Settings settings;
+ Interface::Interface() {
+   interface = this;
+ 
++  information.preAlpha     = false;
+   information.manufacturer = "Bandai";
+   information.name         = "WonderSwan";
+   information.overscan     = false;
+@@ -16,13 +17,12 @@ Interface::Interface() {
+   information.capability.states = true;
+   information.capability.cheats = true;
+ 
+-  media.append({ID::WonderSwan,      "WonderSwan",       "ws" });
+-  media.append({ID::WonderSwanColor, "WonderSwan Color", "wsc"});
++  media.append({ID::WonderSwan,      "WonderSwan",       "ws",  Domain::Portable});
++  media.append({ID::WonderSwanColor, "WonderSwan Color", "wsc", Domain::Portable});
+ 
+-  Port hardwareHorizontalPort{ID::Port::HardwareHorizontal, "Hardware - Horizontal"};
+-  Port hardwareVerticalPort{ID::Port::HardwareVertical, "Hardware - Vertical"};
++  Port hardwarePort{ID::Port::Hardware, "Hardware", PlugAndPlay};
+ 
+-  { Device device{ID::Device::Controls, "Controls"};
++  { Device device{ID::Device::HorizontalControls, "Horizontal Controls"};
+     device.inputs.append({0, "Y1"});
+     device.inputs.append({0, "Y2"});
+     device.inputs.append({0, "Y3"});
+@@ -34,13 +34,25 @@ Interface::Interface() {
+     device.inputs.append({0, "B"});
+     device.inputs.append({0, "A"});
+     device.inputs.append({0, "Start"});
+-    device.inputs.append({0, "Rotate"});
+-    hardwareHorizontalPort.devices.append(device);
+-    hardwareVerticalPort.devices.append(device);
++    hardwarePort.devices.append(device);
+   }
+ 
+-  ports.append(move(hardwareHorizontalPort));
+-  ports.append(move(hardwareVerticalPort));
++  { Device device{ID::Device::VerticalControls, "Vertical Controls"};
++    device.inputs.append({0, "Y1"});
++    device.inputs.append({0, "Y2"});
++    device.inputs.append({0, "Y3"});
++    device.inputs.append({0, "Y4"});
++    device.inputs.append({0, "X1"});
++    device.inputs.append({0, "X2"});
++    device.inputs.append({0, "X3"});
++    device.inputs.append({0, "X4"});
++    device.inputs.append({0, "B"});
++    device.inputs.append({0, "A"});
++    device.inputs.append({0, "Start"});
++    hardwarePort.devices.append(device);
++  }
++
++  ports.append(move(hardwarePort));
+ }
+ 
+ auto Interface::manifest() -> string {
+@@ -118,6 +130,10 @@ auto Interface::unload() -> void {
+   system.unload();
+ }
+ 
++auto Interface::connect(uint port, uint device) -> void {
++  if(port == 0 && system.orientation() != device) system.rotate();
++}
++
+ auto Interface::power() -> void {
+   system.power();
+ }
+@@ -126,6 +142,11 @@ auto Interface::run() -> void {
+   system.run();
+ }
+ 
++auto Interface::rotate() -> void {
++  system.rotate();
++  deviceChanged(0, system.orientation());
++}
++
+ auto Interface::serialize() -> serializer {
+   system.runToSave();
+   return system.serialize();
+diff --git a/higan-hack/higan/ws/interface/interface.hpp b/nSide/higan/ws/interface/interface.hpp
+index 1119d6f..55944c8 100644
+--- a/higan-hack/higan/ws/interface/interface.hpp
++++ b/nSide/higan/ws/interface/interface.hpp
+@@ -8,12 +8,12 @@ struct ID {
+   };
+ 
+   struct Port { enum : uint {
+-    HardwareHorizontal,
+-    HardwareVertical,
++    Hardware,
+   };};
+ 
+   struct Device { enum : uint {
+-    Controls,
++    HorizontalControls,
++    VerticalControls,
+   };};
+ };
+ 
+@@ -39,8 +39,10 @@ struct Interface : Emulator::Interface {
+   auto save() -> void override;
+   auto unload() -> void override;
+ 
++  auto connect(uint port, uint device) -> void;
+   auto power() -> void override;
+   auto run() -> void override;
++  auto rotate() -> void override;
+ 
+   auto serialize() -> serializer override;
+   auto unserialize(serializer&) -> bool override;
+diff --git a/higan-hack/higan/ws/memory/memory.cpp b/nSide/higan/ws/memory/memory.cpp
+index 9c402a5..b89eb79 100644
+--- a/higan-hack/higan/ws/memory/memory.cpp
++++ b/nSide/higan/ws/memory/memory.cpp
+@@ -36,7 +36,7 @@ auto Bus::read(uint20 addr) -> uint8 {
+   if(addr.bits(16,19) == 1) data = cartridge.ramRead(addr);
+   if(addr.bits(16,19) >= 2) data = cartridge.romRead(addr);
+   if(cheat) {
+-    if(auto result = cheat.find(addr, data)) data = result();
++    if(auto result = cheat.find<1>(addr, data)) data = result();
+   }
+   return data;
+ }
+diff --git a/higan-hack/higan/ws/ppu/ppu.cpp b/nSide/higan/ws/ppu/ppu.cpp
+index 8027983..a6b018f 100644
+--- a/higan-hack/higan/ws/ppu/ppu.cpp
++++ b/nSide/higan/ws/ppu/ppu.cpp
+@@ -28,10 +28,7 @@ auto PPU::main() -> void {
+         if(l.screenTwoEnable) renderScreenTwo();
+         if(l.spriteEnable) renderSprite();
+       }
+-      switch(l.orientation) {
+-      case 0: output[(s.vclk + 40) * 224 + s.hclk] = s.pixel.color; break;
+-      case 1: output[(223 - s.hclk) * 224 + (s.vclk + 40)] = s.pixel.color; break;
+-      }
++      output[s.vclk * 224 + s.hclk] = s.pixel.color;
+       step(1);
+     }
+     step(32);
+@@ -76,14 +73,10 @@ auto PPU::frame() -> void {
+   s.field = !s.field;
+   s.vclk = 0;
+   scheduler.exit(Scheduler::Event::Frame);
+-  if(l.orientation != system.orientation()) {
+-    l.orientation = system.orientation();
+-    memory::fill(output, 224 * 224 * sizeof(uint32));
+-  }
+ }
+ 
+ auto PPU::refresh() -> void {
+-  Emulator::video.refresh(output, 224 * sizeof(uint32), 224, 224);
++  Emulator::video.refreshRegion(output, 224 * sizeof(uint32), 0, (224 - 144) / 2, 224, 144);
+ }
+ 
+ auto PPU::step(uint clocks) -> void {
+diff --git a/higan-hack/higan/ws/ppu/ppu.hpp b/nSide/higan/ws/ppu/ppu.hpp
+index 4a2f94f..15d432a 100644
+--- a/higan-hack/higan/ws/ppu/ppu.hpp
++++ b/nSide/higan/ws/ppu/ppu.hpp
+@@ -35,7 +35,7 @@ struct PPU : Thread, IO {
+     uint12 color;
+   };
+ 
+-  uint32 output[224 * 224];
++  uint32 output[224 * 144];
+ 
+   struct State {
+     bool field;
+@@ -45,9 +45,6 @@ struct PPU : Thread, IO {
+   } s;
+ 
+   struct Latches {
+-    //frame(), power()
+-    bool orientation;
+-
+     //latchRegisters()
+     uint8 backColor;
+ 
+diff --git a/higan-hack/higan/ws/ppu/serialization.cpp b/nSide/higan/ws/ppu/serialization.cpp
+index 5ed28a1..e0f682c 100644
+--- a/higan-hack/higan/ws/ppu/serialization.cpp
++++ b/nSide/higan/ws/ppu/serialization.cpp
+@@ -7,7 +7,6 @@ auto PPU::serialize(serializer& s) -> void {
+   s.integer((uint&)this->s.pixel.source);
+   s.integer(this->s.pixel.color);
+ 
+-  s.integer(l.orientation);
+   s.integer(l.backColor);
+   s.integer(l.screenOneEnable);
+   s.integer(l.screenOneMapBase);
+diff --git a/higan-hack/higan/ws/system/system.cpp b/nSide/higan/ws/system/system.cpp
+index f8b569e..736e4ea 100644
+--- a/higan-hack/higan/ws/system/system.cpp
++++ b/nSide/higan/ws/system/system.cpp
+@@ -63,6 +63,7 @@ auto System::unload() -> void {
+ auto System::power() -> void {
+   Emulator::video.reset();
+   Emulator::video.setInterface(interface);
++  Emulator::video.resize(224, 224);
+   configureVideoPalette();
+   configureVideoEffects();
+ 
+@@ -101,9 +102,8 @@ auto System::runToSave() -> void {
+ }
+ 
+ auto System::pollKeypad() -> void {
+-  uint port = !_orientation ? ID::Port::HardwareHorizontal : ID::Port::HardwareVertical;
+-  uint device = ID::Device::Controls;
+-  bool rotate = keypad.rotate;
++  uint port = ID::Port::Hardware;
++  uint device = !_orientation ? ID::Device::HorizontalControls : ID::Device::VerticalControls;
+ 
+   keypad.y1 = interface->inputPoll(port, device, 0);
+   keypad.y2 = interface->inputPoll(port, device, 1);
+@@ -116,7 +116,6 @@ auto System::pollKeypad() -> void {
+   keypad.b = interface->inputPoll(port, device, 8);
+   keypad.a = interface->inputPoll(port, device, 9);
+   keypad.start = interface->inputPoll(port, device, 10);
+-  keypad.rotate = interface->inputPoll(port, device, 11);
+ 
+   if(keypad.y1 || keypad.y2 || keypad.y3 || keypad.y4
+   || keypad.x1 || keypad.x2 || keypad.x3 || keypad.x4
+@@ -124,10 +123,11 @@ auto System::pollKeypad() -> void {
+   ) {
+     cpu.raise(CPU::Interrupt::Input);
+   }
++}
+ 
+-  if(!rotate && keypad.rotate) {
+-    _orientation = !_orientation;
+-  }
++auto System::rotate() -> void {
++  _orientation = !_orientation;
++  configureVideoEffects();
+ }
+ 
+ }
+diff --git a/higan-hack/higan/ws/system/system.hpp b/nSide/higan/ws/system/system.hpp
+index af3a119..a27790a 100644
+--- a/higan-hack/higan/ws/system/system.hpp
++++ b/nSide/higan/ws/system/system.hpp
+@@ -16,6 +16,7 @@ struct System : IO {
+   auto run() -> void;
+   auto runToSave() -> void;
+   auto pollKeypad() -> void;
++  auto rotate() -> void;
+ 
+   //io.cpp
+   auto portRead(uint16 addr) -> uint8 override;
+@@ -42,7 +43,6 @@ struct System : IO {
+     bool y1, y2, y3, y4;
+     bool x1, x2, x3, x4;
+     bool b, a, start;
+-    bool rotate;
+   } keypad;
+ 
+ privileged:
+diff --git a/higan-hack/higan/ws/system/video.cpp b/nSide/higan/ws/system/video.cpp
+index f77e7ae..d981e15 100644
+--- a/higan-hack/higan/ws/system/video.cpp
++++ b/nSide/higan/ws/system/video.cpp
+@@ -4,4 +4,6 @@ auto System::configureVideoPalette() -> void {
+ 
+ auto System::configureVideoEffects() -> void {
+   Emulator::video.setEffect(Emulator::Video::Effect::InterframeBlending, settings.blurEmulation);
++  Emulator::video.setEffect(Emulator::Video::Effect::Rotation, !orientation() ? 0 : 3);
++  Emulator::video.clear();
+ }
+

@@ -1,0 +1,320 @@
+diff --git a/higan-hack/higan/gba/cpu/bus.cpp b/nSide/higan/gba/cpu/bus.cpp
+index 1c89df6..f7ba991 100644
+--- a/higan-hack/higan/gba/cpu/bus.cpp
++++ b/nSide/higan/gba/cpu/bus.cpp
+@@ -32,6 +32,12 @@ auto CPU::_read(uint mode, uint32 addr) -> uint32 {
+     prefetchStep(1);
+   }
+ 
++  if(cheat) {
++    if(mode & Byte) if(auto result = cheat.find<1>(addr, word)) return result();
++    if(mode & Half) if(auto result = cheat.find<2>(addr, word)) return result();
++    if(mode & Word) if(auto result = cheat.find<4>(addr, word)) return result();
++  }
++
+   return word;
+ }
+ 
+diff --git a/higan-hack/higan/gba/cpu/io.cpp b/nSide/higan/gba/cpu/io.cpp
+index cf68375..c6abf4d 100644
+--- a/higan-hack/higan/gba/cpu/io.cpp
++++ b/nSide/higan/gba/cpu/io.cpp
+@@ -61,19 +61,25 @@ auto CPU::readIO(uint32 addr) -> uint8 {
+ 
+   //KEYINPUT
+   case 0x04000130: {
+-    static const uint lookup[] = {5, 4, 8, 9, 3, 2, 0, 1};
++    uint port = ID::Port::Hardware;
++    uint device = !system.orientation() ? ID::Device::HorizontalControls : ID::Device::VerticalControls;
++    static const uint lookupHorizontal[] = {5, 4, 8, 9, 3, 2, 0, 1};
++    static const uint lookupVertical[]   = {5, 4, 8, 9, 0, 1, 2, 3};
++    const uint* lookup = !system.orientation() ? lookupHorizontal : lookupVertical;
+     if(auto result = player.keyinput()) return result() >> 0;
+     uint8 result = 0;
+-    for(uint n = 0; n < 8; n++) result |= interface->inputPoll(0, 0, lookup[n]) << n;
++    for(uint n = 0; n < 8; n++) result |= interface->inputPoll(port, device, lookup[n]) << n;
+     if((result & 0xc0) == 0xc0) result &= (uint8)~0xc0;  //up+down cannot be pressed simultaneously
+     if((result & 0x30) == 0x30) result &= (uint8)~0x30;  //left+right cannot be pressed simultaneously
+     return result ^ 0xff;
+   }
+   case 0x04000131: {
+     if(auto result = player.keyinput()) return result() >> 8;
++    uint port = ID::Port::Hardware;
++    uint device = !system.orientation() ? ID::Device::HorizontalControls : ID::Device::VerticalControls;
+     uint8 result = 0;
+-    result |= interface->inputPoll(0, 0, 7) << 0;
+-    result |= interface->inputPoll(0, 0, 6) << 1;
++    result |= interface->inputPoll(port, device, 7) << 0;
++    result |= interface->inputPoll(port, device, 6) << 1;
+     return result ^ 0x03;
+   }
+ 
+diff --git a/higan-hack/higan/gba/gba.hpp b/nSide/higan/gba/gba.hpp
+index 55eddfa..9e7334d 100644
+--- a/higan-hack/higan/gba/gba.hpp
++++ b/nSide/higan/gba/gba.hpp
+@@ -6,13 +6,16 @@
+ #include <emulator/emulator.hpp>
+ #include <emulator/thread.hpp>
+ #include <emulator/scheduler.hpp>
++#include <emulator/cheat.hpp>
+ 
+ #include <processor/arm/arm.hpp>
+ 
+ namespace GameBoyAdvance {
+   using File = Emulator::File;
+   using Scheduler = Emulator::Scheduler;
++  using Cheat = Emulator::Cheat;
+   extern Scheduler scheduler;
++  extern Cheat cheat;
+ 
+   enum : uint {           //mode flags for bus read, write:
+     Nonsequential =   1,  //N cycle
+diff --git a/higan-hack/higan/gba/interface/interface.cpp b/nSide/higan/gba/interface/interface.cpp
+index cb1a480..139eddb 100644
+--- a/higan-hack/higan/gba/interface/interface.cpp
++++ b/nSide/higan/gba/interface/interface.cpp
+@@ -8,19 +8,35 @@ Settings settings;
+ Interface::Interface() {
+   interface = this;
+ 
++  information.preAlpha     = false;
+   information.manufacturer = "Nintendo";
+   information.name         = "Game Boy Advance";
+   information.overscan     = false;
+   information.resettable   = false;
+ 
+   information.capability.states = true;
+-  information.capability.cheats = false;
++  information.capability.cheats = true;
+ 
+-  media.append({ID::GameBoyAdvance, "Game Boy Advance", "gba"});
++  media.append({ID::GameBoyAdvance, "Game Boy Advance", "gba", Domain::Portable});
+ 
+-  Port hardwarePort{ID::Port::Hardware, "Hardware"};
++  Port hardwarePort{ID::Port::Hardware, "Hardware", PlugAndPlay};
+ 
+-  { Device device{ID::Device::Controls, "Controls"};
++  { Device device{ID::Device::HorizontalControls, "Horizontal Controls"};
++    device.inputs.append({0, "Up"    });
++    device.inputs.append({0, "Down"  });
++    device.inputs.append({0, "Left"  });
++    device.inputs.append({0, "Right" });
++    device.inputs.append({0, "B"     });
++    device.inputs.append({0, "A"     });
++    device.inputs.append({0, "L"     });
++    device.inputs.append({0, "R"     });
++    device.inputs.append({0, "Select"});
++    device.inputs.append({0, "Start" });
++    device.inputs.append({2, "Rumble"});
++    hardwarePort.devices.append(device);
++  }
++
++  { Device device{ID::Device::VerticalControls, "Vertical Controls"};
+     device.inputs.append({0, "Up"    });
+     device.inputs.append({0, "Down"  });
+     device.inputs.append({0, "Left"  });
+@@ -47,12 +63,12 @@ auto Interface::title() -> string {
+ }
+ 
+ auto Interface::videoSize() -> VideoSize {
+-  return {240, 160};
++  return {240, 240};
+ }
+ 
+ auto Interface::videoSize(uint width, uint height, bool arc) -> VideoSize {
+   uint w = 240;
+-  uint h = 160;
++  uint h = 240;
+   uint m = min(width / w, height / h);
+   return {w * m, h * m};
+ }
+@@ -108,11 +124,11 @@ auto Interface::unload() -> void {
+   system.unload();
+ }
+ 
+-auto Interface::power() -> void {
+-  system.power();
++auto Interface::connect(uint port, uint device) -> void {
++  if(port == 0 && system.orientation() != device) system.rotate();
+ }
+ 
+-auto Interface::reset() -> void {
++auto Interface::power() -> void {
+   system.power();
+ }
+ 
+@@ -120,6 +136,11 @@ auto Interface::run() -> void {
+   system.run();
+ }
+ 
++auto Interface::rotate() -> void {
++  system.rotate();
++  deviceChanged(0, system.orientation());
++}
++
+ auto Interface::serialize() -> serializer {
+   system.runToSave();
+   return system.serialize();
+@@ -129,6 +150,10 @@ auto Interface::unserialize(serializer& s) -> bool {
+   return system.unserialize(s);
+ }
+ 
++auto Interface::cheatSet(const string_vector& list) -> void {
++  cheat.assign(list);
++}
++
+ auto Interface::cap(const string& name) -> bool {
+   if(name == "Blur Emulation") return true;
+   if(name == "Color Emulation") return true;
+@@ -157,4 +182,21 @@ auto Interface::set(const string& name, const any& value) -> bool {
+   return false;
+ }
+ 
++auto Interface::exportMemory() -> void {
++  string pathname = {path(cartridge.pathID()), "debug/"};
++  directory::create(pathname);
++
++  if(auto fp = interface->open(cartridge.pathID(), "debug/i-work.ram", File::Write)) fp->write(cpu.iwram, 32 * 1024);
++  if(auto fp = interface->open(cartridge.pathID(), "debug/e-work.ram", File::Write)) fp->write(cpu.ewram, 256 * 1024);
++  if(cartridge.sram.size) if(auto fp = interface->open(cartridge.pathID(), "debug/save-static.ram", File::Write)) {
++    fp->write(cartridge.sram.data, cartridge.sram.size);
++  }
++  if(cartridge.eeprom.size) if(auto fp = interface->open(cartridge.pathID(), "debug/save-eeprom.ram", File::Write)) {
++    fp->write(cartridge.eeprom.data, cartridge.eeprom.size);
++  }
++  if(cartridge.flash.size) if(auto fp = interface->open(cartridge.pathID(), "debug/save-flash.ram", File::Write)) {
++    fp->write(cartridge.flash.data, cartridge.flash.size);
++  }
++}
++
+ }
+diff --git a/higan-hack/higan/gba/interface/interface.hpp b/nSide/higan/gba/interface/interface.hpp
+index f5eee4b..94b7fa7 100644
+--- a/higan-hack/higan/gba/interface/interface.hpp
++++ b/nSide/higan/gba/interface/interface.hpp
+@@ -11,7 +11,8 @@ struct ID {
+   };};
+ 
+   struct Device { enum : uint {
+-    Controls,
++    HorizontalControls,
++    VerticalControls,
+   };};
+ };
+ 
+@@ -36,16 +37,22 @@ struct Interface : Emulator::Interface {
+   auto save() -> void override;
+   auto unload() -> void override;
+ 
++  auto connect(uint port, uint device) -> void override;
+   auto power() -> void override;
+-  auto reset() -> void override;
+   auto run() -> void override;
++  auto rotate() -> void override;
+ 
+   auto serialize() -> serializer override;
+   auto unserialize(serializer&) -> bool override;
+ 
++  auto cheatSet(const string_vector&) -> void override;
++
+   auto cap(const string& name) -> bool override;
+   auto get(const string& name) -> any override;
+   auto set(const string& name, const any& value) -> bool override;
++
++  //debugger functions
++  auto exportMemory() -> void override;
+ };
+ 
+ struct Settings {
+diff --git a/higan-hack/higan/gba/ppu/ppu.cpp b/nSide/higan/gba/ppu/ppu.cpp
+index 7b926d0..553845b 100644
+--- a/higan-hack/higan/gba/ppu/ppu.cpp
++++ b/nSide/higan/gba/ppu/ppu.cpp
+@@ -182,7 +182,7 @@ auto PPU::frame() -> void {
+ }
+ 
+ auto PPU::refresh() -> void {
+-  Emulator::video.refresh(output, 240 * sizeof(uint32), 240, 160);
++  Emulator::video.refreshRegion(output, 240 * sizeof(uint32), 0, (240 - 160) / 2, 240, 160);
+ }
+ 
+ }
+diff --git a/higan-hack/higan/gba/system/system.cpp b/nSide/higan/gba/system/system.cpp
+index dfc66e3..83fbfee 100644
+--- a/higan-hack/higan/gba/system/system.cpp
++++ b/nSide/higan/gba/system/system.cpp
+@@ -8,6 +8,7 @@ namespace GameBoyAdvance {
+ BIOS bios;
+ System system;
+ Scheduler scheduler;
++Cheat cheat;
+ 
+ auto System::init() -> void {
+ }
+@@ -18,6 +19,7 @@ auto System::term() -> void {
+ auto System::power() -> void {
+   Emulator::video.reset();
+   Emulator::video.setInterface(interface);
++  Emulator::video.resize(240, 240);
+   configureVideoPalette();
+   configureVideoEffects();
+ 
+@@ -48,6 +50,7 @@ auto System::load() -> bool {
+ 
+   if(!cartridge.load()) return false;
+   serializeInit();
++  _orientation = 0;
+   return _loaded = true;
+ }
+ 
+@@ -72,4 +75,9 @@ auto System::runToSave() -> void {
+   scheduler.synchronize(apu);
+ }
+ 
++auto System::rotate() -> void {
++  _orientation = !_orientation;
++  configureVideoEffects();
++}
++
+ }
+diff --git a/higan-hack/higan/gba/system/system.hpp b/nSide/higan/gba/system/system.hpp
+index 78cdd9d..63396f8 100644
+--- a/higan-hack/higan/gba/system/system.hpp
++++ b/nSide/higan/gba/system/system.hpp
+@@ -16,6 +16,7 @@ struct BIOS {
+ 
+ struct System {
+   auto loaded() const -> bool { return _loaded; }
++  auto orientation() const -> bool { return _orientation; }
+ 
+   auto init() -> void;
+   auto term() -> void;
+@@ -25,6 +26,7 @@ struct System {
+   auto power() -> void;
+   auto run() -> void;
+   auto runToSave() -> void;
++  auto rotate() -> void;
+ 
+   //video.cpp
+   auto configureVideoPalette() -> void;
+@@ -43,6 +45,7 @@ struct System {
+   } information;
+ 
+   bool _loaded = false;
++  bool _orientation = 0;  //0 = horizontal, 1 = vertical
+   uint _serializeSize = 0;
+ };
+ 
+diff --git a/higan-hack/higan/gba/system/video.cpp b/nSide/higan/gba/system/video.cpp
+index f77e7ae..d981e15 100644
+--- a/higan-hack/higan/gba/system/video.cpp
++++ b/nSide/higan/gba/system/video.cpp
+@@ -4,4 +4,6 @@ auto System::configureVideoPalette() -> void {
+ 
+ auto System::configureVideoEffects() -> void {
+   Emulator::video.setEffect(Emulator::Video::Effect::InterframeBlending, settings.blurEmulation);
++  Emulator::video.setEffect(Emulator::Video::Effect::Rotation, !orientation() ? 0 : 3);
++  Emulator::video.clear();
+ }
+

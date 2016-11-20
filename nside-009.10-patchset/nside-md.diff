@@ -1,0 +1,513 @@
+diff --git a/higan/higan/md/bus/bus.cpp b/nSide/higan/md/bus/bus.cpp
+index c69c180..7a6602c 100644
+--- a/higan/higan/md/bus/bus.cpp
++++ b/nSide/higan/md/bus/bus.cpp
+@@ -51,6 +51,8 @@ auto BusCPU::writeWord(uint24 addr, uint16 data) -> void {
+ 
+ auto BusCPU::readIO(uint24 addr) -> uint16 {
+   switch(addr & ~1) {
++  case 0xa10000: return 0x00a0;  //Overseas NTSC (North America), no Mega-CD
++
+   case 0xa10002: return peripherals.controllerPort1->readData();
+   case 0xa10004: return peripherals.controllerPort2->readData();
+   case 0xa10006: return peripherals.extensionPort->readData();
+diff --git a/nSide/higan/md/controller/control-pad/control-pad.cpp b/nSide/higan/md/controller/control-pad/control-pad.cpp
+new file mode 100644
+index 0000000..e7995d5
+--- /dev/null
++++ b/nSide/higan/md/controller/control-pad/control-pad.cpp
+@@ -0,0 +1,31 @@
++ControlPad::ControlPad(uint port) : Controller(port) {
++  select = 1;
++}
++
++auto ControlPad::readData() -> uint8 {
++  uint6 data;
++
++  if(select == 0) {
++    data.bit(0) = interface->inputPoll(port, ID::Device::ControlPad, Up);
++    data.bit(1) = interface->inputPoll(port, ID::Device::ControlPad, Down);
++    data.bit(2) = 1;
++    data.bit(3) = 1;
++    data.bit(4) = interface->inputPoll(port, ID::Device::ControlPad, A);
++    data.bit(5) = interface->inputPoll(port, ID::Device::ControlPad, Start);
++  } else {
++    data.bit(0) = interface->inputPoll(port, ID::Device::ControlPad, Up);
++    data.bit(1) = interface->inputPoll(port, ID::Device::ControlPad, Down);
++    data.bit(2) = interface->inputPoll(port, ID::Device::ControlPad, Left);
++    data.bit(3) = interface->inputPoll(port, ID::Device::ControlPad, Right);
++    data.bit(4) = interface->inputPoll(port, ID::Device::ControlPad, B);
++    data.bit(5) = interface->inputPoll(port, ID::Device::ControlPad, C);
++  }
++
++  data = ~data;
++  return latch << 7 | select << 6 | data;
++}
++
++auto ControlPad::writeData(uint8 data) -> void {
++  select = data.bit(6);
++  latch  = data.bit(7);
++}
+diff --git a/higan/higan/md/controller/gamepad/gamepad.hpp b/nSide/higan/md/controller/control-pad/control-pad.hpp
+similarity index 58%
+rename from higan/higan/md/controller/gamepad/gamepad.hpp
+rename to nSide/higan/md/controller/control-pad/control-pad.hpp
+index f0e9311..6bd061f 100644
+--- a/higan/higan/md/controller/gamepad/gamepad.hpp
++++ b/nSide/higan/md/controller/control-pad/control-pad.hpp
+@@ -1,9 +1,9 @@
+-struct Gamepad : Controller {
++struct ControlPad : Controller {
+   enum : uint {
+-    Up, Down, Left, Right, A, B, C, X, Y, Z, Start,
++    Up, Down, Left, Right, A, B, C, Start,
+   };
+ 
+-  Gamepad(uint port);
++  ControlPad(uint port);
+ 
+   auto readData() -> uint8 override;
+   auto writeData(uint8 data) -> void override;
+diff --git a/higan/higan/md/controller/controller.cpp b/nSide/higan/md/controller/controller.cpp
+index 96195fb..4a734df 100644
+--- a/higan/higan/md/controller/controller.cpp
++++ b/nSide/higan/md/controller/controller.cpp
+@@ -2,13 +2,15 @@
+ 
+ namespace MegaDrive {
+ 
+-#include "gamepad/gamepad.cpp"
++#include "control-pad/control-pad.cpp"
++#include "fighting-pad-6b/fighting-pad-6b.cpp"
+ 
+ Controller::Controller(uint port) : port(port) {
+   if(!handle()) create(Controller::Enter, 100);
+ }
+ 
+ Controller::~Controller() {
++  scheduler.remove(*this);
+ }
+ 
+ auto Controller::Enter() -> void {
+diff --git a/higan/higan/md/controller/controller.hpp b/nSide/higan/md/controller/controller.hpp
+index a2f2301..41bc35d 100644
+--- a/higan/higan/md/controller/controller.hpp
++++ b/nSide/higan/md/controller/controller.hpp
+@@ -1,9 +1,26 @@
++//Mega Drive controller port pinout:
++//  ___________________
++// /(1) (2) (3) (4) (5)\
++//  \ (6) (7) (8) (9) /
++//   \---------------/
++//
++// pin  name   port1        port2
++//  1:  up     $a10003.d0   $a10005.d0
++//  2:  down   $a10003.d1   $a10005.d1
++//  3:  left   $a10003.d2   $a10005.d2
++//  4:  right  $a10003.d3   $a10005.d3
++//  5:  +5v
++//  6:  tl     $a10003.d4   $a10005.d4
++//  7:  th     $a10003.d6   $a10005.d6
++//  8:  gnd
++//  9:  tr     $a10003.d5   $a10005.d5
++
+ struct Controller : Thread {
+   Controller(uint port);
+   virtual ~Controller();
+ 
+   static auto Enter() -> void;
+-  auto main() -> void;
++  virtual auto main() -> void;
+ 
+   virtual auto readData() -> uint8 { return 0xff; }
+   virtual auto writeData(uint8 data) -> void {}
+@@ -14,4 +31,5 @@ struct Controller : Thread {
+   const uint port;
+ };
+ 
+-#include "gamepad/gamepad.hpp"
++#include "control-pad/control-pad.hpp"
++#include "fighting-pad-6b/fighting-pad-6b.hpp"
+diff --git a/nSide/higan/md/controller/fighting-pad-6b/fighting-pad-6b.cpp b/nSide/higan/md/controller/fighting-pad-6b/fighting-pad-6b.cpp
+new file mode 100644
+index 0000000..a7052e2
+--- /dev/null
++++ b/nSide/higan/md/controller/fighting-pad-6b/fighting-pad-6b.cpp
+@@ -0,0 +1,55 @@
++FightingPad6B::FightingPad6B(uint port) : Controller(port) {
++  create(Controller::Enter, 1'000'000.0);
++  select = 1;
++}
++
++auto FightingPad6B::main() -> void {
++  if(timeout) timeout -= 1;
++  else        counter  = 0;
++  step(1);
++  synchronize(cpu);
++}
++
++auto FightingPad6B::readData() -> uint8 {
++  uint6 data;
++
++  if(select == 0) {
++    if(counter != 2 && counter != 3) {
++      data.bit(0) = interface->inputPoll(port, ID::Device::FightingPad6B, Up);
++      data.bit(1) = interface->inputPoll(port, ID::Device::FightingPad6B, Down);
++      data.bits(2,3) = ~0;
++    } else if(counter == 2) {
++      data.bits(0,3) = ~0;  //needed for controller detection
++    } else if(counter == 3) {
++      data.bits(0,3) =  0;
++    }
++    data.bit(4) = interface->inputPoll(port, ID::Device::FightingPad6B, A);
++    data.bit(5) = interface->inputPoll(port, ID::Device::FightingPad6B, Start);
++  } else if(select == 1) {
++    if(counter != 3) {
++      data.bit(0) = interface->inputPoll(port, ID::Device::FightingPad6B, Up);
++      data.bit(1) = interface->inputPoll(port, ID::Device::FightingPad6B, Down);
++      data.bit(2) = interface->inputPoll(port, ID::Device::FightingPad6B, Left);
++      data.bit(3) = interface->inputPoll(port, ID::Device::FightingPad6B, Right);
++      data.bit(4) = interface->inputPoll(port, ID::Device::FightingPad6B, B);
++      data.bit(5) = interface->inputPoll(port, ID::Device::FightingPad6B, C);
++    } else {
++      data.bit(0) = interface->inputPoll(port, ID::Device::FightingPad6B, Z);
++      data.bit(1) = interface->inputPoll(port, ID::Device::FightingPad6B, Y);
++      data.bit(2) = interface->inputPoll(port, ID::Device::FightingPad6B, X);
++      data.bit(3) = interface->inputPoll(port, ID::Device::FightingPad6B, Mode);
++      data.bits(4,5) = 0;
++    }
++  }
++
++  data = ~data;
++  return latch << 7 | select << 6 | data;
++}
++
++auto FightingPad6B::writeData(uint8 data) -> void {
++  if(!select && data.bit(6)) counter = (counter + 1) % 5;
++  select = data.bit(6);
++  timeout = 1607;
++
++  latch  = data.bit(7);
++}
+diff --git a/nSide/higan/md/controller/fighting-pad-6b/fighting-pad-6b.hpp b/nSide/higan/md/controller/fighting-pad-6b/fighting-pad-6b.hpp
+new file mode 100644
+index 0000000..ebe5fef
+--- /dev/null
++++ b/nSide/higan/md/controller/fighting-pad-6b/fighting-pad-6b.hpp
+@@ -0,0 +1,16 @@
++struct FightingPad6B : Controller {
++  enum : uint {
++    Up, Down, Left, Right, A, B, C, X, Y, Z, Start, Mode,
++  };
++
++  FightingPad6B(uint port);
++
++  auto main() -> void override;
++  auto readData() -> uint8 override;
++  auto writeData(uint8 data) -> void override;
++
++  boolean select;
++  boolean latch;
++  uint3 counter;
++  uint timeout;
++};
+diff --git a/higan/higan/md/controller/gamepad/gamepad.cpp b/higan/higan/md/controller/gamepad/gamepad.cpp
+deleted file mode 100644
+index 516dd61..0000000
+--- a/higan/higan/md/controller/gamepad/gamepad.cpp
++++ /dev/null
+@@ -1,30 +0,0 @@
+-Gamepad::Gamepad(uint port) : Controller(port) {
+-}
+-
+-auto Gamepad::readData() -> uint8 {
+-  uint6 data;
+-
+-  if(select == 0) {
+-    data.bit(0) = interface->inputPoll(port, ID::Device::Gamepad, Up);
+-    data.bit(1) = interface->inputPoll(port, ID::Device::Gamepad, Down);
+-    data.bit(2) = 1;
+-    data.bit(3) = 1;
+-    data.bit(4) = interface->inputPoll(port, ID::Device::Gamepad, A);
+-    data.bit(5) = interface->inputPoll(port, ID::Device::Gamepad, Start);
+-  } else {
+-    data.bit(0) = interface->inputPoll(port, ID::Device::Gamepad, Up);
+-    data.bit(1) = interface->inputPoll(port, ID::Device::Gamepad, Down);
+-    data.bit(2) = interface->inputPoll(port, ID::Device::Gamepad, Left);
+-    data.bit(3) = interface->inputPoll(port, ID::Device::Gamepad, Right);
+-    data.bit(4) = interface->inputPoll(port, ID::Device::Gamepad, B);
+-    data.bit(5) = interface->inputPoll(port, ID::Device::Gamepad, C);
+-  }
+-
+-  data = ~data;
+-  return latch << 7 | select << 6 | data;
+-}
+-
+-auto Gamepad::writeData(uint8 data) -> void {
+-  select = data.bit(6);
+-  latch  = data.bit(7);
+-}
+diff --git a/higan/higan/md/interface/interface.cpp b/nSide/higan/md/interface/interface.cpp
+index 757d1d2..b44014a 100644
+--- a/higan/higan/md/interface/interface.cpp
++++ b/nSide/higan/md/interface/interface.cpp
+@@ -7,7 +7,9 @@ Settings settings;
+ 
+ Interface::Interface() {
+   interface = this;
++  system.init();
+ 
++  information.preAlpha     = true;
+   information.manufacturer = "Sega";
+   information.name         = "Mega Drive";
+   information.overscan     = true;
+@@ -16,11 +18,11 @@ Interface::Interface() {
+   information.capability.states = false;
+   information.capability.cheats = false;
+ 
+-  media.append({ID::MegaDrive, "Mega Drive", "md"});
++  media.append({ID::MegaDrive, "Mega Drive", "md", Domain::Home});
+ 
+-  Port controllerPort1{ID::Port::Controller1, "Controller Port 1"};
+-  Port controllerPort2{ID::Port::Controller2, "Controller Port 2"};
+-  Port extensionPort{ID::Port::Extension, "Extension Port"};
++  Port controllerPort1{ID::Port::Controller1, "Controller Port 1", PlugAndPlay};
++  Port controllerPort2{ID::Port::Controller2, "Controller Port 2", PlugAndPlay};
++  Port extensionPort{ID::Port::Extension, "Extension Port", PlugAndPlay};
+ 
+   { Device device{ID::Device::None, "None"};
+     controllerPort1.devices.append(device);
+@@ -28,7 +30,20 @@ Interface::Interface() {
+     extensionPort.devices.append(device);
+   }
+ 
+-  { Device device{ID::Device::Gamepad, "Gamepad"};
++  { Device device{ID::Device::ControlPad, "Control Pad"};
++    device.inputs.append({0, "Up"   });
++    device.inputs.append({0, "Down" });
++    device.inputs.append({0, "Left" });
++    device.inputs.append({0, "Right"});
++    device.inputs.append({0, "A"    });
++    device.inputs.append({0, "B"    });
++    device.inputs.append({0, "C"    });
++    device.inputs.append({0, "Start"});
++    controllerPort1.devices.append(device);
++    controllerPort2.devices.append(device);
++  }
++
++  { Device device{ID::Device::FightingPad6B, "Fighting Pad 6B"};
+     device.inputs.append({0, "Up"   });
+     device.inputs.append({0, "Down" });
+     device.inputs.append({0, "Left" });
+@@ -40,6 +55,7 @@ Interface::Interface() {
+     device.inputs.append({0, "Y"    });
+     device.inputs.append({0, "Z"    });
+     device.inputs.append({0, "Start"});
++    device.inputs.append({0, "Mode" });
+     controllerPort1.devices.append(device);
+     controllerPort2.devices.append(device);
+   }
+@@ -62,10 +78,14 @@ auto Interface::videoSize() -> VideoSize {
+ }
+ 
+ auto Interface::videoSize(uint width, uint height, bool arc) -> VideoSize {
+-  uint w = 320;
++  double w = 320;
++  if(arc) {
++    double squarePixelRate = 135.0 / 22.0 * 1'000'000.0;
++    w *= squarePixelRate / (system.colorburst() * 15.0 / 8.0);
++  }
+   uint h = 240;
+-  uint m = min(width / w, height / h);
+-  return {w * m, h * m};
++  uint m = min((uint)(width / w), height / h);
++  return {(uint)(w * m), h * m};
+ }
+ 
+ auto Interface::videoFrequency() -> double {
+@@ -73,17 +93,33 @@ auto Interface::videoFrequency() -> double {
+ }
+ 
+ auto Interface::videoColors() -> uint32 {
+-  return 1 << 9;
++  return (1 << 9) * 3;
+ }
+ 
+ auto Interface::videoColor(uint32 color) -> uint64 {
+   uint R = color.bits(0,2);
+   uint G = color.bits(3,5);
+   uint B = color.bits(6,8);
++  uint intensity = color.bits(9,10);
++
++  switch(intensity) {
++  case 0:  //shadow
++    break;
++  case 1:  //normal
++    R <<= 1;
++    G <<= 1;
++    B <<= 1;
++    break;
++  case 2:  //highlight
++    R += 7;
++    G += 7;
++    B += 7;
++    break;
++  }
+ 
+-  uint64 r = image::normalize(R, 3, 16);
+-  uint64 g = image::normalize(G, 3, 16);
+-  uint64 b = image::normalize(B, 3, 16);
++  uint64 r = image::normalize(R, 4, 16) + image::normalize(R, 4, 16) / 14;
++  uint64 g = image::normalize(G, 4, 16) + image::normalize(G, 4, 16) / 14;
++  uint64 b = image::normalize(B, 4, 16) + image::normalize(B, 4, 16) / 14;
+ 
+   return r << 32 | g << 16 | b << 0;
+ }
+diff --git a/higan/higan/md/interface/interface.hpp b/nSide/higan/md/interface/interface.hpp
+index 2eda14c..8b76de7 100644
+--- a/higan/higan/md/interface/interface.hpp
++++ b/nSide/higan/md/interface/interface.hpp
+@@ -14,7 +14,8 @@ struct ID {
+ 
+   struct Device { enum : uint {
+     None,
+-    Gamepad,
++    ControlPad,
++    FightingPad6B,
+   };};
+ };
+ 
+diff --git a/higan/higan/md/system/peripherals.cpp b/nSide/higan/md/system/peripherals.cpp
+index 1afb147..9e0d186 100644
+--- a/higan/higan/md/system/peripherals.cpp
++++ b/nSide/higan/md/system/peripherals.cpp
+@@ -22,8 +22,9 @@ auto Peripherals::connect(uint port, uint device) -> void {
+ 
+     delete controllerPort1;
+     switch(device) { default:
+-    case ID::Device::None:    controllerPort1 = new Controller(0); break;
+-    case ID::Device::Gamepad: controllerPort1 = new Gamepad(0); break;
++    case ID::Device::None:          controllerPort1 = new Controller(0); break;
++    case ID::Device::ControlPad:    controllerPort1 = new ControlPad(0); break;
++    case ID::Device::FightingPad6B: controllerPort1 = new FightingPad6B(0); break;
+     }
+   }
+ 
+@@ -33,8 +34,9 @@ auto Peripherals::connect(uint port, uint device) -> void {
+ 
+     delete controllerPort2;
+     switch(device) { default:
+-    case ID::Device::None:    controllerPort2 = new Controller(1); break;
+-    case ID::Device::Gamepad: controllerPort2 = new Gamepad(1); break;
++    case ID::Device::None:          controllerPort2 = new Controller(1); break;
++    case ID::Device::ControlPad:    controllerPort2 = new ControlPad(1); break;
++    case ID::Device::FightingPad6B: controllerPort2 = new FightingPad6B(1); break;
+     }
+   }
+ 
+diff --git a/higan/higan/md/system/system.cpp b/nSide/higan/md/system/system.cpp
+index 5ad4ccb..21e0d5d 100644
+--- a/higan/higan/md/system/system.cpp
++++ b/nSide/higan/md/system/system.cpp
+@@ -10,6 +10,10 @@ auto System::run() -> void {
+   if(scheduler.enter() == Scheduler::Event::Frame) vdp.refresh();
+ }
+ 
++auto System::init() -> void {
++  assert(interface != nullptr);
++}
++
+ auto System::load() -> bool {
+   information = Information();
+   if(auto fp = interface->open(ID::System, "manifest.bml", File::Read, File::Required)) {
+@@ -22,12 +26,16 @@ auto System::load() -> bool {
+ }
+ 
+ auto System::save() -> void {
++  if(!loaded()) return;
+   cartridge.save();
+ }
+ 
+ auto System::unload() -> void {
++  if(!loaded()) return;
+   peripherals.unload();
++
+   cartridge.unload();
++  information.loaded = false;
+ }
+ 
+ auto System::power() -> void {
+diff --git a/higan/higan/md/system/system.hpp b/nSide/higan/md/system/system.hpp
+index ae3d905..21242e0 100644
+--- a/higan/higan/md/system/system.hpp
++++ b/nSide/higan/md/system/system.hpp
+@@ -4,6 +4,7 @@ struct System {
+ 
+   auto run() -> void;
+ 
++  auto init() -> void;
+   auto load() -> bool;
+   auto save() -> void;
+   auto unload() -> void;
+diff --git a/higan/higan/md/vdp/render.cpp b/nSide/higan/md/vdp/render.cpp
+index ea456bb..b5ec5d2 100644
+--- a/higan/higan/md/vdp/render.cpp
++++ b/nSide/higan/md/vdp/render.cpp
+@@ -24,6 +24,7 @@ auto VDP::run() -> void {
+   sprite.run(state.x, state.y);
+ 
+   auto output = io.backgroundColor;
++  uint2 intensity = 1;
+   if(auto color = planeB.output.color) output = color;
+   if(auto color = planeA.output.color) output = color;
+   if(auto color = sprite.output.color) output = color;
+@@ -31,14 +32,15 @@ auto VDP::run() -> void {
+   if(planeA.output.priority) if(auto color = planeA.output.color) output = color;
+   if(sprite.output.priority) if(auto color = sprite.output.color) output = color;
+ 
+-  outputPixel(cram[output]);
++  outputPixel(cram[output] | intensity << 9);
+   state.x++;
+ }
+ 
+-auto VDP::outputPixel(uint9 color) -> void {
+-  for(auto n : range(4)) {
++auto VDP::outputPixel(uint11 color) -> void {
++  uint pixelWidth = screenWidth() == 256 ? 5 : 4;
++  for(auto n : range(pixelWidth)) {
+     state.output[   0 + n] = color;
+     state.output[1280 + n] = color;
+   }
+-  state.output += 4;
++  state.output += pixelWidth;
+ }
+diff --git a/higan/higan/md/vdp/vdp.cpp b/nSide/higan/md/vdp/vdp.cpp
+index 5ebf734..200010a 100644
+--- a/higan/higan/md/vdp/vdp.cpp
++++ b/nSide/higan/md/vdp/vdp.cpp
+@@ -20,9 +20,9 @@ auto VDP::main() -> void {
+       cpu.lower(CPU::Interrupt::VerticalBlank);
+     }
+     cpu.lower(CPU::Interrupt::HorizontalBlank);
+-    for(uint x : range(320)) {
++    for(uint x : range(screenWidth())) {
+       run();
+-      step(4);
++      step(screenWidth() == 256 ? 5 : 4);
+     }
+     if(io.horizontalBlankInterruptEnable) {
+       cpu.raise(CPU::Interrupt::HorizontalBlank);
+diff --git a/higan/higan/md/vdp/vdp.hpp b/nSide/higan/md/vdp/vdp.hpp
+index 8eb1ec3..4422264 100644
+--- a/higan/higan/md/vdp/vdp.hpp
++++ b/nSide/higan/md/vdp/vdp.hpp
+@@ -28,7 +28,7 @@ struct VDP : Thread {
+   //render.cpp
+   auto scanline() -> void;
+   auto run() -> void;
+-  auto outputPixel(uint9 color) -> void;
++  auto outputPixel(uint11 color) -> void;
+ 
+   //background.cpp
+   struct Background {
+

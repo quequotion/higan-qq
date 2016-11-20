@@ -1,0 +1,1391 @@
+diff --git a/nSide-hack/icarus/GNUmakefile b/nSide-hack/icarus/GNUmakefile
+index fc201db..84ebce5 100644
+--- a/nSide-hack/icarus/GNUmakefile
++++ b/nSide-hack/icarus/GNUmakefile
+@@ -1,7 +1,7 @@
+ include ../nall/GNUmakefile
+ include ../hiro/GNUmakefile
+ 
+-name := icarus
++name := cart-pal
+ flags += -I.. -O3
+ link +=
+ 
+@@ -10,7 +10,7 @@ ifeq ($(platform),windows)
+ endif
+ 
+ objects := obj/hiro.o
+-objects += obj/icarus.o
++objects += obj/cart-pal.o
+ objects += $(if $(call streq,$(platform),windows),obj/resource.o)
+ 
+ all: $(objects)
+@@ -25,8 +25,8 @@ endif
+ obj/hiro.o: ../hiro/hiro.cpp
+ 	$(compiler) $(hiroflags) -o obj/hiro.o -c ../hiro/hiro.cpp
+ 
+-obj/icarus.o: icarus.cpp $(call rwildcard,core/) $(call rwildcard,heuristics/) $(call rwildcard,ui/)
+-	$(compiler) $(cppflags) $(flags) -o obj/icarus.o -c icarus.cpp
++obj/cart-pal.o: icarus.cpp $(call rwildcard,core/) $(call rwildcard,heuristics/) $(call rwildcard,ui/)
++	$(compiler) $(cppflags) $(flags) -o obj/cart-pal.o -c icarus.cpp
+ 
+ obj/resource.o:
+ 	windres ../hiro/windows/hiro.rc obj/resource.o
+diff --git a/nSide-hack/icarus/icarus.cpp b/nSide-hack/icarus/icarus.cpp
+index 4160655..8fe4e23 100644
+--- a/nSide-hack/icarus/icarus.cpp
++++ b/nSide-hack/icarus/icarus.cpp
+@@ -8,11 +8,11 @@ auto locate(string name) -> string {
+   string location = {Path::program(), name};
+   if(inode::exists(location)) return location;
+ 
+-  location = {Path::config(), "icarus/", name};
++  location = {Path::config(), "cart-pal/", name};
+   if(inode::exists(location)) return location;
+ 
+-  directory::create({Path::local(), "icarus/"});
+-  return {Path::local(), "icarus/", name};
++  directory::create({Path::local(), "cart-pal/"});
++  return {Path::local(), "cart-pal/", name};
+ }
+ 
+ #include "settings.cpp"
+@@ -76,7 +76,7 @@ auto nall::main(string_vector args) -> void {
+   if(args.size() == 2 && args[1] == "--import") {
+     if(string source = BrowserDialog()
+     .setTitle("Load ROM Image")
+-    .setPath(settings["icarus/Path"].text())
++    .setPath(settings["cart-pal/Path"].text())
+     .setFilters("ROM Files|"
+       "*.a26:"
+       "*.fc:*.nes:"
+@@ -96,8 +96,8 @@ auto nall::main(string_vector args) -> void {
+       "*.st:"
+       "*.zip"
+     ).openFile()) {
+       if(string target = icarus.import(source)) {
+-        settings["icarus/Path"].setValue(Location::path(source));
++        settings["cart-pal/Path"].setValue(Location::path(source));
+         return print(target, "\n");
+       }
+     }
+@@ -110,11 +110,12 @@ auto nall::main(string_vector args) -> void {
+   new ErrorDialog;
+   #if defined(PLATFORM_MACOSX)
+   Application::Cocoa::onAbout([&] {
+-    MessageDialog().setTitle("About icarus").setText({
+-      "icarus\n\n"
+-      "Author: byuu\n"
++    MessageDialog().setTitle("About cart-pal").setText({
++      "cart-pal\n\n"
++      "Based on icarus by byuu\n"
++      "Famicom Additions Author: hex_usr\n"
+       "License: GPLv3\n"
+-      "Website: http://byuu.org/\n"
++      "icarus Website: http://byuu.org/\n"
+     }).information();
+   });
+   Application::Cocoa::onPreferences([&] {
+diff --git a/nSide-hack/icarus/icarus.plist b/nSide-hack/icarus/icarus.plist
+index 658bece..d6be182 100644
+--- a/nSide-hack/icarus/icarus.plist
++++ b/nSide-hack/icarus/icarus.plist
+@@ -3,14 +3,14 @@
+ <plist version="1.0">
+ <dict>
+   <key>CFBundleIdentifier</key>
+-  <string>org.byuu.board.icarus</string>
++  <string>org.byuu.board.cart-pal</string>
+   <key>CFBundleDisplayName</key>
+-  <string>icarus</string>
++  <string>cart-pal</string>
+   <key>CFBundleExecutable</key>
+-  <string>icarus</string>
++  <string>cart-pal</string>
+   <!--
+   <key>CFBundleIconFile</key>
+-  <string>icarus.icns</string>
++  <string>cart-pal.icns</string>
+   -->
+   <key>NSHighResolutionCapable</key>
+   <false/>
+diff --git a/nSide-hack/icarus/core/atari-2600.cpp b/nSide-hack/icarus/core/atari-2600.cpp
+index 4ecfc68..8a690d4 100644
+--- a/nSide-hack/icarus/core/atari-2600.cpp
++++ b/nSide-hack/icarus/core/atari-2600.cpp
+@@ -7,7 +7,7 @@
+ auto Icarus::atari2600Manifest(vector<uint8_t>& buffer, string location) -> string {
+   string manifest;
+ 
+-  if(settings["icarus/UseDatabase"].boolean() && !manifest) {
++  if(settings["cart-pal/UseDatabase"].boolean() && !manifest) {
+     string digest = Hash::SHA256(buffer.data(), buffer.size()).digest();
+     for(auto node : database.atari2600) {
+       if(node["sha256"].text() == digest) {
+@@ -17,7 +17,7 @@ auto Icarus::atari2600Manifest(vector<uint8_t>& buffer, string location) -> stri
+     }
+   }
+ 
+-  if(settings["icarus/UseHeuristics"].boolean() && !manifest) {
++  if(settings["cart-pal/UseHeuristics"].boolean() && !manifest) {
+     Atari2600Cartridge cartridge{location, buffer.data(), buffer.size()};
+     manifest = cartridge.manifest;
+   }
+@@ -39,7 +39,7 @@ auto Icarus::atari2600Import(vector<uint8_t>& buffer, string location) -> string
+     file::copy({source, name, ".sav"}, {target, "save.ram"});
+   }
+ 
+-  if(settings["icarus/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, manifest);
++  if(settings["cart-pal/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, manifest);
+   file::write({target, "program.rom"}, buffer);
+   return success(target);
+ }
+diff --git a/nSide-hack/icarus/core/bs-memory.cpp b/nSide-hack/icarus/core/bs-memory.cpp
+index 65a46d6..66923bf 100644
+--- a/nSide-hack/icarus/core/bs-memory.cpp
++++ b/nSide-hack/icarus/core/bs-memory.cpp
+@@ -8,7 +8,7 @@
+   string markup;
+   string digest = Hash::SHA256(buffer.data(), buffer.size()).digest();
+ 
+-  if(settings["icarus/UseDatabase"].boolean() && !markup) {
++  if(settings["cart-pal/UseDatabase"].boolean() && !markup) {
+     for(auto node : database.bsMemory) {
+       if(node["sha256"].text() == digest) {
+         markup.append(node.text(), "\n  sha256:   ", digest, "\n");
+@@ -17,14 +17,14 @@
+     }
+   }
+ 
+-  if(settings["icarus/UseHeuristics"].boolean() && !markup) {
++  if(settings["cart-pal/UseHeuristics"].boolean() && !markup) {
+     BSMemoryCartridge cartridge{buffer.data(), buffer.size()};
+     if(markup = cartridge.markup) {
+       markup.append("\n");
+       markup.append("information\n");
+       markup.append("  title:  ", Location::prefix(location), "\n");
+       markup.append("  sha256: ", digest, "\n");
+-      markup.append("  note:   ", "heuristically generated by icarus\n");
++      markup.append("  note:   ", "heuristically generated by cart-pal\n");
+     }
+   }
+ 
+@@ -41,7 +41,7 @@ auto Icarus::bsMemoryImport(vector<uint8_t>& buffer, string location) -> string
+   if(!markup) return failure("failed to parse ROM image");
+   if(!directory::create(target)) return failure("library path unwritable");
+ 
+-  if(settings["icarus/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
++  if(settings["cart-pal/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
+   file::write({target, "program.rom"}, buffer);
+   return success(target);
+ }
+diff --git a/nSide-hack/icarus/core/famicom.cpp b/nSide-hack/icarus/core/famicom.cpp
+index ec63d0d..3dd21cc 100644
+--- a/nSide-hack/icarus/core/famicom.cpp
++++ b/nSide-hack/icarus/core/famicom.cpp
+@@ -15,7 +15,7 @@ auto Icarus::famicomManifest(vector<uint8_t>& buffer, string location, uint* prg
+   || buffer.data()[3] !=  26) offset = 0;
+   string digest = Hash::SHA256(buffer.data() + offset, buffer.size() - offset).digest();
+ 
+-  if(settings["icarus/UseDatabase"].boolean() && !markup) {
++  if(settings["cart-pal/UseDatabase"].boolean() && !markup) {
+     for(auto node : database.famicom) {
+       if(node["sha256"].text() == digest) {
+         markup.append(node.text(), "\n  sha256:   ", digest, "\n");
+@@ -24,7 +24,7 @@ auto Icarus::famicomManifest(vector<uint8_t>& buffer, string location, uint* prg
+     }
+   }
+ 
+-  if(settings["icarus/UseHeuristics"].boolean() && !markup) {
++  if(settings["cart-pal/UseHeuristics"].boolean() && !markup) {
+     FamicomCartridge cartridge{buffer.data(), buffer.size()};
+     if(markup = cartridge.markup) {
+       markup.append("\n");
+@@ -32,7 +32,7 @@ auto Icarus::famicomManifest(vector<uint8_t>& buffer, string location, uint* prg
+       markup.append("  region: ", cartridge.region == 0 ? "NTSC" : "PAL", "\n");
+       markup.append("  title:  ", Location::prefix(location), "\n");
+       markup.append("  sha256: ", digest, "\n");
+-      markup.append("  note:   ", "heuristically generated by icarus\n");
++      markup.append("  note:   ", "heuristically generated by cart-pal\n");
+     }
+   }
+ 
+@@ -83,7 +83,7 @@ auto Icarus::famicomImport(vector<uint8_t>& buffer, string location) -> string {
+     file::copy({source, name, ".sav"}, {target, "save.ram"});
+   }
+ 
+-  if(settings["icarus/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
++  if(settings["cart-pal/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
+   for(auto rom : roms) {
+     auto name = rom["name"].text();
+     auto size = rom["size"].natural();
+diff --git a/nSide-hack/icarus/core/game-boy-advance.cpp b/nSide-hack/icarus/core/game-boy-advance.cpp
+index 40cfdbb..c608a8f 100644
+--- a/nSide-hack/icarus/core/game-boy-advance.cpp
++++ b/nSide-hack/icarus/core/game-boy-advance.cpp
+@@ -8,7 +8,7 @@
+   string markup;
+   string digest = Hash::SHA256(buffer.data(), buffer.size()).digest();
+ 
+-  if(settings["icarus/UseDatabase"].boolean() && !markup) {
++  if(settings["cart-pal/UseDatabase"].boolean() && !markup) {
+     for(auto node : database.gameBoyAdvance) {
+       if(node["sha256"].text() == digest) {
+         markup.append(node.text(), "\n  sha256:   ", digest, "\n");
+@@ -17,14 +17,14 @@
+     }
+   }
+ 
+-  if(settings["icarus/UseHeuristics"].boolean() && !markup) {
++  if(settings["cart-pal/UseHeuristics"].boolean() && !markup) {
+     GameBoyAdvanceCartridge cartridge{buffer.data(), buffer.size()};
+     if(markup = cartridge.markup) {
+       markup.append("\n");
+       markup.append("information\n");
+       markup.append("  title:  ", Location::prefix(location), "\n");
+       markup.append("  sha256: ", digest, "\n");
+-      markup.append("  note:   ", "heuristically generated by icarus\n");
++      markup.append("  note:   ", "heuristically generated by cart-pal\n");
+     }
+   }
+ 
+@@ -45,7 +45,7 @@ auto Icarus::gameBoyAdvanceImport(vector<uint8_t>& buffer, string location) -> s
+     file::copy({source, name, ".sav"}, {target, "save.ram"});
+   }
+ 
+-  if(settings["icarus/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
++  if(settings["cart-pal/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
+   file::write({target, "program.rom"}, buffer);
+   return success(target);
+ }
+diff --git a/nSide-hack/icarus/core/game-boy-color.cpp b/nSide-hack/icarus/core/game-boy-color.cpp
+index db18c82..4d98e7a 100644
+--- a/nSide-hack/icarus/core/game-boy-color.cpp
++++ b/nSide-hack/icarus/core/game-boy-color.cpp
+@@ -8,7 +8,7 @@
+   string markup;
+   string digest = Hash::SHA256(buffer.data(), buffer.size()).digest();
+ 
+-  if(settings["icarus/UseDatabase"].boolean() && !markup) {
++  if(settings["cart-pal/UseDatabase"].boolean() && !markup) {
+     for(auto node : database.gameBoyColor) {
+       if(node["sha256"].text() == digest) {
+         markup.append(node.text(), "\n  sha256:   ", digest, "\n");
+@@ -17,14 +17,14 @@
+     }
+   }
+ 
+-  if(settings["icarus/UseHeuristics"].boolean() && !markup) {
++  if(settings["cart-pal/UseHeuristics"].boolean() && !markup) {
+     GameBoyCartridge cartridge{buffer.data(), buffer.size()};
+     if(markup = cartridge.markup) {
+       markup.append("\n");
+       markup.append("information\n");
+       markup.append("  title:  ", Location::prefix(location), "\n");
+       markup.append("  sha256: ", digest, "\n");
+-      markup.append("  note:   ", "heuristically generated by icarus\n");
++      markup.append("  note:   ", "heuristically generated by cart-pal\n");
+     }
+   }
+ 
+@@ -45,7 +45,7 @@ auto Icarus::gameBoyColorImport(vector<uint8_t>& buffer, string location) -> str
+     file::copy({source, name, ".sav"}, {target, "save.ram"});
+   }
+ 
+-  if(settings["icarus/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
++  if(settings["cart-pal/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
+   file::write({target, "program.rom"}, buffer);
+   return success(target);
+ }
+diff --git a/nSide-hack/icarus/core/game-boy.cpp b/nSide-hack/icarus/core/game-boy.cpp
+index 126c824..03becd1 100644
+--- a/nSide-hack/icarus/core/game-boy.cpp
++++ b/nSide-hack/icarus/core/game-boy.cpp
+@@ -8,7 +8,7 @@
+   string markup;
+   string digest = Hash::SHA256(buffer.data(), buffer.size()).digest();
+ 
+-  if(settings["icarus/UseDatabase"].boolean() && !markup) {
++  if(settings["cart-pal/UseDatabase"].boolean() && !markup) {
+     for(auto node : database.gameBoy) {
+       if(node["sha256"].text() == digest) {
+         markup.append(node.text(), "\n  sha256:   ", digest, "\n");
+@@ -17,14 +17,14 @@
+     }
+   }
+ 
+-  if(settings["icarus/UseHeuristics"].boolean() && !markup) {
++  if(settings["cart-pal/UseHeuristics"].boolean() && !markup) {
+     GameBoyCartridge cartridge{buffer.data(), buffer.size()};
+     if(markup = cartridge.markup) {
+       markup.append("\n");
+       markup.append("information\n");
+       markup.append("  title:  ", Location::prefix(location), "\n");
+       markup.append("  sha256: ", digest, "\n");
+-      markup.append("  note:   ", "heuristically generated by icarus\n");
++      markup.append("  note:   ", "heuristically generated by cart-pal\n");
+     }
+   }
+ 
+@@ -45,7 +45,7 @@ auto Icarus::gameBoyImport(vector<uint8_t>& buffer, string location) -> string {
+     file::copy({source, name, ".sav"}, {target, "save.ram"});
+   }
+ 
+-  if(settings["icarus/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
++  if(settings["cart-pal/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
+   file::write({target, "program.rom"}, buffer);
+   return success(target);
+ }
+diff --git a/nSide-hack/icarus/core/game-gear.cpp b/nSide-hack/icarus/core/game-gear.cpp
+index 40b7b6b..2df490f 100644
+--- a/nSide-hack/icarus/core/game-gear.cpp
++++ b/nSide-hack/icarus/core/game-gear.cpp
+@@ -7,7 +7,7 @@
+ auto Icarus::gameGearManifest(vector<uint8_t>& buffer, string location) -> string {
+   string manifest;
+ 
+-  if(settings["icarus/UseDatabase"].boolean() && !manifest) {
++  if(settings["cart-pal/UseDatabase"].boolean() && !manifest) {
+     string digest = Hash::SHA256(buffer.data(), buffer.size()).digest();
+     for(auto node : database.gameGear) {
+       if(node["sha256"].text() == digest) {
+@@ -17,7 +17,7 @@ auto Icarus::gameGearManifest(vector<uint8_t>& buffer, string location) -> strin
+     }
+   }
+ 
+-  if(settings["icarus/UseHeuristics"].boolean() && !manifest) {
++  if(settings["cart-pal/UseHeuristics"].boolean() && !manifest) {
+     GameGearCartridge cartridge{location, buffer.data(), buffer.size()};
+     manifest = cartridge.manifest;
+   }
+@@ -39,7 +39,7 @@ auto Icarus::gameGearImport(vector<uint8_t>& buffer, string location) -> string
+     file::copy({source, name, ".sav"}, {target, "save.ram"});
+   }
+ 
+-  if(settings["icarus/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, manifest);
++  if(settings["cart-pal/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, manifest);
+   file::write({target, "program.rom"}, buffer);
+   return success(target);
+ }
+diff --git a/nSide-hack/icarus/core/master-system.cpp b/nSide-hack/icarus/core/master-system.cpp
+index c0d75c8..10d4017 100644
+--- a/nSide-hack/icarus/core/master-system.cpp
++++ b/nSide-hack/icarus/core/master-system.cpp
+@@ -7,7 +7,7 @@
+ auto Icarus::masterSystemManifest(vector<uint8_t>& buffer, string location) -> string {
+   string manifest;
+ 
+-  if(settings["icarus/UseDatabase"].boolean() && !manifest) {
++  if(settings["cart-pal/UseDatabase"].boolean() && !manifest) {
+     string digest = Hash::SHA256(buffer.data(), buffer.size()).digest();
+     for(auto node : database.masterSystem) {
+       if(node["sha256"].text() == digest) {
+@@ -17,7 +17,7 @@ auto Icarus::masterSystemManifest(vector<uint8_t>& buffer, string location) -> s
+     }
+   }
+ 
+-  if(settings["icarus/UseHeuristics"].boolean() && !manifest) {
++  if(settings["cart-pal/UseHeuristics"].boolean() && !manifest) {
+     MasterSystemCartridge cartridge{location, buffer.data(), buffer.size()};
+     manifest = cartridge.manifest;
+   }
+@@ -39,7 +39,7 @@ auto Icarus::masterSystemImport(vector<uint8_t>& buffer, string location) -> str
+     file::copy({source, name, ".sav"}, {target, "save.ram"});
+   }
+ 
+-  if(settings["icarus/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, manifest);
++  if(settings["cart-pal/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, manifest);
+   file::write({target, "program.rom"}, buffer);
+   return success(target);
+ }
+diff --git a/nSide-hack/icarus/core/mega-drive.cpp b/nSide-hack/icarus/core/mega-drive.cpp
+index 2bd849f..e0d0e3f 100644
+--- a/nSide-hack/icarus/core/mega-drive.cpp
++++ b/nSide-hack/icarus/core/mega-drive.cpp
+@@ -7,7 +7,7 @@
+ auto Icarus::megaDriveManifest(vector<uint8_t>& buffer, string location) -> string {
+   string manifest;
+ 
+-  if(settings["icarus/UseDatabase"].boolean() && !manifest) {
++  if(settings["cart-pal/UseDatabase"].boolean() && !manifest) {
+     string digest = Hash::SHA256(buffer.data(), buffer.size()).digest();
+     for(auto node : database.megaDrive) {
+       if(node["sha256"].text() == digest) {
+@@ -17,7 +17,7 @@ auto Icarus::megaDriveManifest(vector<uint8_t>& buffer, string location) -> stri
+     }
+   }
+ 
+-  if(settings["icarus/UseHeuristics"].boolean() && !manifest) {
++  if(settings["cart-pal/UseHeuristics"].boolean() && !manifest) {
+     MegaDriveCartridge cartridge{location, buffer.data(), buffer.size()};
+     manifest = cartridge.manifest;
+   }
+@@ -39,7 +39,7 @@ auto Icarus::megaDriveImport(vector<uint8_t>& buffer, string location) -> string
+     file::copy({source, name, ".sav"}, {target, "save.ram"});
+   }
+ 
+-  if(settings["icarus/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, manifest);
++  if(settings["cart-pal/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, manifest);
+   file::write({target, "program.rom"}, buffer);
+   return success(target);
+ }
+diff --git a/nSide-hack/icarus/core/playchoice-10.cpp b/nSide-hack/icarus/core/playchoice-10.cpp
+index d6e24b0..4d45cf5 100644
+--- a/nSide-hack/icarus/core/playchoice-10.cpp
++++ b/nSide-hack/icarus/core/playchoice-10.cpp
+@@ -20,7 +20,7 @@ auto Icarus::playchoice10Manifest(vector<uint8_t>& buffer, string location,
+   || buffer.data()[3] !=  26) offset = 0;
+   string digest = Hash::SHA256(buffer.data() + offset, buffer.size() - offset).digest();
+ 
+-  if(settings["icarus/UseDatabase"].boolean() && !markup) {
++  if(settings["cart-pal/UseDatabase"].boolean() && !markup) {
+     //PlayChoice-10 ROMs in iNES format store 16 bytes for the key,
+     //and 16 more bytes for Counter Out.
+     //However, only 9 key bytes actually exist in the cartridge.
+@@ -35,14 +35,14 @@ auto Icarus::playchoice10Manifest(vector<uint8_t>& buffer, string location,
+     }
+   }
+ 
+-  if(settings["icarus/UseHeuristics"].boolean() && !markup) {
++  if(settings["cart-pal/UseHeuristics"].boolean() && !markup) {
+     FamicomCartridge cartridge{buffer.data(), buffer.size()};
+     if(markup = cartridge.markup) {
+       markup.append("\n");
+       markup.append("information\n");
+       markup.append("  title:  ", Location::prefix(location), "\n");
+       markup.append("  sha256: ", digest, "\n");
+-      markup.append("  note:   ", "heuristically generated by icarus\n");
++      markup.append("  note:   ", "heuristically generated by cart-pal\n");
+     }
+   }
+ 
+@@ -90,7 +90,7 @@ auto Icarus::playchoice10Import(vector<uint8_t>& buffer, string location) -> str
+     file::copy({source, name, ".sav"}, {target, "save.ram"});
+   }
+ 
+-  if(settings["icarus/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
++  if(settings["cart-pal/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
+   for(auto rom : roms) {
+     auto name = rom["name"].text();
+     auto size = rom["size"].natural();
+diff --git a/nSide-hack/icarus/core/sg-1000.cpp b/nSide-hack/icarus/core/sg-1000.cpp
+index d51167d..4156e66 100644
+--- a/nSide-hack/icarus/core/sg-1000.cpp
++++ b/nSide-hack/icarus/core/sg-1000.cpp
+@@ -7,7 +7,7 @@
+ auto Icarus::sg1000Manifest(vector<uint8_t>& buffer, string location) -> string {
+   string manifest;
+ 
+-  if(settings["icarus/UseDatabase"].boolean() && !manifest) {
++  if(settings["cart-pal/UseDatabase"].boolean() && !manifest) {
+     string digest = Hash::SHA256(buffer.data(), buffer.size()).digest();
+     for(auto node : database.sg1000) {
+       if(node["sha256"].text() == digest) {
+@@ -17,7 +17,7 @@ auto Icarus::sg1000Manifest(vector<uint8_t>& buffer, string location) -> string
+     }
+   }
+ 
+-  if(settings["icarus/UseHeuristics"].boolean() && !manifest) {
++  if(settings["cart-pal/UseHeuristics"].boolean() && !manifest) {
+     MasterSystemCartridge cartridge{location, buffer.data(), buffer.size()};
+     manifest = cartridge.manifest;
+   }
+@@ -39,7 +39,7 @@ auto Icarus::sg1000Import(vector<uint8_t>& buffer, string location) -> string {
+     file::copy({source, name, ".sav"}, {target, "save.ram"});
+   }
+ 
+-  if(settings["icarus/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, manifest);
++  if(settings["cart-pal/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, manifest);
+   file::write({target, "program.rom"}, buffer);
+   return success(target);
+ }
+diff --git a/nSide-hack/icarus/core/sufami-turbo.cpp b/nSide-hack/icarus/core/sufami-turbo.cpp
+index 6179297..f5f8e0c 100644
+--- a/nSide-hack/icarus/core/sufami-turbo.cpp
++++ b/nSide-hack/icarus/core/sufami-turbo.cpp
+@@ -8,7 +8,7 @@
+   string markup;
+   string digest = Hash::SHA256(buffer.data(), buffer.size()).digest();
+ 
+-  if(settings["icarus/UseDatabase"].boolean() && !markup) {
++  if(settings["cart-pal/UseDatabase"].boolean() && !markup) {
+     for(auto node : database.sufamiTurbo) {
+       if(node["sha256"].text() == digest) {
+         markup.append(node.text(), "\n  sha256:   ", digest, "\n");
+@@ -17,14 +17,14 @@
+     }
+   }
+ 
+-  if(settings["icarus/UseHeuristics"].boolean() && !markup) {
++  if(settings["cart-pal/UseHeuristics"].boolean() && !markup) {
+     SufamiTurboCartridge cartridge{buffer.data(), buffer.size()};
+     if(markup = cartridge.markup) {
+       markup.append("\n");
+       markup.append("information\n");
+       markup.append("  title:  ", Location::prefix(location), "\n");
+       markup.append("  sha256: ", digest, "\n");
+-      markup.append("  note:   ", "heuristically generated by icarus\n");
++      markup.append("  note:   ", "heuristically generated by cart-pal\n");
+     }
+   }
+ 
+@@ -41,7 +41,7 @@ auto Icarus::sufamiTurboImport(vector<uint8_t>& buffer, string location) -> stri
+   if(!markup) return failure("failed to parse ROM image");
+   if(!directory::create(target)) return failure("library path unwritable");
+ 
+-  if(settings["icarus/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
++  if(settings["cart-pal/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
+   file::write({target, "program.rom"}, buffer);
+   return success(target);
+ }
+diff --git a/nSide-hack/icarus/core/super-famicom.cpp b/nSide-hack/icarus/core/super-famicom.cpp
+index fc4d12d..4323aea 100644
+--- a/nSide-hack/icarus/core/super-famicom.cpp
++++ b/nSide-hack/icarus/core/super-famicom.cpp
+@@ -14,7 +14,7 @@
+   string markup;
+   string digest = Hash::SHA256(buffer.data(), buffer.size()).digest();
+ 
+-  if(settings["icarus/UseDatabase"].boolean() && !markup) {
++  if(settings["cart-pal/UseDatabase"].boolean() && !markup) {
+     for(auto node : database.superFamicom) {
+       if(node["sha256"].text() == digest) {
+         markup.append(node.text(), "\n  sha256:   ", digest, "\n");
+@@ -23,7 +23,7 @@
+     }
+   }
+ 
+-  if(settings["icarus/UseHeuristics"].boolean() && !markup) {
++  if(settings["cart-pal/UseHeuristics"].boolean() && !markup) {
+     bool hasMSU1 = file::exists({location, "msu1.rom"});
+     SuperFamicomCartridge cartridge{buffer.data(), buffer.size(), hasMSU1};
+     if(markup = cartridge.markup) {
+@@ -33,7 +33,7 @@
+       markup.append("  region: ", cartridge.region == SuperFamicomCartridge::Region::NTSC ? "NTSC" : "PAL", "\n");
+       markup.append("  title:  ", Location::prefix(location), "\n");
+       markup.append("  sha256: ", digest, "\n");
+-      markup.append("  note:   ", "heuristically generated by icarus\n");
++      markup.append("  note:   ", "heuristically generated by cart-pal\n");
+     }
+   }
+ 
+@@ -70,7 +70,7 @@ auto Icarus::superFamicomImport(vector<uint8_t>& buffer, string location) -> str
+     file::copy({source, name, ".srm"}, {target, "save.ram"});
+   }
+ 
+-  if(settings["icarus/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
++  if(settings["cart-pal/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
+   uint offset = (buffer.size() & 0x7fff) == 512 ? 512 : 0;  //skip header if present
+   for(auto rom : roms) {
+     auto name = rom["name"].text();
+diff --git a/nSide-hack/icarus/core/vs-system.cpp b/nSide-hack/icarus/core/vs-system.cpp
+index 8ee4ae7..b058c29 100644
+--- a/nSide-hack/icarus/core/vs-system.cpp
++++ b/nSide-hack/icarus/core/vs-system.cpp
+@@ -19,7 +19,7 @@ auto Icarus::vsSystemManifest(vector<uint8_t>& buffer, string location, uint* pr
+   || buffer.data()[3] !=  26) offset = 0;
+   string digest = Hash::SHA256(buffer.data() + offset, buffer.size() - offset).digest();
+ 
+-  if(settings["icarus/UseDatabase"].boolean() && !markup) {
++  if(settings["cart-pal/UseDatabase"].boolean() && !markup) {
+     for(auto node : database.vsSystem) {
+       if(node["sha256"].text() == digest) {
+         markup.append(node.text(), "\n  sha256:   ", digest, "\n");
+@@ -28,14 +28,14 @@ auto Icarus::vsSystemManifest(vector<uint8_t>& buffer, string location, uint* pr
+     }
+   }
+ 
+-  if(settings["icarus/UseHeuristics"].boolean() && !markup) {
++  if(settings["cart-pal/UseHeuristics"].boolean() && !markup) {
+     FamicomCartridge cartridge{buffer.data(), buffer.size()};
+     if(auto markup = cartridge.markup) {
+       markup.append("\n");
+       markup.append("information\n");
+       markup.append("  title:  ", Location::prefix(location), "\n");
+       markup.append("  sha256: ", digest, "\n");
+-      markup.append("  note:   ", "heuristically generated by icarus\n");
++      markup.append("  note:   ", "heuristically generated by cart-pal\n");
+     }
+   }
+ 
+@@ -80,7 +80,7 @@ auto Icarus::vsSystemImport(vector<uint8_t>& buffer, string location) -> string
+     file::copy({source, name, ".sav"}, {target, "save.ram"});
+   }
+ 
+-  if(settings["icarus/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
++  if(settings["cart-pal/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, markup);
+   for(auto rom : roms) {
+     auto name = rom["name"].text();
+     auto size = rom["size"].natural();
+diff --git a/nSide-hack/icarus/core/wonderswan-color.cpp b/nSide-hack/icarus/core/wonderswan-color.cpp
+index 212dadd..c2f3d77 100644
+--- a/nSide-hack/icarus/core/wonderswan-color.cpp
++++ b/nSide-hack/icarus/core/wonderswan-color.cpp
+@@ -7,7 +7,7 @@
+ auto Icarus::wonderSwanColorManifest(vector<uint8_t>& buffer, string location) -> string {
+   string manifest;
+ 
+-  if(settings["icarus/UseDatabase"].boolean() && !manifest) {
++  if(settings["cart-pal/UseDatabase"].boolean() && !manifest) {
+     string digest = Hash::SHA256(buffer.data(), buffer.size()).digest();
+     for(auto node : database.wonderSwanColor) {
+       if(node["sha256"].text() == digest) {
+@@ -17,7 +17,7 @@
+     }
+   }
+ 
+-  if(settings["icarus/UseHeuristics"].boolean() && !manifest) {
++  if(settings["cart-pal/UseHeuristics"].boolean() && !manifest) {
+     WonderSwanCartridge cartridge{location, buffer.data(), buffer.size()};
+     manifest = cartridge.manifest;
+   }
+@@ -39,7 +39,7 @@ auto Icarus::wonderSwanColorImport(vector<uint8_t>& buffer, string location) ->
+     file::copy({source, name, ".sav"}, {target, "save.ram"});
+   }
+ 
+-  if(settings["icarus/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, manifest);
++  if(settings["cart-pal/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, manifest);
+   file::write({target, "program.rom"}, buffer);
+   return success(target);
+ }
+diff --git a/nSide-hack/icarus/core/wonderswan.cpp b/nSide-hack/icarus/core/wonderswan.cpp
+index df8199b..2d8c2a4 100644
+--- a/nSide-hack/icarus/core/wonderswan.cpp
++++ b/nSide-hack/icarus/core/wonderswan.cpp
+@@ -7,7 +7,7 @@
+ auto Icarus::wonderSwanManifest(vector<uint8_t>& buffer, string location) -> string {
+   string manifest;
+ 
+-  if(settings["icarus/UseDatabase"].boolean() && !manifest) {
++  if(settings["cart-pal/UseDatabase"].boolean() && !manifest) {
+     string digest = Hash::SHA256(buffer.data(), buffer.size()).digest();
+     for(auto node : database.wonderSwan) {
+       if(node["sha256"].text() == digest) {
+@@ -17,7 +17,7 @@ auto Icarus::wonderSwanManifest(vector<uint8_t>& buffer, string location) -> str
+     }
+   }
+ 
+-  if(settings["icarus/UseHeuristics"].boolean() && !manifest) {
++  if(settings["cart-pal/UseHeuristics"].boolean() && !manifest) {
+     WonderSwanCartridge cartridge{location, buffer.data(), buffer.size()};
+     manifest = cartridge.manifest;
+   }
+@@ -39,7 +39,7 @@ auto Icarus::wonderSwanImport(vector<uint8_t>& buffer, string location) -> strin
+     file::copy({source, name, ".sav"}, {target, "save.ram"});
+   }
+ 
+-  if(settings["icarus/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, manifest);
++  if(settings["cart-pal/CreateManifests"].boolean()) file::write({target, "manifest.bml"}, manifest);
+   file::write({target, "program.rom"}, buffer);
+   return success(target);
+ }
+diff --git a/nSide-hack/icarus/heuristics/atari-2600.cpp b/nSide-hack/icarus/heuristics/atari-2600.cpp
+index c65bbcd..a790474 100644
+--- a/nSide-hack/icarus/heuristics/atari-2600.cpp
++++ b/nSide-hack/icarus/heuristics/atari-2600.cpp
+@@ -16,5 +16,5 @@ Atari2600Cartridge::Atari2600Cartridge(string location, uint8_t* data, uint size
+   manifest.append("  title:  ", Location::prefix(location), "\n");
+   manifest.append("  sha256: ", Hash::SHA256(data, size).digest(), "\n");
+   manifest.append("\n");
+-  manifest.append("note: heuristically generated by icarus\n");
++  manifest.append("note: heuristically generated by cart-pal\n");
+ }
+diff --git a/nSide-hack/icarus/heuristics/game-gear.cpp b/nSide-hack/icarus/heuristics/game-gear.cpp
+index 3667f22..bc1ab85 100644
+--- a/nSide-hack/icarus/heuristics/game-gear.cpp
++++ b/nSide-hack/icarus/heuristics/game-gear.cpp
+@@ -16,5 +16,5 @@ GameGearCartridge::GameGearCartridge(string location, uint8_t* data, uint size)
+   manifest.append("  title:  ", Location::prefix(location), "\n");
+   manifest.append("  sha256: ", Hash::SHA256(data, size).digest(), "\n");
+   manifest.append("\n");
+-  manifest.append("note: heuristically generated by icarus\n");
++  manifest.append("note: heuristically generated by cart-pal\n");
+ }
+diff --git a/nSide-hack/icarus/heuristics/master-system.cpp b/nSide-hack/icarus/heuristics/master-system.cpp
+index 79cee49..adff002 100644
+--- a/nSide-hack/icarus/heuristics/master-system.cpp
++++ b/nSide-hack/icarus/heuristics/master-system.cpp
+@@ -16,5 +16,5 @@ MasterSystemCartridge::MasterSystemCartridge(string location, uint8_t* data, uin
+   manifest.append("  title:  ", Location::prefix(location), "\n");
+   manifest.append("  sha256: ", Hash::SHA256(data, size).digest(), "\n");
+   manifest.append("\n");
+-  manifest.append("note: heuristically generated by icarus\n");
++  manifest.append("note: heuristically generated by cart-pal\n");
+ }
+diff --git a/nSide-hack/icarus/heuristics/mega-drive.cpp b/nSide-hack/icarus/heuristics/mega-drive.cpp
+index e3a98dc..bb15ec7 100644
+--- a/nSide-hack/icarus/heuristics/mega-drive.cpp
++++ b/nSide-hack/icarus/heuristics/mega-drive.cpp
+@@ -15,5 +15,5 @@ MegaDriveCartridge::MegaDriveCartridge(string location, uint8_t* data, uint size
+   manifest.append("information\n");
+   manifest.append("  title: ", Location::prefix(location), "\n");
+   manifest.append("\n");
+-  manifest.append("note: heuristically generated by icarus\n");
++  manifest.append("note: heuristically generated by cart-pal\n");
+ }
+diff --git a/nSide-hack/icarus/heuristics/wonderswan.cpp b/nSide-hack/icarus/heuristics/wonderswan.cpp
+index 7491909..6b6a247 100644
+--- a/nSide-hack/icarus/heuristics/wonderswan.cpp
++++ b/nSide-hack/icarus/heuristics/wonderswan.cpp
+@@ -49,5 +49,5 @@ WonderSwanCartridge::WonderSwanCartridge(string location, uint8_t* data, uint si
+   manifest.append("  orientation: ", !information.orientation ? "horizontal" : "vertical", "\n");
+   manifest.append("  sha256:      ", Hash::SHA256(data, size).digest(), "\n");
+   manifest.append("\n");
+-  manifest.append("note: heuristically generated by icarus\n");
++  manifest.append("note: heuristically generated by cart-pal\n");
+ }
+diff --git a/nSide-hack/icarus/settings.cpp b/nSide-hack/icarus/settings.cpp 
+index 9aaebb7..d7147bc 100644
+--- a/nSide-hack/icarus/settings.cpp
++++ b/nSide-hack/icarus/settings.cpp 
+@@ -13,10 +13,10 @@ Settings::Settings() {
+ 
+   set("Library/Location", {Path::user(), "Emulation/"});
+ 
+-  set("icarus/Path", Path::user());
+-  set("icarus/CreateManifests", false);
+-  set("icarus/UseDatabase", true);
+-  set("icarus/UseHeuristics", true);
++  set("cart-pal/Path", Path::user());
++  set("cart-pal/CreateManifests", false);
++  set("cart-pal/UseDatabase", true);
++  set("cart-pal/UseHeuristics", true);
+ }
+ 
+ Settings::~Settings() {
+diff --git a/nSide-hack/icarus/ui/import-dialog.cpp b/nSide-hack/icarus/ui/import-dialog.cpp
+index 4a88f01..83a786c 100644
+--- a/nSide-hack/icarus/ui/import-dialog.cpp
++++ b/nSide-hack/icarus/ui/import-dialog.cpp
+@@ -8,7 +8,7 @@ ImportDialog::ImportDialog() {
+   layout.setMargin(5);
+   stopButton.setText("Stop").onActivate([&] { doClose(); });
+ 
+-  setTitle("icarus - Importing ...");
++  setTitle("cart-pal - Importing ...");
+   setSize({480, layout.minimumSize().height()});
+   setCentered();
+ }
+@@ -40,13 +40,13 @@
+ 
+   if(errors) {
+     string message{"Import completed, but with ", errors.size(), " error", errors.size() ? "s" : "", ". View log?"};
+-    if(MessageDialog().setTitle("icarus").setText(message).question() == "Yes") {
++    if(MessageDialog().setTitle("cart-pal").setText(message).question() == "Yes") {
+       errorDialog->show(errors.merge("\n"));
+     } else {
+       scanDialog->show();
+     }
+   } else {
+-    MessageDialog().setTitle("icarus").setText("Import completed successfully.").information();
++    MessageDialog().setTitle("cart-pal").setText("Import completed successfully.").information();
+     scanDialog->show();
+   }
+ }
+diff --git a/nSide-hack/icarus/ui/scan-dialog.cpp b/nSide-hack/icarus/ui/scan-dialog.cpp
+index 3015194..0cc5752 100644
+--- a/nSide-hack/icarus/ui/scan-dialog.cpp
++++ b/nSide-hack/icarus/ui/scan-dialog.cpp
+@@ -5,7 +5,7 @@ ScanDialog::ScanDialog() {
+   layout.setMargin(5);
+   pathEdit.onActivate([&] { refresh(); });
+   refreshButton.setIcon(Icon::Action::Refresh).setBordered(false).onActivate([&] {
+-    pathEdit.setText(settings["icarus/Path"].text());
++    pathEdit.setText(settings["cart-pal/Path"].text());
+     refresh();
+   });
+   homeButton.setIcon(Icon::Go::Home).setBordered(false).onActivate([&] {
+@@ -13,7 +13,7 @@ ScanDialog::ScanDialog() {
+     refresh();
+   });
+   upButton.setIcon(Icon::Go::Up).setBordered(false).onActivate([&] {
+-    pathEdit.setText(Location::dir(settings["icarus/Path"].text()));
++    pathEdit.setText(Location::dir(settings["cart-pal/Path"].text()));
+     refresh();
+   });
+   scanList.onActivate([&] { activate(); });
+@@ -34,14 +34,14 @@ ScanDialog::ScanDialog() {
+   });
+   importButton.setText("Import ...").onActivate([&] { import(); });
+ 
+-  setTitle("icarus");
++  setTitle("cart-pal");
+   setSize({800, 480});
+   setCentered();
+ }
+ 
+ auto ScanDialog::show() -> void {
+   setVisible();
+-  pathEdit.setText(settings["icarus/Path"].text());
++  pathEdit.setText(settings["cart-pal/Path"].text());
+   refresh();
+ }
+ 
+@@ -51,7 +51,7 @@ auto ScanDialog::refresh() -> void {
+   auto pathname = pathEdit.text().transform("\\", "/");
+   if((pathname || Path::root() == "/") && !pathname.endsWith("/")) pathname.append("/");
+ 
+-  settings["icarus/Path"].setValue(pathname);
++  settings["cart-pal/Path"].setValue(pathname);
+   pathEdit.setText(pathname);
+   auto contents = directory::icontents(pathname);
+ 
+@@ -73,7 +73,7 @@ auto ScanDialog::refresh() -> void {
+ 
+ auto ScanDialog::activate() -> void {
+   if(auto item = scanList.selected()) {
+-    string location{settings["icarus/Path"].text(), item.text()};
++    string location{settings["cart-pal/Path"].text(), item.text()};
+     if(!gamePakType(Location::suffix(location))) {
+       pathEdit.setText(location);
+       refresh();
+@@ -85,7 +85,7 @@ auto ScanDialog::import() -> void {
+   string_vector filenames;
+   for(auto& item : scanList.items()) {
+     if(item.checked()) {
+-      filenames.append(string{settings["icarus/Path"].text(), item.text()});
++      filenames.append(string{settings["cart-pal/Path"].text(), item.text()});
+     }
+   }
+ 
+diff --git a/nSide-hack/icarus/ui/settings-dialog.cpp b/nSide-hack/icarus/ui/settings-dialog.cpp
+index 80640d3..0e5af47 100644
+--- a/nSide-hack/icarus/ui/settings-dialog.cpp
++++ b/nSide-hack/icarus/ui/settings-dialog.cpp
+@@ -11,14 +11,14 @@ SettingsDialog::SettingsDialog() {
+     }
+   });
+   createManifestsOption.setText("Create Manifests (not recommended; breaks backward-compatibility)")
+-  .setChecked(settings["icarus/CreateManifests"].boolean()).onToggle([&] {
+-    settings["icarus/CreateManifests"].setValue(createManifestsOption.checked());
++  .setChecked(settings["cart-pal/CreateManifests"].boolean()).onToggle([&] {
++    settings["cart-pal/CreateManifests"].setValue(createManifestsOption.checked());
+   });
+   useDatabaseOption.setText("Use Database (highly recommended; provides bit-perfect memory mapping)")
+-  .setChecked(settings["icarus/UseDatabase"].boolean()).onToggle([&] {
+-    settings["icarus/UseDatabase"].setValue(useDatabaseOption.checked());
++  .setChecked(settings["cart-pal/UseDatabase"].boolean()).onToggle([&] {
++    settings["cart-pal/UseDatabase"].setValue(useDatabaseOption.checked());
+   });
+ 
+-  setTitle("icarus Settings");
++  setTitle("cart-pal Settings");
+   setSize({480, layout.minimumSize().height()});
+ }
+diff --git a/nSide-hack/higan/shaders/GNUmakefile b/nSide-hack/higan/shaders/GNUmakefile
+index 80d315c..8f682dd 100644
+--- a/nSide-hack/higan/shaders/GNUmakefile
++++ b/nSide-hack/higan/shaders/GNUmakefile
+@@ -1,5 +1,5 @@
+ install:
+-	if [ -d /usr/share/higan/Video\ Shaders ]; then sudo rm -r /usr/share/higan/Video\ Shaders; fi
+-	sudo mkdir -p /usr/share/higan/Video\ Shaders
+-	sudo cp -r *.shader /usr/share/higan/Video\ Shaders
+-	sudo chmod -R 777 /usr/share/higan/Video\ Shaders
++	if [ -d /usr/share/nSide/Video\ Shaders ]; then sudo rm -r /usr/share/nSide/Video\ Shaders; fi
++	sudo mkdir -p /usr/share/nSide/Video\ Shaders
++	sudo cp -r *.shader /usr/share/nSide/Video\ Shaders
++	sudo chmod -R 777 /usr/share/nSide/Video\ Shaders
+diff --git a/nSide-hack/higan/data/higan.desktop b/nSide-hack/higan/data/higan.desktop
+index 26b2e83..c0f4c8b 100644
+--- a/nSide-hack/higan/data/higan.desktop
++++ b/nSide-hack/higan/data/higan.desktop
+@@ -1,8 +1,8 @@
+ [Desktop Entry]
+-Name=higan
+-Comment=Emulator
+-Exec=higan
+-Icon=higan
++Name=nSide
++Comment=Famicom, VS. UniSystem emulator
++Exec=nSide
++Icon=nSide
+ Terminal=false
+ Type=Application
+ Categories=Game;Emulator;
+diff --git a/nSide-hack/higan/data/higan.Manifest b/nSide-hack/higan/data/higan.Manifest
+index 2796a43..ab8b435 100644
+--- a/nSide-hack/higan/data/higan.Manifest
++++ b/nSide-hack/higan/data/higan.Manifest
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+ <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+-  <assemblyIdentity type="win32" name="higan" version="1.0.0.0" processorArchitecture="*"/>
++  <assemblyIdentity type="win32" name="nSide" version="1.0.0.0" processorArchitecture="*"/>
+   <dependency>
+     <dependentAssembly>
+       <assemblyIdentity type="win32" name="Microsoft.Windows.Common-Controls" version="6.0.0.0" processorArchitecture="*" publicKeyToken="6595b64144ccf1df" language="*"/>
+diff --git a/nSide-hack/higan/data/higan.plist b/nSide-hack/higan/data/higan.plist
+index 53d81b5..690ff98 100644
+--- a/nSide-hack/higan/data/higan.plist
++++ b/nSide-hack/higan/data/higan.plist
+@@ -3,13 +3,13 @@
+ <plist version="1.0">
+ <dict>
+   <key>CFBundleIdentifier</key>
+-  <string>org.byuu.higan</string>
++  <string>org.byuu.board.nSide</string>
+   <key>CFBundleDisplayName</key>
+-  <string>higan</string>
++  <string>nSide</string>
+   <key>CFBundleExecutable</key>
+-  <string>higan</string>
++  <string>nSide</string>
+   <key>CFBundleIconFile</key>
+-  <string>higan.icns</string>
++  <string>nSide.icns</string>
+   <key>NSHighResolutionCapable</key>
+   <false/>
+   <key>NSSupportsAutomaticGraphicsSwitching</key>
+diff --git a/nSide-hack/higan/emulator/emulator.hpp b/nSide-hack/higan/emulator/emulator.hpp
+index a82fbba..176f69b
+--- a/nSide-hack/higan/emulator/emulator.hpp
++++ b/nSide-hack/higan/emulator/emulator.hpp
+@@ -11,11 +11,52 @@
+ #include <resource/resource.hpp>
+ 
+ namespace Emulator {
+-  static const string Name    = "higan";
+-  static const string Version = "101.23";
+-  static const string Author  = "byuu";
+-  static const string License = "GPLv3";
+-  static const string Website = "http://byuu.org/";
++  static const string Name           = "nSide";
++  static const string OriginalName   = "higan";
++  static const string Version        = "009.10";
++  static const string FromVersion    = "101.22";
++  static const string Author         = "hex_usr";
++  static const string OriginalAuthor = "byuu";
++  static const string License        = "GPLv3";
++  static const string Website        = "http://byuu.org/";
++  static const string_vector Contributors = {
++    "Alyosha_TAS (Atari 2600 PIA, TIA, timing details)",
++    "Andreas Naive (S-DD1 decompression algorithm)",
++    //"Ange Albertini (higan logo)",  //not used in nSide
++    "anomie",
++    "AWJ (Super Famicom PPUcounter NTSC/PAL timing)",
++    "Bisqwit (Famicom PPU color generation for NTSC systems)",
++    "blargg (Famicom testing, Super Famicom testing and Balanced DSP)",
++    "Cydrak (ST-018 discoveries and bug fixes, Game Boy Advance emulation)",
++    "_Demo_",
++    "Derrick Sobodash",
++    "DMV27",
++    "Dr. Decapitator (DSP-1,2,3,4, ST-010,011 ROM dumps)",
++    "endrift (Game Boy, Game Boy Advance fixes)",
++    "FirebrandX",
++    "FitzRoy (Famicom, Super Famicom bug-testing)",
++    "gekkio (Game Boy STAT IRQ and other fixes)",
++    "GIGO",
++    "jchadwick (Game Boy Advance fixes)",
++    "Jonas Quinn (Super Famicom DSP, Game Boy, Game Boy Advance fixes)",
++    "kevtris (Famicom PPU voltage levels)",
++    "kode54",
++    "krom",
++    "LostTemplar (ST-018 program ROM analysis)",
++    "Matthew Callis",
++    "Nach",
++    "neviksti (SPC7110 decompression algorithm)",
++    "Overload (Cx4 data ROM dump)",
++    "RedDwarf",
++    "Richard Bannister",
++    "Ryphecha (Famicom emulation)",
++    "segher (Cx4 reverse engineering)",
++    "tetsuo55",
++    "TRAC",
++    "trap15 (WonderSwan information and fixes)",
++    "wareya (WASAPI driver)",
++    "zones",
++  };
+ 
+   //incremented only when serialization format changes
+   static const string SerializerVersion = "009.10(101)";
+diff --git a/nSide-hack/higan/fc/fc.hpp b/nSide-hack/higan/fc/fc.hpp
+index 4cc77e0..0d0946b 100644
+--- a/nSide-hack/higan/fc/fc.hpp
++++ b/nSide-hack/higan/fc/fc.hpp
+@@ -1,7 +1,13 @@
+ #pragma once
+ 
++//based on higan's Famicom emulator by byuu and Ryphecha,
++//with contributions from:
++// Bisqwit (PPU color generation for NTSC systems)
++// FitzRoy (Bug-testing)
++// kevtris (PPU voltage levels in Bisqwit's color formula)
++// hex_usr (Many code organization changes, PPU timing fixes, mapper implementations, controllers, etc.)
+ //license: GPLv3
+-//started: 2011-09-05
++//original project started: 2011-09-05
+ 
+ #include <emulator/emulator.hpp>
+ #include <emulator/thread.hpp>
+diff --git a/nSide-hack/higan/gb/gb.hpp b/nSide-hack/higan/gb/gb.hpp
+index a1a3dd2..135bcfe 100644
+--- a/nSide-hack/higan/gb/gb.hpp
++++ b/nSide-hack/higan/gb/gb.hpp
+@@ -1,7 +1,9 @@
+ #pragma once
+ 
++//based on higan's Game Boy emulator by byuu,
++//with contributions from Jonas Quinn, gekkio, and endrift.
+ //license: GPLv3
+-//started: 2010-12-27
++//original project started: 2010-12-27
+ 
+ #include <emulator/emulator.hpp>
+ #include <emulator/thread.hpp>
+diff --git a/nSide-hack/higan/gba/gba.hpp b/nSide-hack/higan/gba/gba.hpp
+index 9e7334d..c5d699f 100644
+--- a/nSide-hack/higan/gba/gba.hpp
++++ b/nSide-hack/higan/gba/gba.hpp
+@@ -1,7 +1,9 @@
+ #pragma once
+ 
++//based on higan's Game Boy Advance emulator by byuu and Cydrak,
++//with contributions from endrift, jchadwick, and Jonas Quinn.
+ //license: GPLv3
+-//started: 2012-03-19
++//original project started: 2012-03-19
+ 
+ #include <emulator/emulator.hpp>
+ #include <emulator/thread.hpp>
+diff --git a/nSide-hack/higan/md/md.hpp b/nSide-hack/higan/md/md.hpp
+index 65966ed..70aa9b6 100644
+--- a/nSide-hack/higan/md/md.hpp
++++ b/nSide-hack/higan/md/md.hpp
+@@ -1,7 +1,8 @@
+ #pragma once
+ 
++//based on higan's Mega Drive emulator by byuu
+ //license: GPLv3
+-//started: 2016-07-08
++//original project started: 2016-07-08
+ 
+ #include <emulator/emulator.hpp>
+ #include <emulator/thread.hpp>
+diff --git a/nSide-hack/higan/ms/ms.hpp b/nSide-hack/higan/ms/ms.hpp
+index a3242d2..5d65c37 100644
+--- a/nSide-hack/higan/ms/ms.hpp
++++ b/nSide-hack/higan/ms/ms.hpp
+@@ -1,7 +1,8 @@
+ #pragma once
+ 
++//based on higan's Master System/Game Gear emulator by byuu
+ //license: GPLv3
+-//started: 2016-08-17
++//original project started: 2016-08-17
+ 
+ #include <emulator/emulator.hpp>
+ #include <emulator/thread.hpp>
+diff --git a/nSide-hack/higan/resource/resource.bml b/nSide-hack/higan/resource/resource.bml
+index a2fdecb..b2497eb 100644
+--- a/nSide-hack/higan/resource/resource.bml
++++ b/nSide-hack/higan/resource/resource.bml
+@@ -1,6 +1,7 @@
+ namespace name=Resource
+   namespace name=Logo
+     binary name=higan file=logo/higan.png
++    binary name=nSide file=logo/nSide.png
+   namespace name=Sprite
+     binary name=CrosshairRed file=sprite/crosshair-red.png
+     binary name=CrosshairGreen file=sprite/crosshair-green.png
+diff --git a/nSide-hack/higan/resource/resource.cpp b/nSide-hack/higan/resource/resource.cpp
+index 12a3c69..e3dea4b 100644
+--- a/nSide-hack/higan/resource/resource.cpp
++++ b/nSide-hack/higan/resource/resource.cpp
+@@ -2528,7 +2528,7 @@ const nall::vector<uint8_t> higan = {  //size: 80706
+   103,97,110,47,108,111,103,111,47,104,105,103,97,110,46,115,118,103,214,196,144,254,0,0,0,0,73,69,78,68,174,66,
+   96,130,
+ };
+-const nall::vector<uint8_t> higan = {  //size: 5353
++const nall::vector<uint8_t> nSide = {  //size: 5353
+   137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,1,0,0,0,0,96,8,6,0,0,0,242,241,172,
+   136,0,0,20,176,73,68,65,84,120,94,237,157,11,148,20,213,157,198,63,121,137,188,149,103,16,20,69,16,20,121,8,
+   8,190,199,229,161,172,144,25,4,21,34,65,36,8,232,194,113,34,174,202,137,102,198,160,184,138,138,138,10,70,215,81,
+diff --git a/nSide-hack/higan/resource/resource.hpp b/nSide-hack/higan/resource/resource.hpp
+index 6f099a4..b1ec9f6 100644
+--- a/nSide-hack/higan/resource/resource.hpp
++++ b/nSide-hack/higan/resource/resource.hpp
+@@ -1,7 +1,7 @@
+ namespace Resource {
+ namespace Logo {
+ extern const nall::vector<uint8_t> higan;
+-extern const nall::vector<uint8_t> higan;
++extern const nall::vector<uint8_t> nSide;
+ }
+ namespace Sprite {
+ extern const nall::vector<uint8_t> CrosshairRed;
+diff --git a/nSide-hack/higan/sfc/sfc.hpp b/nSide-hack/higan/sfc/sfc.hpp
+index 72137a3..81afd8f 100644
+--- a/nSide-hack/higan/sfc/sfc.hpp
++++ b/nSide-hack/higan/sfc/sfc.hpp
+@@ -1,7 +1,35 @@
+ #pragma once
+ 
++//based on higan's Super Famicom emulator by byuu,
++//with contributions from:
++// Andreas Naive     (S-DD1 decompression algorithm)
++// anomie
++// AWJ               (PPUcounter NTSC/PAL timing)
++// Cydrak            (ST-018 discoveries and bug fixes)
++// _Demo_
++// Derrick Sobodash
++// DMV27
++// Dr. Decapitator   (DSP-1,2,3,4, ST-010,011 ROM dumps)
++// FirebrandX
++// FitzRoy
++// GIGO
++// Jonas Quinn       (DSP fixes, Game Boy fixes)
++// kode54
++// krom
++// LostTemplar       (ST-018 program ROM analysis)
++// Matthew Callis
++// Nach
++// neviksti          (SPC7110 decompression algorithm)
++// Overload          (Cx4 data ROM dump)
++// RedDwarf
++// Richard Bannister
++// segher            (Cx4 reverse engineering)
++// tetsuo55
++// TRAC
++// zones
++// hex_usr           (exportMemory PPU register/expansion chip support, Super Scope turbo cursor)
+ //license: GPLv3
+-//started: 2004-10-14
++//original project started: 2004-10-14
+ 
+ #include <emulator/emulator.hpp>
+ #include <emulator/thread.hpp>
+diff --git a/nSide-hack/higan/target-tomoko/GNUmakefile b/nSide-hack/higan/target-tomoko/GNUmakefile
+index b5d33c5..4bcc5d4 100644
+--- a/nSide-hack/higan/target-tomoko/GNUmakefile
++++ b/nSide/nSide/target-nSide-t/GNUmakefile
+@@ -1,5 +1,5 @@
+ ifndef name
+-  name := higan
++  name := nSide
+ endif
+ flags += -DSFC_SUPERGAMEBOY
+ 
+diff --git a/nSide-hack/higan/target-tomoko/presentation/about.cpp b/nSide-hack/higan/target-tomoko/presentation/about.cpp
+index 782fc83..fb639c5 100644
+--- a/nSide-hack/higan/target-tomoko/presentation/about.cpp
++++ b/nSide-hack/higan/target-tomoko/presentation/about.cpp
+@@ -1,24 +1,30 @@
+ AboutWindow::AboutWindow() {
+   aboutWindow = this;
+ 
+-  setTitle("About higan ...");
++  setTitle("About nSide ...");
+   setBackgroundColor({255, 255, 240});
+   layout.setMargin(10);
+-  auto logo = image{Resource::Logo::higan};
++  auto logo = image{Resource::Logo::nSide};
+   logo.alphaBlend(0xfffff0);
+   canvas.setIcon(logo);
+   informationLeft.setFont(Font().setBold()).setAlignment(1.0).setText({
+     "Version:\n",
+-    "Author:\n",
++    "Based on:\n",
++    "Fork Author:\n",
+     "License:\n",
+-    "Website:"
++    "Website of ", Emulator::OriginalName, ":"
+   });
+   informationRight.setFont(Font().setBold()).setAlignment(0.0).setText({
+     Emulator::Version, "\n",
++    Emulator::OriginalName, " ", Emulator::FromVersion, " by ", Emulator::OriginalAuthor, "\n",
+     Emulator::Author, "\n",
+     Emulator::License, "\n",
+     Emulator::Website
+   });
++  informationBottom.setFont(Font().setBold()).setAlignment(0.0).setText({
++    "Contributors to ", Emulator::OriginalName, ":\n",
++    Emulator::Contributors.merge("\n")
++  });
+ 
+   setResizable(false);
+   setSize(layout.minimumSize());
+diff --git a/nSide-hack/higan/target-tomoko/presentation/presentation.cpp b/nSide-hack/higan/target-tomoko/presentation/presentation.cpp
+index 6ca8276..93922ac 100644
+--- a/nSide-hack/higan/target-tomoko/presentation/presentation.cpp
++++ b/nSide-hack/higan/target-tomoko/presentation/presentation.cpp
+@@ -131,7 +131,7 @@ Presentation::Presentation() {
+ 
+   onClose([&] { program->quit(); });
+ 
+-  setTitle({"higan v", Emulator::Version});
++  setTitle({"nSide v", Emulator::Version});
+   setResizable(false);
+   setBackgroundColor({0, 0, 0});
+   resizeViewport();
+@@ -178,18 +178,18 @@ auto Presentation::refreshLibraryMenu() -> void {
+       }
+     }
+   }
+-  //add icarus menu options -- but only if icarus binary is present
+-  if(execute("icarus", "--name").output.strip() == "icarus") {
++  //add cart-pal menu options -- but only if cart-pal binary is present
++  if(execute("cart-pal", "--name").output.strip() == "cart-pal") {
+     libraryMenu.append(MenuSeparator());
+     libraryMenu.append(MenuItem().setText("Load ROM File ...").onActivate([&] {
+       audio->clear();
+-      if(auto location = execute("icarus", "--import")) {
++      if(auto location = execute("cart-pal", "--import")) {
+         program->mediumQueue.append(location.output.strip());
+         program->loadMedium();
+       }
+     }));
+     libraryMenu.append(MenuItem().setText("Import ROM Files ...").onActivate([&] {
+-      invoke("icarus");
++      invoke("cart-pal");
+     }));
+   }
+ }
+diff --git a/nSide-hack/higan/target-tomoko/program/interface.cpp b/nSide-hack/higan/target-tomoko/program/interface.cpp
+index 1cfe56f..36ef05f 100644
+--- a/nSide-hack/higan/target-tomoko/program/interface.cpp
++++ b/nSide-hack/higan/target-tomoko/program/interface.cpp
+@@ -5,7 +5,7 @@ auto Program::path(uint id) -> string {
+ auto Program::open(uint id, string name, vfs::file::mode mode, bool required) -> vfs::shared::file {
+   if(name == "manifest.bml" && !path(id).endsWith(".sys/")) {
+     if(!file::exists({path(id), name}) || settings["Library/IgnoreManifests"].boolean()) {
+-      if(auto manifest = execute("icarus", "--manifest", path(id))) {
++      if(auto manifest = execute("cart-pal", "--manifest", path(id))) {
+         return vfs::memory::file::open(manifest.output.data<uint8_t>(), manifest.output.size());
+       }
+     }
+@@ -125,5 +125,5 @@ auto Program::dipSettings(Markup::Node node) -> uint {
+ }
+ 
+ auto Program::notify(string text) -> void {
+-  MessageWindow().setTitle("higan").setText(text).information();
++  MessageWindow().setTitle("nSide").setText(text).information();
+ }
+diff --git a/nSide-hack/higan/target-tomoko/program/medium.cpp b/nSide-hack/higan/target-tomoko/program/medium.cpp
+index fc570e8..66daf23 100644
+--- a/nSide-hack/higan/target-tomoko/program/medium.cpp
++++ b/nSide-hack/higan/target-tomoko/program/medium.cpp
+@@ -51,7 +51,7 @@ auto Program::unloadMedium() -> void {
+   mediumPaths.reset();
+ 
+   presentation->resizeViewport();
+-  presentation->setTitle({"higan v", Emulator::Version});
++  presentation->setTitle({"nSide v", Emulator::Version});
+   presentation->systemMenu.setVisible(false);
+   presentation->toolsMenu.setVisible(false);
+   toolsManager->setVisible(false);
+diff --git a/nSide-hack/higan/target-tomoko/program/program.cpp b/nSide-hack/higan/target-tomoko/program/program.cpp
+index 8d19b2b..33141b0 100644
+--- a/nSide-hack/higan/target-tomoko/program/program.cpp
++++ b/nSide-hack/higan/target-tomoko/program/program.cpp
+@@ -73,7 +73,7 @@ Program::Program(string_vector args) {
+     } else if(directory::exists(argument)) {
+       mediumQueue.append(argument);
+     } else if(file::exists(argument)) {
+-      if(auto result = execute("icarus", "--import", argument)) {
++      if(auto result = execute("cart-pal", "--import", argument)) {
+         mediumQueue.append(result.output.strip());
+       }
+     }
+diff --git a/nSide-hack/higan/target-tomoko/program/state.cpp b/nSide-hack/higan/target-tomoko/program/state.cpp
+index 489501b..52c0226 100644
+--- a/nSide-hack/higan/target-tomoko/program/state.cpp
++++ b/nSide-hack/higan/target-tomoko/program/state.cpp
+@@ -1,6 +1,6 @@
+ auto Program::stateName(uint slot, bool manager) -> string {
+   return {
+-    mediumPaths(1), "higan/states/",
++    mediumPaths(1), "nSide/states/",
+     manager ? "managed/" : "quick/",
+     "slot-", slot, ".bst"
+   };
+diff --git a/nSide-hack/higan/target-tomoko/tomoko.cpp b/nSide-hack/higan/target-tomoko/tomoko.cpp
+index 650dc05..4f4cc45 100644
+--- a/nSide-hack/higan/target-tomoko/tomoko.cpp
++++ b/nSide-hack/higan/target-tomoko/tomoko.cpp
+@@ -8,18 +8,18 @@ auto locate(string name) -> string {
+   string location = {Path::program(), name};
+   if(inode::exists(location)) return location;
+ 
+-  location = {Path::config(), "higan/", name};
++  location = {Path::config(), "nSide/", name};
+   if(inode::exists(location)) return location;
+ 
+-  location = {Path::local(), "higan/", name};
++  location = {Path::local(), "nSide/", name};
+   if(inode::exists(location)) return location;
+ 
+   location = {Path::config(), "higan/", name};
+   if(inode::exists(location)) {
+     if(Location::suffix(location) == ".bml" && Location::suffix(Location::dir(location)) != ".sys") {
+-      directory::create({Path::config(), "higan/"});
+-      file::copy(location, {Path::config(), "higan/", name});
+-      return {Path::config(), "higan/", name};
++      directory::create({Path::config(), "nSide/"});
++      file::copy(location, {Path::config(), "nSide/", name});
++      return {Path::config(), "nSide/", name};
+     }
+     return location;
+   }
+@@ -27,15 +27,15 @@ auto locate(string name) -> string {
+   location = {Path::local(), "higan/", name};
+   if(inode::exists(location)) {
+     if(Location::suffix(location) == ".bml" && Location::suffix(Location::dir(location)) != ".sys") {
+-      directory::create({Path::local(), "higan/"});
+-      file::copy(location, {Path::local(), "higan/", name});
+-      return {Path::local(), "higan/", name};
++      directory::create({Path::local(), "nSide/"});
++      file::copy(location, {Path::local(), "nSide/", name});
++      return {Path::local(), "nSide/", name};
+     }
+     return location;
+   }
+ 
+-  directory::create({Path::local(), "higan/"});
+-  return {Path::local(), "higan/", name};
++  directory::create({Path::local(), "nSide/"});
++  return {Path::local(), "nSide/", name};
+ }
+ 
+ auto locateSystem(string name) -> string {
+@@ -47,7 +47,7 @@ auto locateSystem(string name) -> string {
+ 
+ #include <nall/main.hpp>
+ auto nall::main(string_vector args) -> void {
+-  Application::setName("higan");
++  Application::setName("nSide");
+   new Program(args);
+   Application::run();
+ }
+diff --git a/nSide-hack/higan/target-star-rod/laevateinn.cpp b/nSide-hack/higan/target-star-rod/laevateinn.cpp
+index b8e4159..48284cf 100644
+--- a/nSide-hack/higan/target-star-rod/laevateinn.cpp
++++ b/nSide-hack/higan/target-star-rod/laevateinn.cpp
+@@ -20,10 +20,10 @@ auto locateHigan(string name) -> string {
+   string location = {Path::program(), name};
+   if(inode::exists(location)) return location;
+ 
+-  location = {Path::config(), "higan/", name};
++  location = {Path::config(), "nSide/", name};
+   if(inode::exists(location)) return location;
+ 
+-  return {Path::local(), "higan/", name};
++  return {Path::local(), "nSide/", name};
+ }
+ 
+ auto locateSystem(string name) -> string {
+diff --git a/nSide-hack/higan/ws/ws.hpp b/nSide-hack/higan/ws/ws.hpp
+index 8e58c46..69df15a 100644
+--- a/nSide-hack/higan/ws/ws.hpp
++++ b/nSide-hack/higan/ws/ws.hpp
+@@ -1,7 +1,9 @@
+ #pragma once
+ 
++//based on higan's WonderSwan, WonderSwan Color, and SwanCrystal emulator by byuu,
++//with contributions from trap15.
+ //license: GPLv3
+-//started: 2016-01-26
++//original project started: 2016-01-26
+ 
+ #include <emulator/emulator.hpp>
+ #include <emulator/thread.hpp>

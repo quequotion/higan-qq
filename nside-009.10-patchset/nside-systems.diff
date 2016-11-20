@@ -1,0 +1,138 @@
+diff --git a/nSide/higan/systems/Atari 2600.sys/manifest.bml b/nSide/higan/systems/Atari 2600.sys/manifest.bml
+new file mode 100644
+index 0000000..553ebe3
+--- /dev/null
++++ b/nSide/higan/systems/Atari 2600.sys/manifest.bml	
+@@ -0,0 +1,5 @@
++system region=auto name:Atari 2600
++  cpu
++  pia
++    ram name=work.ram size=0x80 volatile
++  tia
+diff --git a/higan-hack/higan/systems/Famicom.sys/manifest.bml b/nSide/higan/systems/Famicom.sys/manifest.bml
+index 231fa13..1fa1730 100644
+--- a/higan-hack/higan/systems/Famicom.sys/manifest.bml
++++ b/nSide/higan/systems/Famicom.sys/manifest.bml
+@@ -1 +1,8 @@
+-system name:Famicom
++system region=auto name:Famicom
++  cpu
++    ram name=work.ram size=0x800 volatile
++  ppu ntsc-version=RP2C02G pal-version=RP2C07 dendy-version=UA6538
++    ram name=nametable.ram size=0x800 volatile
++    ram name=object.ram size=256 volatile
++    ram name=palette.ram size=28 volatile
++  apu ntsc-version=RP2A03G pal-version=RP2A07G dendy-version=UA6527P
+diff --git a/nSide/higan/systems/FamicomBox.sys/manifest.bml b/nSide/higan/systems/FamicomBox.sys/manifest.bml
+new file mode 100644
+index 0000000..9669520
+--- /dev/null
++++ b/nSide/higan/systems/FamicomBox.sys/manifest.bml
+@@ -0,0 +1,12 @@
++system name:FamicomBox
++  cpu
++    ram name=work.ram size=0x2000 volatile
++  ppu version=RP2C02C
++    ram name=nametable.ram size=0x800 volatile
++    ram name=object.ram size=256 volatile
++    ram name=palette.ram size=28 volatile
++  apu version=RP2A03E
++  prg
++    rom name=bios.program.rom size=0x8000
++  chr
++    rom name=bios.character.rom size=0x2000
+diff --git a/higan-hack/higan/systems/Game Gear.sys/manifest.bml b/nSide/higan/systems/Game Gear.sys/manifest.bml
+index 41f40dc..1e6c520 100644
+--- a/higan-hack/higan/systems/Game Gear.sys/manifest.bml	
++++ b/nSide/higan/systems/Game Gear.sys/manifest.bml	
+@@ -1 +1,6 @@
+ system name:Game Gear
++  cpu
++    ram name=work.ram size=0x2000 volatile
++  psg
++  vdp
++    ram name=video.ram size=0x4000 volatile
+diff --git a/higan-hack/higan/systems/Master System.sys/manifest.bml b/nSide/higan/systems/Master System.sys/manifest.bml
+index 770db3f..f95e3b3 100644
+--- a/higan-hack/higan/systems/Master System.sys/manifest.bml	
++++ b/nSide/higan/systems/Master System.sys/manifest.bml	
+@@ -1 +1,6 @@
+-system name:Master System
++system region=auto name:Master System
++  cpu
++    ram name=work.ram size=0x2000 volatile
++  psg
++  vdp
++    ram name=video.ram size=0x4000 volatile
+diff --git a/higan-hack/higan/systems/Mega Drive.sys/manifest.bml b/nSide/higan/systems/Mega Drive.sys/manifest.bml
+index 016eab9..267f0d2 100644
+--- a/higan-hack/higan/systems/Mega Drive.sys/manifest.bml	
++++ b/nSide/higan/systems/Mega Drive.sys/manifest.bml	
+@@ -1 +1,12 @@
+ system name:Mega Drive
++  bus
++    rom name=tmss.rom size=0x800
++    ram name=work.ram size=0x10000 volatile
++  apu
++    ram name=audio.ram size=0x2000 volatile
++  vdp
++    ram name=video.ram size=0x10000 volatile
++    ram name=palette.ram size=0x80 volatile
++    ram name=vertical-scroll.ram size=0x50 volatile
++  psg
++  ym2612
+diff --git a/nSide/higan/systems/PlayChoice-10.sys/manifest.bml b/nSide/higan/systems/PlayChoice-10.sys/manifest.bml
+new file mode 100644
+index 0000000..f6bb5ac
+--- /dev/null
++++ b/nSide/higan/systems/PlayChoice-10.sys/manifest.bml
+@@ -0,0 +1,22 @@
++system name:PlayChoice-10
++  cpu
++    ram name=work.ram size=0x800 volatile
++  ppu version=RP2C03B
++    ram name=nametable.ram size=0x800 volatile
++    ram name=object.ram size=256 volatile
++    ram name=palette.ram size=28 volatile
++  apu version=RP2A03G
++  pc10
++    screen mode=2
++    cpu
++      rom name=bios-dual.rom size=0x4000
++    video-circuit
++      vrom name=character.rom size=0x6000
++      cgrom name=palette.rom size=0x300
++    setting name="Attract Mode Sounds"
++      option value="0x0040" name="Plays"
++      option value="0x0000" name="Muted"
++    setting name="Play Time / Coin"
++      option value="0x8000" name="Free Play"
++      option value="0x3f00" name="5:00"
++      option value="0x2200" name="2:30"
+diff --git a/nSide/higan/systems/SG-1000.sys/manifest.bml b/nSide/higan/systems/SG-1000.sys/manifest.bml
+new file mode 100644
+index 0000000..0581850
+--- /dev/null
++++ b/nSide/higan/systems/SG-1000.sys/manifest.bml
+@@ -0,0 +1,6 @@
++system region=auto name:SG-1000
++  cpu
++    ram name=work.ram size=0x400 volatile
++  psg
++  vdc
++    ram name=video.ram size=0x4000 volatile
+diff --git a/nSide/higan/systems/VS. System.sys/manifest.bml b/nSide/higan/systems/VS. System.sys/manifest.bml
+new file mode 100644
+index 0000000..e556451
+--- /dev/null
++++ b/nSide/higan/systems/VS. System.sys/manifest.bml	
+@@ -0,0 +1,8 @@
++system name:VS. System
++  cpu
++    ram name=work.ram size=0x800 volatile
++  ppu
++    ram name=nametable.ram size=0x1000 volatile
++    ram name=object.ram size=256 volatile
++    ram name=palette.ram size=28 volatile
++  apu
+

@@ -1,0 +1,180 @@
+diff --git a/higan-hack/higan/video/video.cpp b/nSide/higan/video/video.cpp
+index fd14001..ca5bd06 100644
+--- a/higan-hack/higan/video/video.cpp
++++ b/nSide/higan/video/video.cpp
+@@ -20,6 +20,7 @@ auto Video::reset() -> void {
+   height = 0;
+   effects.colorBleed = false;
+   effects.interframeBlending = false;
++  effects.rotation = 0;
+ }
+ 
+ auto Video::setInterface(Interface* interface) -> void {
+@@ -85,6 +86,17 @@ auto Video::setEffect(Effect effect, const any& value) -> void {
+   if(effect == Effect::InterframeBlending && value.is<bool>()) {
+     effects.interframeBlending = value.get<bool>();
+   }
++
++  if(effect == Effect::Scanlines && value.is<bool>()) {
++    effects.scanlines = value.get<bool>();
++    resize(this->width, this->height);
++  }
++
++  if(effect == Effect::Rotation) {
++    if(value.is<int>())   effects.rotation = value.get<int>();
++    if(value.is<uint>())  effects.rotation = value.get<uint>();
++    if(value.is<uint2>()) effects.rotation = value.get<uint2>();
++  }
+ }
+ 
+ auto Video::createSprite(uint width, uint height) -> shared_pointer<Sprite> {
+@@ -104,35 +116,82 @@ auto Video::removeSprite(shared_pointer<Sprite> sprite) -> bool {
+ }
+ 
+ auto Video::refresh(uint32* input, uint pitch, uint width, uint height) -> void {
++  resize(width, height);
++  refreshRegion(input, pitch, 0, 0, width, height);
++}
++
++auto Video::resize(uint width, uint height) -> void {
+   if(this->width != width || this->height != height) {
+     delete output;
+-    output = new uint32[width * height]();
++    output = new uint32[width * (height << effects.scanlines)]();
+     this->width = width;
+     this->height = height;
+   }
++}
+ 
++auto Video::refreshRegion(uint32* input, uint pitch, uint origin_x, uint origin_y, uint width, uint height, uint paletteOffset) -> void {
+   pitch >>= 2;  //bytes to words
+-  for(uint y : range(height)) {
+-    auto source = input + y * pitch;
+-    auto target = output + y * width;
+ 
+-    if(!effects.interframeBlending) {
+-      for(uint x : range(width)) {
+-        auto color = palette[*source++];
+-        *target++ = color;
++  if(!effects.scanlines) {
++    int increment;
++    switch(effects.rotation) {
++    case 0: increment =  1;            break;
++    case 1: increment =  this->height; break;
++    case 2: increment = -1;            break;
++    case 3: increment = -this->height; break;
++    }
++    for(uint y : range(height)) {
++      uint32* source = input + y * pitch;
++      uint32* target = output + (origin_y + y) * this->width + origin_x;
++      switch(effects.rotation) {
++      case 1: target = output + (this->height - 1 - origin_y - y); break;
++      case 2: target = output + (this->height - 1 - origin_y - y) * this->width + this->width - 1 - origin_x; break;
++      case 3: target = output + (this->width - 1 - origin_x) * this->height + origin_y + y; break;
+       }
+-    } else {
+-      for(uint x : range(width)) {
+-        auto a = *target;
+-        auto b = palette[*source++];
+-        *target++ = (a + b - ((a ^ b) & 0x01010101)) >> 1;
++
++      if(!effects.interframeBlending) {
++        for(uint x : range(width)) {
++          auto color = palette[*source++ + paletteOffset];
++          *target = color;
++          target += increment;
++        }
++      } else {
++        for(uint x : range(width)) {
++          auto a = *target;
++          auto b = palette[*source++ + paletteOffset];
++          *target = (a + b - ((a ^ b) & 0x01010101)) >> 1;
++          target += increment;
++        }
++      }
++    }
++  } else {
++    for(uint y : range(height)) {
++      auto source = input + y * pitch;
++      auto targetLo = output + (origin_y + y) * this->width * 2 + origin_x;
++      auto targetHi = output + (origin_y + y) * this->width * 2 + origin_x + this->width;
++
++      if(!effects.interframeBlending) {
++        for(uint x : range(width)) {
++          auto color = palette[*source++ + paletteOffset];
++          *targetLo++ = color;
++          *targetHi++ = (255 << 24) | ((color & 0xfefefe) >> 1);
++        }
++      } else {
++        for(uint x : range(width)) {
++          auto a = *targetLo;
++          auto b = palette[*source++ + paletteOffset];
++          *targetLo++ = (a + b - ((a ^ b) & 0x01010101)) >> 1;
++          auto c = *targetHi;
++          auto d = (255 << 24) | ((b & 0xfefefe) >> 1);
++          *targetHi++ = (c + d - ((c ^ d) & 0x01010101)) >> 1;
++        }
+       }
+     }
+   }
+ 
+   if(effects.colorBleed) {
+     for(uint y : range(height)) {
+-      auto target = output + y * width;
++      auto target = output + (origin_y + y) * this->width + origin_x;
+       for(uint x : range(width)) {
+         auto a = target[x];
+         auto b = target[x + (x != width - 1)];
+@@ -158,7 +217,18 @@ auto Video::refresh(uint32* input, uint pitch, uint width, uint height) -> void
+     }
+   }
+ 
+-  interface->videoRefresh(output, width * sizeof(uint32), width, height);
++  if(!effects.rotation.bit(0)) {
++    interface->videoRefresh(output, this->width * sizeof(uint32), this->width, this->height << effects.scanlines);
++  } else {
++    interface->videoRefresh(
++      output, (this->height << effects.scanlines) * sizeof(uint32),
++      this->height << effects.scanlines, this->width
++    );
++  }
++}
++
++auto Video::clear() -> void {
++  memory::fill(output, width * (height << effects.scanlines) * sizeof(uint32));
+ }
+ 
+ }
+diff --git a/higan-hack/higan/video/video.hpp b/nSide/higan/video/video.hpp
+index e4a5a12..5ddb3b4 100644
+--- a/higan-hack/higan/video/video.hpp
++++ b/nSide/higan/video/video.hpp
+@@ -10,6 +10,8 @@ struct Video {
+   enum class Effect : uint {
+     ColorBleed,
+     InterframeBlending,
++    Scanlines,
++    Rotation,
+   };
+ 
+   ~Video();
+@@ -28,6 +30,9 @@ struct Video {
+   auto removeSprite(shared_pointer<Sprite> sprite) -> bool;
+ 
+   auto refresh(uint32* input, uint pitch, uint width, uint height) -> void;
++  auto resize(uint width, uint height) -> void;
++  auto refreshRegion(uint32* input, uint pitch, uint origin_x, uint origin_y, uint width, uint height, uint paletteOffset = 0) -> void;
++  auto clear() -> void;
+ 
+ private:
+   Emulator::Interface* interface = nullptr;
+@@ -47,6 +52,8 @@ private:
+   struct Effects {
+     bool colorBleed = false;
+     bool interframeBlending = false;
++    bool scanlines = false;
++    uint2 rotation = 0;
+   } effects;
+ 
+   friend class Sprite;
+

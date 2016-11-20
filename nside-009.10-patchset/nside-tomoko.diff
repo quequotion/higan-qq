@@ -1,0 +1,739 @@
+diff --git a/higan-hack/higan/target-tomoko/GNUmakefile b/nSide/higan/target-tomoko/GNUmakefile
+index 5569af9..b5d33c5 100644
+--- a/higan-hack/higan/target-tomoko/GNUmakefile
++++ b/nSide/higan/target-tomoko/GNUmakefile
+@@ -1,8 +1,17 @@
+-name := higan
++ifndef name
++  name := higan
++endif
+ flags += -DSFC_SUPERGAMEBOY
+ 
++include a2600/GNUmakefile
+ include fc/GNUmakefile
+-include sfc/GNUmakefile
++ifndef profile
++  include sfc/GNUmakefile
++else ifeq ($(profile),accuracy)
++  include sfc/GNUmakefile
++else ifeq ($(profile),balanced)
++  include sfc-balanced/GNUmakefile
++endif
+ include ms/GNUmakefile
+ include md/GNUmakefile
+ include gb/GNUmakefile
+@@ -11,7 +20,7 @@ include ws/GNUmakefile
+ include processor/GNUmakefile
+ 
+ ui_objects := ui-tomoko ui-program ui-configuration ui-input
+-ui_objects += ui-settings ui-tools ui-presentation
++ui_objects += ui-settings ui-tools ui-dip-switches ui-presentation
+ ui_objects += ruby hiro
+ ui_objects += $(if $(call streq,$(platform),windows),ui-resource)
+ 
+@@ -59,6 +68,7 @@ obj/ui-input.o: $(ui)/input/input.cpp $(call rwildcard,$(ui)/)
+ obj/ui-library.o: $(ui)/library/library.cpp $(call rwildcard,$(ui)/)
+ obj/ui-settings.o: $(ui)/settings/settings.cpp $(call rwildcard,$(ui)/)
+ obj/ui-tools.o: $(ui)/tools/tools.cpp $(call rwildcard,$(ui)/)
++obj/ui-dip-switches.o: $(ui)/dip-switches/dip-switches.cpp $(call rwildcard,$(ui)/)
+ obj/ui-presentation.o: $(ui)/presentation/presentation.cpp $(call rwildcard,$(ui)/)
+ 
+ obj/ui-resource.o:
+diff --git a/higan-hack/higan/target-tomoko/configuration/configuration.cpp b/nSide/higan/target-tomoko/configuration/configuration.cpp
+index 980d82a..5f33a38 100644
+--- a/higan-hack/higan/target-tomoko/configuration/configuration.cpp
++++ b/nSide/higan/target-tomoko/configuration/configuration.cpp
+@@ -13,6 +13,7 @@ Settings::Settings() {
+ 
+   set("Library/Location", {Path::user(), "Emulation/"});
+   set("Library/IgnoreManifests", false);
++  set("Library/ShowPreAlpha", false);
+ 
+   set("Video/Driver", ruby::Video::optimalDriver());
+   set("Video/Synchronize", false);
+diff --git a/nSide/higan/target-tomoko/dip-switches/dip-switches.cpp b/nSide/higan/target-tomoko/dip-switches/dip-switches.cpp
+new file mode 100644
+index 0000000..3dfea5d
+--- /dev/null
++++ b/nSide/higan/target-tomoko/dip-switches/dip-switches.cpp
+@@ -0,0 +1,66 @@
++#include "../tomoko.hpp"
++DipSwitches* dipSwitches = nullptr;
++
++DipSwitch::DipSwitch(VerticalLayout* parent, Size size) : HorizontalLayout(parent, size) {
++}
++
++DipSwitches::DipSwitches() {
++  dipSwitches = this;
++  setTitle("DIP Switches");
++
++  layout.setMargin(5);
++
++  setSize({250, layout.minimumSize().height()});
++
++  accept.setText("Accept");
++
++  onClose([&] {
++    setModal(false);
++    setVisible(false);
++  });
++
++  accept.onActivate([&] {
++    setModal(false);
++    setVisible(false);
++  });
++}
++
++auto DipSwitches::run(const Markup::Node& node) -> uint {
++  for(DipSwitch& dipItem : dip) {
++    dipItem.name.setEnabled(false);
++    dipItem.name.setText("(empty)");
++    dipItem.value.setEnabled(false);
++    dipItem.value.reset();
++    dipItem.values.reset();
++  }
++
++  uint index = 0;
++  for(auto& setting : node.find("setting")) {
++    dip[index].name.setEnabled();
++    dip[index].name.setText(setting["name"].text());
++    dip[index].value.setEnabled();
++    for(auto& option : setting.find("option")) {
++      if(auto result = Eval::integer(option["value"].text())) {
++        ComboButtonItem item;
++        item.setText(option["name"].text());
++        dip[index].value.append(item);
++        dip[index].values.append(result());
++      }
++    }
++
++    if(++index >= Slots) break;
++  }
++
++  setVisible();
++  accept.setFocused();
++
++  audio->clear();
++  setModal();
++
++  uint result = 0;
++  for(auto& dipItem : dip) {
++    if(dipItem.value.enabled() == false) continue;
++    result |= dipItem.values[dipItem.value.selected().offset()];
++  }
++  return result;
++}
+diff --git a/nSide/higan/target-tomoko/dip-switches/dip-switches.hpp b/nSide/higan/target-tomoko/dip-switches/dip-switches.hpp
+new file mode 100644
+index 0000000..05e9a24
+--- /dev/null
++++ b/nSide/higan/target-tomoko/dip-switches/dip-switches.hpp
+@@ -0,0 +1,32 @@
++struct DipSwitch : HorizontalLayout {
++  DipSwitch(VerticalLayout*, Size);
++
++  Label name{this, Size{100, 0}, 5};
++  ComboButton value{this, Size{~0, 0}};
++
++  vector<uint> values;
++};
++
++struct DipSwitches : Window {
++  enum : uint { Slots = 8 };
++
++  VerticalLayout layout{this};
++    DipSwitch dip[Slots] = {
++      DipSwitch{&layout, Size{~0, 0}},
++      DipSwitch{&layout, Size{~0, 0}},
++      DipSwitch{&layout, Size{~0, 0}},
++      DipSwitch{&layout, Size{~0, 0}},
++      DipSwitch{&layout, Size{~0, 0}},
++      DipSwitch{&layout, Size{~0, 0}},
++      DipSwitch{&layout, Size{~0, 0}},
++      DipSwitch{&layout, Size{~0, 0}}
++    };
++    HorizontalLayout controlLayout{&layout, Size{~0, 0}};
++      Widget spacer{&controlLayout, Size{~0, 0}};
++      Button accept{&controlLayout, Size{80, 0}};
++
++  auto run(const Markup::Node& node) -> uint;
++  DipSwitches();
++};
++
++extern DipSwitches* dipSwitches;
+diff --git a/higan-hack/higan/target-tomoko/input/hotkeys.cpp b/nSide/higan/target-tomoko/input/hotkeys.cpp
+index c6c76e3..4ae1601 100644
+--- a/higan-hack/higan/target-tomoko/input/hotkeys.cpp
++++ b/nSide/higan/target-tomoko/input/hotkeys.cpp
+@@ -68,6 +68,24 @@ auto InputManager::appendHotkeys() -> void {
+     hotkeys.append(hotkey);
+   }
+ 
++  { auto hotkey = new InputHotkey;
++    hotkey->name = "Rotate";
++    hotkey->press = [] {
++      program->rotate();
++    };
++    hotkeys.append(hotkey);
++  }
++
++  { auto hotkey = new InputHotkey;
++    hotkey->name = "Export Memory";
++    hotkey->press = [] {
++      if(!::emulator) return;
++      ::emulator->exportMemory();
++      program->showMessage("Memory exported");
++    };
++    hotkeys.append(hotkey);
++  }
++
+   for(auto& hotkey : hotkeys) {
+     hotkey->path = string{"Hotkey/", hotkey->name}.replace(" ", "");
+     hotkey->assignment = settings(hotkey->path).text();
+diff --git a/higan-hack/higan/target-tomoko/presentation/presentation.cpp b/nSide/higan/target-tomoko/presentation/presentation.cpp
+index 0513af0..6ca8276 100644
+--- a/higan-hack/higan/target-tomoko/presentation/presentation.cpp
++++ b/nSide/higan/target-tomoko/presentation/presentation.cpp
+@@ -7,39 +7,7 @@ Presentation::Presentation() {
+   presentation = this;
+ 
+   libraryMenu.setText("Library");
+-  string_vector manufacturers;
+-  for(auto& emulator : program->emulators) {
+-    if(!manufacturers.find(emulator->information.manufacturer)) {
+-      manufacturers.append(emulator->information.manufacturer);
+-    }
+-  }
+-  for(auto& manufacturer : manufacturers) {
+-    Menu manufacturerMenu{&libraryMenu};
+-    manufacturerMenu.setText(manufacturer);
+-    for(auto& emulator : program->emulators) {
+-      if(emulator->information.manufacturer != manufacturer) continue;
+-      for(auto& medium : emulator->media) {
+-        auto item = new MenuItem{&manufacturerMenu};
+-        item->setText({medium.name, " ..."}).onActivate([=] {
+-          program->loadMedium(*emulator, medium);
+-        });
+-      }
+-    }
+-  }
+-  //add icarus menu options -- but only if icarus binary is present
+-  if(execute("icarus", "--name").output.strip() == "icarus") {
+-    libraryMenu.append(MenuSeparator());
+-    libraryMenu.append(MenuItem().setText("Load ROM File ...").onActivate([&] {
+-      audio->clear();
+-      if(auto location = execute("icarus", "--import")) {
+-        program->mediumQueue.append(location.output.strip());
+-        program->loadMedium();
+-      }
+-    }));
+-    libraryMenu.append(MenuItem().setText("Import ROM Files ...").onActivate([&] {
+-      invoke("icarus");
+-    }));
+-  }
++  refreshLibraryMenu();
+ 
+   systemMenu.setText("System").setVisible(false);
+   powerSystem.setText("Power").onActivate([&] { program->powerCycle(); });
+@@ -48,9 +16,14 @@ Presentation::Presentation() {
+ 
+   settingsMenu.setText("Settings");
+   videoScaleMenu.setText("Video Scale");
++  if(settings["Video/Scale"].text() == "Tiny") videoScaleTiny.setChecked();
+   if(settings["Video/Scale"].text() == "Small") videoScaleSmall.setChecked();
+   if(settings["Video/Scale"].text() == "Medium") videoScaleMedium.setChecked();
+   if(settings["Video/Scale"].text() == "Large") videoScaleLarge.setChecked();
++  videoScaleTiny.setText("Tiny").onActivate([&] {
++    settings["Video/Scale"].setValue("Tiny");
++    resizeViewport();
++  });
+   videoScaleSmall.setText("Small").onActivate([&] {
+     settings["Video/Scale"].setValue("Small");
+     resizeViewport();
+@@ -114,23 +87,33 @@ Presentation::Presentation() {
+ 
+   toolsMenu.setText("Tools").setVisible(false);
+   saveStateMenu.setText("Save State");
++  saveSlot0.setText("Slot 0").onActivate([&] { program->saveState(0); });
+   saveSlot1.setText("Slot 1").onActivate([&] { program->saveState(1); });
+   saveSlot2.setText("Slot 2").onActivate([&] { program->saveState(2); });
+   saveSlot3.setText("Slot 3").onActivate([&] { program->saveState(3); });
+   saveSlot4.setText("Slot 4").onActivate([&] { program->saveState(4); });
+   saveSlot5.setText("Slot 5").onActivate([&] { program->saveState(5); });
++  saveSlot6.setText("Slot 6").onActivate([&] { program->saveState(6); });
++  saveSlot7.setText("Slot 7").onActivate([&] { program->saveState(7); });
++  saveSlot8.setText("Slot 8").onActivate([&] { program->saveState(8); });
++  saveSlot9.setText("Slot 9").onActivate([&] { program->saveState(9); });
+   loadStateMenu.setText("Load State");
++  loadSlot0.setText("Slot 0").onActivate([&] { program->loadState(0); });
+   loadSlot1.setText("Slot 1").onActivate([&] { program->loadState(1); });
+   loadSlot2.setText("Slot 2").onActivate([&] { program->loadState(2); });
+   loadSlot3.setText("Slot 3").onActivate([&] { program->loadState(3); });
+   loadSlot4.setText("Slot 4").onActivate([&] { program->loadState(4); });
+   loadSlot5.setText("Slot 5").onActivate([&] { program->loadState(5); });
++  loadSlot6.setText("Slot 6").onActivate([&] { program->loadState(6); });
++  loadSlot7.setText("Slot 7").onActivate([&] { program->loadState(7); });
++  loadSlot8.setText("Slot 8").onActivate([&] { program->loadState(8); });
++  loadSlot9.setText("Slot 9").onActivate([&] { program->loadState(9); });
+   cheatEditor.setText("Cheat Editor").onActivate([&] { toolsManager->show(0); });
+   stateManager.setText("State Manager").onActivate([&] { toolsManager->show(1); });
+   manifestViewer.setText("Manifest Viewer").onActivate([&] { toolsManager->show(2); });
+ 
+   helpMenu.setText("Help");
+-  documentation.setText("Documentation ...").onActivate([&] {
++  documentation.setText("Documentation for higan ...").onActivate([&] {
+     invoke("http://doc.byuu.org/higan/");
+   });
+   about.setText("About ...").onActivate([&] {
+@@ -169,17 +152,66 @@ Presentation::Presentation() {
+   #endif
+ }
+ 
++auto Presentation::refreshLibraryMenu() -> void {
++  libraryMenu.reset();
++  string_vector manufacturers;
++  for(auto& emulator : program->emulators) {
++    if(emulator->information.preAlpha && !settings["Library/ShowPreAlpha"].boolean()) continue;
++    if(!manufacturers.find(emulator->information.manufacturer)) {
++      manufacturers.append(emulator->information.manufacturer);
++    }
++  }
++  for(auto& manufacturer : manufacturers) {
++    Menu manufacturerMenu{&libraryMenu};
++    manufacturerMenu.setText(manufacturer);
++    for(uint domain : range(3)) {
++      for(auto& emulator : program->emulators) {
++        if(emulator->information.manufacturer != manufacturer) continue;
++        if(emulator->information.preAlpha && !settings["Library/ShowPreAlpha"].boolean()) continue;
++        for(auto& medium : emulator->media) {
++          if(medium.domain != domain) continue;
++          auto item = new MenuItem{&manufacturerMenu};
++          item->setText({emulator->information.preAlpha ? "(!) " : "", medium.name, " ..."}).onActivate([=] {
++            program->loadMedium(*emulator, medium);
++          });
++        }
++      }
++    }
++  }
++  //add icarus menu options -- but only if icarus binary is present
++  if(execute("icarus", "--name").output.strip() == "icarus") {
++    libraryMenu.append(MenuSeparator());
++    libraryMenu.append(MenuItem().setText("Load ROM File ...").onActivate([&] {
++      audio->clear();
++      if(auto location = execute("icarus", "--import")) {
++        program->mediumQueue.append(location.output.strip());
++        program->loadMedium();
++      }
++    }));
++    libraryMenu.append(MenuItem().setText("Import ROM Files ...").onActivate([&] {
++      invoke("icarus");
++    }));
++  }
++}
++
+ auto Presentation::updateEmulator() -> void {
+   if(!emulator) return;
+   resetSystem.setVisible(emulator->information.resettable);
+   inputPort1.setVisible(false).reset();
+   inputPort2.setVisible(false).reset();
+   inputPort3.setVisible(false).reset();
++  inputPort4.setVisible(false).reset();
+ 
+   for(auto n : range(emulator->ports)) {
+-    if(n >= 3) break;
++    if(n >= 4) break;
+     auto& port = emulator->ports[n];
+-    auto& menu = (n == 0 ? inputPort1 : n == 1 ? inputPort2 : inputPort3);
++    if(!port.plugAndPlay) continue;
++    auto& menu = (
++    n == 0 ? inputPort1 :
++    n == 1 ? inputPort2 :
++    n == 2 ? inputPort3 :
++             inputPort4
++    );
+     menu.setText(port.name);
+ 
+     Group devices;
+@@ -202,7 +234,12 @@ auto Presentation::updateEmulator() -> void {
+     }
+   }
+ 
+-  systemMenuSeparatorPorts.setVisible(inputPort1.visible() || inputPort2.visible() || inputPort3.visible());
++  systemMenuSeparatorPorts.setVisible(
++    inputPort1.visible() ||
++    inputPort2.visible() ||
++    inputPort3.visible() ||
++    inputPort4.visible()
++  );
+ 
+   emulator->set("Blur Emulation", blurEmulation.checked());
+   emulator->set("Color Emulation", colorEmulation.checked());
+@@ -232,6 +269,7 @@ auto Presentation::resizeViewport() -> void {
+   clearViewport();
+ 
+   uint scale = 2;
++  if(settings["Video/Scale"].text() == "Tiny"  ) scale = 1;
+   if(settings["Video/Scale"].text() == "Small" ) scale = 2;
+   if(settings["Video/Scale"].text() == "Medium") scale = 3;
+   if(settings["Video/Scale"].text() == "Large" ) scale = 4;
+@@ -239,9 +277,9 @@ auto Presentation::resizeViewport() -> void {
+   uint windowWidth = 0, windowHeight = 0;
+   bool aspectCorrection = true;
+   if(!fullScreen()) {
+-    windowWidth  = 320 * scale;
+-    windowHeight = 240 * scale;
+     aspectCorrection = settings["Video/AspectCorrection"].boolean();
++    windowWidth  = (aspectCorrection ? 384 : 320) * scale;  //320 for NTSC, 384 for PAL and SECAM
++    windowHeight = 240 * scale;  //240 for NTSC, 288 for PAL and SECAM
+   } else {
+     windowWidth  = geometry().width();
+     windowHeight = geometry().height();
+@@ -279,6 +317,40 @@ auto Presentation::toggleFullScreen() -> void {
+   resizeViewport();
+ }
+ 
++/*
++auto Presentation::draw(image logo) -> void {
++  if(!video) return;
++
++  uint32_t* output;
++  uint length = 0;
++  uint width = viewport.geometry().width();
++  uint height = viewport.geometry().height();
++  if(video->lock(output, length, width, height)) {
++    uint cx = (width - logo.width()) - 10;
++    uint cy = (height - logo.height()) - 10;
++
++    image backdrop;
++    backdrop.allocate(width, height);
++    if(logo && !program->hasQuit) {
++    //backdrop.sphericalGradient(0xff0000bf, 0xff000000, logo.width(), logo.height() / 2, width, height);
++      backdrop.impose(image::blend::sourceAlpha, cx, cy, logo, 0, 0, logo.width(), logo.height());
++    } else {
++      backdrop.fill(0xff000000);
++    }
++
++    auto data = (uint32_t*)backdrop.data();
++    for(auto y : range(height)) {
++      auto dp = output + y * (length >> 2);
++      auto sp = data + y * width;
++      for(auto x : range(width)) *dp++ = *sp++;
++    }
++
++    video->unlock();
++    video->refresh();
++  }
++}
++*/
++
+ auto Presentation::loadShaders() -> void {
+   auto pathname = locate("Video Shaders/");
+ 
+diff --git a/higan-hack/higan/target-tomoko/presentation/presentation.hpp b/nSide/higan/target-tomoko/presentation/presentation.hpp
+index 497e1f5..b5991d5 100644
+--- a/higan-hack/higan/target-tomoko/presentation/presentation.hpp
++++ b/nSide/higan/target-tomoko/presentation/presentation.hpp
+@@ -2,18 +2,21 @@ struct AboutWindow : Window {
+   AboutWindow();
+ 
+   VerticalLayout layout{this};
+-    Canvas canvas{&layout, Size{399, 95}, 15};
++    Canvas canvas{&layout, Size{256, 96}, 15};
+     HorizontalLayout informationLayout{&layout, Size{~0, 0}};
+       Label informationLeft{&informationLayout, Size{~0, 0}, 3};
+       Label informationRight{&informationLayout, Size{~0, 0}};
++    Label informationBottom{&layout, Size{~0, 0}};
+ };
+ 
+ struct Presentation : Window {
+   Presentation();
++  auto refreshLibraryMenu() -> void;
+   auto updateEmulator() -> void;
+   auto clearViewport() -> void;
+   auto resizeViewport() -> void;
+   auto toggleFullScreen() -> void;
++  //auto draw(image logo = {}) -> void;
+   auto loadShaders() -> void;
+ 
+   MenuBar menuBar{this};
+@@ -25,14 +28,16 @@ struct Presentation : Window {
+       Menu inputPort1{&systemMenu};
+       Menu inputPort2{&systemMenu};
+       Menu inputPort3{&systemMenu};
++      Menu inputPort4{&systemMenu};
+       MenuSeparator systemMenuSeparatorUnload{&systemMenu};
+       MenuItem unloadSystem{&systemMenu};
+     Menu settingsMenu{&menuBar};
+       Menu videoScaleMenu{&settingsMenu};
++        MenuRadioItem videoScaleTiny{&videoScaleMenu};
+         MenuRadioItem videoScaleSmall{&videoScaleMenu};
+         MenuRadioItem videoScaleMedium{&videoScaleMenu};
+         MenuRadioItem videoScaleLarge{&videoScaleMenu};
+-          Group videoScales{&videoScaleSmall, &videoScaleMedium, &videoScaleLarge};
++          Group videoScales{&videoScaleTiny, &videoScaleSmall, &videoScaleMedium, &videoScaleLarge};
+         MenuSeparator videoScaleSeparator{&videoScaleMenu};
+         MenuCheckItem aspectCorrection{&videoScaleMenu};
+       Menu videoEmulationMenu{&settingsMenu};
+@@ -53,17 +58,27 @@ struct Presentation : Window {
+       MenuItem showConfiguration{&settingsMenu};
+     Menu toolsMenu{&menuBar};
+       Menu saveStateMenu{&toolsMenu};
++        MenuItem saveSlot0{&saveStateMenu};
+         MenuItem saveSlot1{&saveStateMenu};
+         MenuItem saveSlot2{&saveStateMenu};
+         MenuItem saveSlot3{&saveStateMenu};
+         MenuItem saveSlot4{&saveStateMenu};
+         MenuItem saveSlot5{&saveStateMenu};
++        MenuItem saveSlot6{&saveStateMenu};
++        MenuItem saveSlot7{&saveStateMenu};
++        MenuItem saveSlot8{&saveStateMenu};
++        MenuItem saveSlot9{&saveStateMenu};
+       Menu loadStateMenu{&toolsMenu};
++        MenuItem loadSlot0{&loadStateMenu};
+         MenuItem loadSlot1{&loadStateMenu};
+         MenuItem loadSlot2{&loadStateMenu};
+         MenuItem loadSlot3{&loadStateMenu};
+         MenuItem loadSlot4{&loadStateMenu};
+         MenuItem loadSlot5{&loadStateMenu};
++        MenuItem loadSlot6{&loadStateMenu};
++        MenuItem loadSlot7{&loadStateMenu};
++        MenuItem loadSlot8{&loadStateMenu};
++        MenuItem loadSlot9{&loadStateMenu};
+       MenuSeparator toolsMenuSeparator{&toolsMenu};
+       MenuItem cheatEditor{&toolsMenu};
+       MenuItem stateManager{&toolsMenu};
+diff --git a/higan-hack/higan/target-tomoko/program/interface.cpp b/nSide/higan/target-tomoko/program/interface.cpp
+index 415dac6..1cfe56f 100644
+--- a/higan-hack/higan/target-tomoko/program/interface.cpp
++++ b/nSide/higan/target-tomoko/program/interface.cpp
+@@ -105,9 +105,25 @@ auto Program::inputRumble(uint port, uint device, uint input, bool enable) -> vo
+   }
+ }
+ 
++auto Program::deviceChanged(uint port, uint device) -> void {
++  Menu& portMenu = (
++    port == 0 ? presentation->inputPort1 :
++    port == 1 ? presentation->inputPort2 :
++    port == 2 ? presentation->inputPort3 :
++                presentation->inputPort4
++  );
++  uint localDevice = 0;
++  for(uint i : range(device)) {
++    //Check if device is available for this port by checking its name's length
++    if(inputManager->emulator->ports[port].devices[i].name) localDevice++;
++  }
++  ((MenuRadioItem)portMenu.action(localDevice)).setChecked();
++}
++
+ auto Program::dipSettings(Markup::Node node) -> uint {
+-  return 0;
++  return dipSwitches->run(node);
+ }
+ 
+ auto Program::notify(string text) -> void {
++  MessageWindow().setTitle("higan").setText(text).information();
+ }
+diff --git a/higan-hack/higan/target-tomoko/program/medium.cpp b/nSide/higan/target-tomoko/program/medium.cpp
+index afb13f9..fc570e8 100644
+--- a/higan-hack/higan/target-tomoko/program/medium.cpp
++++ b/nSide/higan/target-tomoko/program/medium.cpp
+@@ -17,7 +17,7 @@ auto Program::loadMedium() -> void {
+ auto Program::loadMedium(Emulator::Interface& interface, const Emulator::Interface::Medium& medium) -> void {
+   unloadMedium();
+ 
+-  mediumPaths.append(locate({medium.name, ".sys/"}));
++  mediumPaths.append(locateSystem({medium.name, ".sys/"}));
+ 
+   Emulator::audio.reset(2, audio->get(Audio::Frequency).get<uint>(44100));
+   inputManager->bind(emulator = &interface);
+diff --git a/higan-hack/higan/target-tomoko/program/program.cpp b/nSide/higan/target-tomoko/program/program.cpp
+index 06aa549..8d19b2b 100644
+--- a/higan-hack/higan/target-tomoko/program/program.cpp
++++ b/nSide/higan/target-tomoko/program/program.cpp
+@@ -1,6 +1,11 @@
+ #include "../tomoko.hpp"
++#include <a2600/interface/interface.hpp>
+ #include <fc/interface/interface.hpp>
++#if defined(PROFILE_BALANCED)
++#include <sfc-balanced/interface/interface.hpp>
++#else
+ #include <sfc/interface/interface.hpp>
++#endif
+ #include <ms/interface/interface.hpp>
+ #include <md/interface/interface.hpp>
+ #include <gb/interface/interface.hpp>
+@@ -16,6 +21,7 @@ Program::Program(string_vector args) {
+   program = this;
+   Application::onMain({&Program::main, this});
+ 
++  emulators.append(new Atari2600::Interface);
+   emulators.append(new Famicom::Interface);
+   emulators.append(new SuperFamicom::Interface);
+   emulators.append(new MasterSystem::Interface);
+@@ -51,6 +57,7 @@ Program::Program(string_vector args) {
+   new SettingsManager;
+   new CheatDatabase;
+   new ToolsManager;
++  new DipSwitches;
+   new AboutWindow;
+ 
+   presentation->setFocused();
+diff --git a/higan-hack/higan/target-tomoko/program/program.hpp b/nSide/higan/target-tomoko/program/program.hpp
+index 4e75749..93418f7 100644
+--- a/higan-hack/higan/target-tomoko/program/program.hpp
++++ b/nSide/higan/target-tomoko/program/program.hpp
+@@ -12,6 +12,7 @@ struct Program : Emulator::Interface::Bind {
+   auto audioSample(const double* samples, uint channels) -> void override;
+   auto inputPoll(uint port, uint device, uint input) -> int16 override;
+   auto inputRumble(uint port, uint device, uint input, bool enable) -> void override;
++  auto deviceChanged(uint port, uint device) -> void override;
+   auto dipSettings(Markup::Node node) -> uint override;
+   auto notify(string text) -> void override;
+ 
+@@ -29,6 +30,7 @@ struct Program : Emulator::Interface::Bind {
+   auto powerCycle() -> void;
+   auto softReset() -> void;
+   auto connectDevices() -> void;
++  auto rotate() -> void;
+   auto showMessage(const string& text) -> void;
+   auto updateStatusText() -> void;
+   auto updateVideoPalette() -> void;
+diff --git a/higan-hack/higan/target-tomoko/program/utility.cpp b/nSide/higan/target-tomoko/program/utility.cpp
+index ecbecf2..761a5bc 100644
+--- a/higan-hack/higan/target-tomoko/program/utility.cpp
++++ b/nSide/higan/target-tomoko/program/utility.cpp
+@@ -25,6 +25,11 @@ auto Program::connectDevices() -> void {
+   }
+ }
+ 
++auto Program::rotate() -> void {
++  if(!emulator) return;
++  emulator->rotate();
++}
++
+ auto Program::showMessage(const string& text) -> void {
+   statusTime = time(0);
+   statusMessage = text;
+diff --git a/higan-hack/higan/target-tomoko/settings/advanced.cpp b/nSide/higan/target-tomoko/settings/advanced.cpp
+index 56ff124..931f5b6 100644
+--- a/higan-hack/higan/target-tomoko/settings/advanced.cpp
++++ b/nSide/higan/target-tomoko/settings/advanced.cpp
+@@ -43,4 +43,10 @@ AdvancedSettings::AdvancedSettings(TabFrame* parent) : TabFrameItem(parent) {
+   ignoreManifests.setText("Ignore Manifests").setChecked(settings["Library/IgnoreManifests"].boolean()).onToggle([&] {
+     settings["Library/IgnoreManifests"].setValue(ignoreManifests.checked());
+   });
++
++  showPreAlpha.setText("Show Pre-Alpha Cores").setChecked(settings["Library/ShowPreAlpha"].boolean()).onToggle([&] {
++    settings["Library/ShowPreAlpha"].setValue(showPreAlpha.checked());
++    presentation->refreshLibraryMenu();
++    settingsManager->input.refreshEmulatorList();
++  });
+ }
+diff --git a/higan-hack/higan/target-tomoko/settings/input.cpp b/nSide/higan/target-tomoko/settings/input.cpp
+index 038de2c..1c931f4 100644
+--- a/higan-hack/higan/target-tomoko/settings/input.cpp
++++ b/nSide/higan/target-tomoko/settings/input.cpp
+@@ -11,9 +11,7 @@ InputSettings::InputSettings(TabFrame* parent) : TabFrameItem(parent) {
+   allowInput.setText("Allow Input").setChecked(settings["Input/FocusLoss/AllowInput"].boolean()).onToggle([&] {
+     settings["Input/FocusLoss/AllowInput"].setValue(allowInput.checked());
+   });
+-  for(auto& emulator : inputManager->emulators) {
+-    emulatorList.append(ComboButtonItem().setText(emulator.name));
+-  }
++  refreshEmulatorList();
+   emulatorList.onChange([&] { reloadPorts(); });
+   portList.onChange([&] { reloadDevices(); });
+   deviceList.onChange([&] { reloadMappings(); });
+@@ -38,6 +36,14 @@ InputSettings::InputSettings(TabFrame* parent) : TabFrameItem(parent) {
+   reloadPorts();
+ }
+ 
++auto InputSettings::refreshEmulatorList() -> void {
++  emulatorList.reset();
++  for(auto& emulator : inputManager->emulators) {
++    if(emulator.interface->information.preAlpha && !settings["Library/ShowPreAlpha"].boolean()) continue;
++    emulatorList.append(ComboButtonItem().setText(emulator.name));
++  }
++}
++
+ auto InputSettings::updateControls() -> void {
+   eraseButton.setEnabled((bool)mappingList.selected());
+   assignMouse1.setVisible(false);
+diff --git a/higan-hack/higan/target-tomoko/settings/settings.hpp b/nSide/higan/target-tomoko/settings/settings.hpp
+index 351ad69..b23961b 100644
+--- a/higan-hack/higan/target-tomoko/settings/settings.hpp
++++ b/nSide/higan/target-tomoko/settings/settings.hpp
+@@ -59,6 +59,7 @@ struct AudioSettings : TabFrameItem {
+ 
+ struct InputSettings : TabFrameItem {
+   InputSettings(TabFrame*);
++  auto refreshEmulatorList() -> void;
+   auto updateControls() -> void;
+   auto activeEmulator() -> InputEmulator&;
+   auto activePort() -> InputPort&;
+@@ -129,6 +130,7 @@ struct AdvancedSettings : TabFrameItem {
+       LineEdit libraryLocation{&libraryLayout, Size{~0, 0}};
+       Button libraryChange{&libraryLayout, Size{0, 0}};
+     CheckLabel ignoreManifests{&layout, Size{~0, 0}};
++    CheckLabel showPreAlpha{&layout, Size{~0, 0}};
+ };
+ 
+ struct SettingsManager : Window {
+diff --git a/higan-hack/higan/target-tomoko/tomoko.cpp b/nSide/higan/target-tomoko/tomoko.cpp
+index 8eaecde..650dc05 100644
+--- a/higan-hack/higan/target-tomoko/tomoko.cpp
++++ b/nSide/higan/target-tomoko/tomoko.cpp
+@@ -11,10 +11,40 @@ auto locate(string name) -> string {
+   location = {Path::config(), "higan/", name};
+   if(inode::exists(location)) return location;
+ 
++  location = {Path::local(), "higan/", name};
++  if(inode::exists(location)) return location;
++
++  location = {Path::config(), "higan/", name};
++  if(inode::exists(location)) {
++    if(Location::suffix(location) == ".bml" && Location::suffix(Location::dir(location)) != ".sys") {
++      directory::create({Path::config(), "higan/"});
++      file::copy(location, {Path::config(), "higan/", name});
++      return {Path::config(), "higan/", name};
++    }
++    return location;
++  }
++
++  location = {Path::local(), "higan/", name};
++  if(inode::exists(location)) {
++    if(Location::suffix(location) == ".bml" && Location::suffix(Location::dir(location)) != ".sys") {
++      directory::create({Path::local(), "higan/"});
++      file::copy(location, {Path::local(), "higan/", name});
++      return {Path::local(), "higan/", name};
++    }
++    return location;
++  }
++
+   directory::create({Path::local(), "higan/"});
+   return {Path::local(), "higan/", name};
+ }
+ 
++auto locateSystem(string name) -> string {
++  string location = {settings["Library/Location"].text(), "System/", name};
++  if(inode::exists(location)) return location;
++
++  return locate(name);
++}
++
+ #include <nall/main.hpp>
+ auto nall::main(string_vector args) -> void {
+   Application::setName("higan");
+diff --git a/higan-hack/higan/target-tomoko/tomoko.hpp b/nSide/higan/target-tomoko/tomoko.hpp
+index 9282945..ff98876 100644
+--- a/higan-hack/higan/target-tomoko/tomoko.hpp
++++ b/nSide/higan/target-tomoko/tomoko.hpp
+@@ -17,5 +17,7 @@ extern Emulator::Interface* emulator;
+ #include "settings/settings.hpp"
+ #include "tools/tools.hpp"
+ #include "presentation/presentation.hpp"
++#include "dip-switches/dip-switches.hpp"
+ 
+ auto locate(string name) -> string;
++auto locateSystem(string name) -> string;
+

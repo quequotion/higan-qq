@@ -1,0 +1,2506 @@
+diff --git a/nSide/higan/a2600/GNUmakefile b/nSide/higan/a2600/GNUmakefile
+new file mode 100644
+index 0000000..52a8da3
+--- /dev/null
++++ b/nSide/higan/a2600/GNUmakefile
+@@ -0,0 +1,14 @@
++processors += mos6502
++
++objects += a2600-interface
++objects += a2600-cpu a2600-pia a2600-tia
++objects += a2600-system a2600-cartridge
++objects += a2600-controller
++
++obj/a2600-interface.o:    a2600/interface/interface.cpp $(call rwildcard,a2600/interface/)
++obj/a2600-cpu.o:          a2600/cpu/cpu.cpp $(call rwildcard,a2600/cpu/)
++obj/a2600-pia.o:          a2600/pia/pia.cpp $(call rwildcard,a2600/pia/)
++obj/a2600-tia.o:          a2600/tia/tia.cpp $(call rwildcard,a2600/tia/)
++obj/a2600-system.o:       a2600/system/system.cpp $(call rwildcard,a2600/system/)
++obj/a2600-cartridge.o:    a2600/cartridge/cartridge.cpp $(call rwildcard,a2600/cartridge/)
++obj/a2600-controller.o:   a2600/controller/controller.cpp $(call rwildcard,a2600/controller/)
+diff --git a/nSide/higan/a2600/a2600.hpp b/nSide/higan/a2600/a2600.hpp
+new file mode 100644
+index 0000000..c50bef9
+--- /dev/null
++++ b/nSide/higan/a2600/a2600.hpp
+@@ -0,0 +1,44 @@
++#pragma once
++
++//Atari 2600 emulator by hex_usr, with contributions from:
++// byuu        (MOS6502 processor)
++// Alyosha_TAS (PIA TIA, timing details)
++//license: GPLv3
++//original project started: 2016-07-31
++
++#include <emulator/emulator.hpp>
++#include <emulator/thread.hpp>
++#include <emulator/scheduler.hpp>
++#include <emulator/cheat.hpp>
++
++#include <processor/mos6502/mos6502.hpp>
++
++namespace Atari2600 {
++  using File = Emulator::File;
++  using Scheduler = Emulator::Scheduler;
++  using Cheat = Emulator::Cheat;
++  extern Scheduler scheduler;
++  extern Cheat cheat;
++
++  struct Thread : Emulator::Thread {
++    auto create(auto (*entrypoint)() -> void, double frequency) -> void {
++      Emulator::Thread::create(entrypoint, frequency);
++      scheduler.append(*this);
++    }
++
++    inline auto synchronize(Thread& thread) -> void {
++      if(clock() >= thread.clock()) scheduler.resume(thread);
++    }
++  };
++
++  #include <a2600/controller/controller.hpp>
++
++  #include <a2600/cpu/cpu.hpp>
++  #include <a2600/pia/pia.hpp>
++  #include <a2600/tia/tia.hpp>
++
++  #include <a2600/system/system.hpp>
++  #include <a2600/cartridge/cartridge.hpp>
++}
++
++#include <a2600/interface/interface.hpp>
+diff --git a/nSide/higan/a2600/cartridge/cartridge.cpp b/nSide/higan/a2600/cartridge/cartridge.cpp
+new file mode 100644
+index 0000000..527fd4f
+--- /dev/null
++++ b/nSide/higan/a2600/cartridge/cartridge.cpp
+@@ -0,0 +1,88 @@
++#include <a2600/a2600.hpp>
++
++namespace Atari2600 {
++
++#include "serialization.cpp"
++Cartridge cartridge;
++
++auto Cartridge::load() -> bool {
++  information = Information();
++
++  if(auto pathID = interface->load(ID::Atari2600, "Atari 2600", "a26")) {
++    information.pathID = pathID();
++  } else return false;
++
++  if(auto fp = interface->open(pathID(), "manifest.bml", File::Read, File::Required)) {
++    information.manifest = fp->reads();
++  } else return false;
++
++  auto document = BML::unserialize(information.manifest);
++  information.title = document["information/title"].text();
++  if(document["board/region"].text() == "ntsc")  information.region = Region::NTSC;
++  if(document["board/region"].text() == "pal")   information.region = Region::PAL;
++  if(document["board/region"].text() == "secam") information.region = Region::SECAM;
++
++  if(auto node = document["board/rom"]) {
++    rom.size = node["size"].natural();
++    rom.mask = bit::round(rom.size) - 1;
++    if(rom.size) {
++      rom.data = new uint8[rom.mask];
++      if(auto name = node["name"].text()) {
++        if(auto fp = interface->open(pathID(), name, File::Read, File::Required)) {
++          fp->read(rom.data, rom.size);
++        }
++      }
++    }
++  }
++
++  if(auto node = document["board/ram"]) {
++    ram.size = node["size"].natural();
++    ram.mask = bit::round(ram.size) - 1;
++    if(ram.size) {
++      ram.data = new uint8[ram.mask];
++      if(auto name = node["name"].text()) {
++        if(auto fp = interface->open(pathID(), name, File::Read)) {
++          fp->read(ram.data, ram.size);
++        }
++      }
++    }
++  }
++
++  return true;
++}
++
++auto Cartridge::save() -> void {
++  auto document = BML::unserialize(information.manifest);
++
++  if(auto name = document["board/ram/name"].text()) {
++    if(auto fp = interface->open(pathID(), name, File::Write)) {
++      fp->write(ram.data, ram.size);
++    }
++  }
++}
++
++auto Cartridge::unload() -> void {
++  delete[] rom.data;
++  delete[] ram.data;
++  rom = Memory();
++  ram = Memory();
++}
++
++auto Cartridge::power() -> void {
++}
++
++auto Cartridge::reset() -> void {
++}
++
++auto Cartridge::access(uint13 addr, uint8 data) -> uint8 {
++  if(!addr.bit(12)) return data;
++
++  if(ram.size) {
++         if((addr & rom.mask) < ram.size << 0) return ram.data[addr & ram.mask] = data;
++    else if((addr & rom.mask) < ram.size << 1) return ram.data[addr & ram.mask];
++  }
++
++  return rom.data[addr & rom.mask];
++}
++
++}
+diff --git a/nSide/higan/a2600/cartridge/cartridge.hpp b/nSide/higan/a2600/cartridge/cartridge.hpp
+new file mode 100644
+index 0000000..2e3ffd6
+--- /dev/null
++++ b/nSide/higan/a2600/cartridge/cartridge.hpp
+@@ -0,0 +1,38 @@
++struct Cartridge {
++  enum class Region : uint { NTSC, PAL, SECAM };
++
++  auto pathID() const -> uint { return information.pathID; }
++  auto sha256() const -> string { return information.sha256; }
++  auto region() const -> Region { return information.region; }
++  auto manifest() const -> string { return information.manifest; }
++  auto title() const -> string { return information.title; }
++
++  auto load() -> bool;
++  auto save() -> void;
++  auto unload() -> void;
++  auto power() -> void;
++  auto reset() -> void;
++
++  auto access(uint13 addr, uint8 data) -> uint8;
++
++  auto serialize(serializer&) -> void;
++
++  struct Information {
++    uint pathID = 0;
++    string sha256;
++    Region region = Region::NTSC;
++    string manifest;
++    string title;
++  } information;
++
++  struct Memory {
++    uint8* data = nullptr;
++    uint size = 0;
++    uint mask = 0;
++  };
++
++  Memory rom;
++  Memory ram;
++};
++
++extern Cartridge cartridge;
+diff --git a/nSide/higan/a2600/cartridge/serialization.cpp b/nSide/higan/a2600/cartridge/serialization.cpp
+new file mode 100644
+index 0000000..f87cdc7
+--- /dev/null
++++ b/nSide/higan/a2600/cartridge/serialization.cpp
+@@ -0,0 +1,3 @@
++auto Cartridge::serialize(serializer& s) -> void {
++  s.array(ram.data, ram.size);
++}
+diff --git a/nSide/higan/a2600/controller/controller.cpp b/nSide/higan/a2600/controller/controller.cpp
+new file mode 100644
+index 0000000..4277809
+--- /dev/null
++++ b/nSide/higan/a2600/controller/controller.cpp
+@@ -0,0 +1,27 @@
++#include <a2600/a2600.hpp>
++
++namespace Atari2600 {
++
++#include "joystick/joystick.cpp"
++
++Controller::Controller(uint port) : port(port) {
++  if(!handle()) create(Controller::Enter, 1);
++}
++
++Controller::~Controller() {
++}
++
++auto Controller::Enter() -> void {
++  while(true) {
++    scheduler.synchronize();
++    if(peripherals.controllerPort1->active()) peripherals.controllerPort1->main();
++    if(peripherals.controllerPort2->active()) peripherals.controllerPort2->main();
++  }
++}
++
++auto Controller::main() -> void {
++  step(1);
++  synchronize(pia);
++}
++
++}
+diff --git a/nSide/higan/a2600/controller/controller.hpp b/nSide/higan/a2600/controller/controller.hpp
+new file mode 100644
+index 0000000..e50b1bb
+--- /dev/null
++++ b/nSide/higan/a2600/controller/controller.hpp
+@@ -0,0 +1,34 @@
++//Atari 2600 controller port pinout:
++//  ___________________
++// /(1) (2) (3) (4) (5)\
++//  \ (6) (7) (8) (9) /
++//   \---------------/
++//
++// pin  name     port1      port2
++//  1:  up       $0280.d4   $0280.d0
++//  2:  down     $0280.d5   $0280.d1
++//  3:  left     $0280.d6   $0280.d2
++//  4:  right    $0280.d7   $0280.d3
++//  5:  inpt0/2  $0038.d7   $003a.d7
++//  6:  inpt4/5  $003c.d7   $003d.d7
++//  7:  +5v
++//  8:  gnd
++//  9:  inpt1/3  $0039.d7   $003b.d7
++
++struct Controller : Thread {
++  enum : uint { Port1 = 0, Port2 = 1 };
++
++  Controller(uint port);
++  virtual ~Controller();
++  static auto Enter() -> void;
++
++  virtual auto main() -> void;
++  virtual auto pot0() -> bool { return 1; }
++  virtual auto pot1() -> bool { return 1; }
++  virtual auto fire() -> bool { return 1; }
++  virtual auto direction() -> uint4 { return 0xf; }
++
++  const uint port;
++};
++
++#include "joystick/joystick.hpp"
+diff --git a/nSide/higan/a2600/controller/joystick/joystick.cpp b/nSide/higan/a2600/controller/joystick/joystick.cpp
+new file mode 100644
+index 0000000..4a58b21
+--- /dev/null
++++ b/nSide/higan/a2600/controller/joystick/joystick.cpp
+@@ -0,0 +1,22 @@
++Joystick::Joystick(uint port) : Controller(port) {
++}
++
++auto Joystick::pot0() -> bool {
++  return 1;
++}
++
++auto Joystick::pot1() -> bool {
++  return 1;
++}
++
++auto Joystick::fire() -> bool {
++  return !interface->inputPoll(port, ID::Device::Joystick, Fire);
++}
++
++auto Joystick::direction() -> uint4 {
++  bool up    = interface->inputPoll(port, ID::Device::Joystick, Up);
++  bool down  = interface->inputPoll(port, ID::Device::Joystick, Down);
++  bool left  = interface->inputPoll(port, ID::Device::Joystick, Left);
++  bool right = interface->inputPoll(port, ID::Device::Joystick, Right);
++  return !(up && !down) << 0 | !(down && !up) << 1 | !(left && !right) << 2 | !(right && !left) << 3;
++}
+diff --git a/nSide/higan/a2600/controller/joystick/joystick.hpp b/nSide/higan/a2600/controller/joystick/joystick.hpp
+new file mode 100644
+index 0000000..bf69a64
+--- /dev/null
++++ b/nSide/higan/a2600/controller/joystick/joystick.hpp
+@@ -0,0 +1,12 @@
++struct Joystick : Controller {
++  enum : uint {
++    Up, Down, Left, Right, Fire,
++  };
++
++  Joystick(uint port);
++
++  auto pot0() -> bool;
++  auto pot1() -> bool;
++  auto fire() -> bool;
++  auto direction() -> uint4;
++};
+diff --git a/nSide/higan/a2600/cpu/cpu.cpp b/nSide/higan/a2600/cpu/cpu.cpp
+new file mode 100644
+index 0000000..506b020
+--- /dev/null
++++ b/nSide/higan/a2600/cpu/cpu.cpp
+@@ -0,0 +1,41 @@
++#include <a2600/a2600.hpp>
++
++namespace Atari2600 {
++
++CPU cpu;
++#include "memory.cpp"
++#include "timing.cpp"
++#include "serialization.cpp"
++
++CPU::CPU() : Processor::MOS6502(true) {
++}
++
++auto CPU::Enter() -> void {
++  while(true) scheduler.synchronize(), cpu.main();
++}
++
++auto CPU::main() -> void {
++  instruction();
++}
++
++auto CPU::load(Markup::Node node) -> bool {
++  return true;
++}
++
++auto CPU::power() -> void {
++  MOS6502::power();
++  //CPU's clock rate is the same in all regions
++  create(Enter, Emulator::Constants::Colorburst::NTSC);
++}
++
++auto CPU::reset() -> void {
++  MOS6502::reset();
++
++  //CPU
++  r.pc  = cartridge.access(0xfffc, r.mdr) << 0;
++  r.pc |= cartridge.access(0xfffd, r.mdr) << 8;
++
++  io.rdyLine = 1;
++}
++
++}
+diff --git a/nSide/higan/a2600/cpu/cpu.hpp b/nSide/higan/a2600/cpu/cpu.hpp
+new file mode 100644
+index 0000000..c663b03
+--- /dev/null
++++ b/nSide/higan/a2600/cpu/cpu.hpp
+@@ -0,0 +1,33 @@
++//MOS 6507
++
++struct CPU : Processor::MOS6502, Thread {
++  CPU();
++
++  static auto Enter() -> void;
++  auto main() -> void;
++  auto load(Markup::Node) -> bool;
++  auto power() -> void;
++  auto reset() -> void;
++
++  //memory.cpp
++  auto read(uint16 addr) -> uint8 override;
++  auto write(uint16 addr, uint8 data) -> void override;
++
++  //timing.cpp
++  auto step(uint clocks) -> void;
++  auto lastCycle() -> void;
++
++  auto rdyLine(bool) -> void;
++
++  //serialization.cpp
++  auto serialize(serializer&) -> void;
++
++  auto nmi(uint16&) -> void {}
++
++privileged:
++  struct IO {
++    bool rdyLine;
++  } io;
++};
++
++extern CPU cpu;
+diff --git a/nSide/higan/a2600/cpu/memory.cpp b/nSide/higan/a2600/cpu/memory.cpp
+new file mode 100644
+index 0000000..e6aa4ac
+--- /dev/null
++++ b/nSide/higan/a2600/cpu/memory.cpp
+@@ -0,0 +1,23 @@
++auto CPU::read(uint16 addr) -> uint8 {
++  addr &= 0x1fff;
++
++  do {
++    step(3);
++    if((addr & 0x1080) == 0x0000) r.mdr = tia.readIO(addr, r.mdr);
++    if((addr & 0x1280) == 0x0080) r.mdr = pia.readRAM(addr, r.mdr);
++    if((addr & 0x1280) == 0x0280) r.mdr = pia.readIO(addr, r.mdr);
++    if((addr & 0x1000) == 0x1000) r.mdr = cartridge.access(addr, r.mdr);
++  } while(io.rdyLine == 0);
++
++  return r.mdr;
++}
++
++auto CPU::write(uint16 addr, uint8 data) -> void {
++  addr &= 0x1fff;
++  r.mdr = data;
++  step(3);
++  if((addr & 0x1080) == 0x0000) tia.writeIO(addr, data);
++  if((addr & 0x1280) == 0x0080) pia.writeRAM(addr, data);
++  if((addr & 0x1280) == 0x0280) pia.writeIO(addr, data);
++  if((addr & 0x1000) == 0x1000) cartridge.access(addr, data);
++}
+diff --git a/nSide/higan/a2600/cpu/serialization.cpp b/nSide/higan/a2600/cpu/serialization.cpp
+new file mode 100644
+index 0000000..0e41ced
+--- /dev/null
++++ b/nSide/higan/a2600/cpu/serialization.cpp
+@@ -0,0 +1,6 @@
++auto CPU::serialize(serializer& s) -> void {
++  MOS6502::serialize(s);
++  Thread::serialize(s);
++
++  s.integer(io.rdyLine);
++}
+diff --git a/nSide/higan/a2600/cpu/timing.cpp b/nSide/higan/a2600/cpu/timing.cpp
+new file mode 100644
+index 0000000..4b389f2
+--- /dev/null
++++ b/nSide/higan/a2600/cpu/timing.cpp
+@@ -0,0 +1,12 @@
++auto CPU::step(uint clocks) -> void {
++  Thread::step(clocks);
++  synchronize(pia);
++  synchronize(tia);
++}
++
++auto CPU::lastCycle() -> void {
++}
++
++auto CPU::rdyLine(bool line) -> void {
++  io.rdyLine = line;
++}
+diff --git a/nSide/higan/a2600/interface/interface.cpp b/nSide/higan/a2600/interface/interface.cpp
+new file mode 100644
+index 0000000..cc871b2
+--- /dev/null
++++ b/nSide/higan/a2600/interface/interface.cpp
+@@ -0,0 +1,297 @@
++#include <a2600/a2600.hpp>
++
++namespace Atari2600 {
++
++Interface* interface = nullptr;
++Settings settings;
++
++Interface::Interface() {
++  interface = this;
++  system.init();
++
++  information.preAlpha     = true;
++  information.manufacturer = "Atari";
++  information.name         = "Atari 2600";
++  information.overscan     = true;
++  information.resettable   = false;
++
++  information.capability.states = true;
++  information.capability.cheats = false;
++
++  media.append({ID::Atari2600, "Atari 2600", "a26"});
++
++  Port hardwarePort{ID::Port::Hardware, "Hardware", Hardwired};
++  Port controllerPort1{ID::Port::Controller1, "Controller Port 1", PlugAndPlay};
++  Port controllerPort2{ID::Port::Controller2, "Controller Port 2", PlugAndPlay};
++
++  { Device device{ID::Device::Controls, "Controls"};
++    device.inputs.append({0, "Select"          });
++    device.inputs.append({0, "Reset"           });
++    device.inputs.append({0, "Color"           });
++    device.inputs.append({0, "Left Difficulty" });
++    device.inputs.append({0, "Right Difficulty"});
++    hardwarePort.devices.append(device);
++  }
++
++  { Device device{ID::Device::None, "None"};
++    controllerPort1.devices.append(device);
++    controllerPort2.devices.append(device);
++  }
++
++  { Device device{ID::Device::Joystick, "Joystick"};
++    device.inputs.append({0, "Up"   });
++    device.inputs.append({0, "Down" });
++    device.inputs.append({0, "Left" });
++    device.inputs.append({0, "Right"});
++    device.inputs.append({0, "Fire" });
++    controllerPort1.devices.append(device);
++    controllerPort2.devices.append(device);
++  }
++
++  ports.append(move(hardwarePort));
++  ports.append(move(controllerPort1));
++  ports.append(move(controllerPort2));
++}
++
++auto Interface::manifest() -> string {
++  return cartridge.manifest();
++}
++
++auto Interface::title() -> string {
++  return cartridge.title();
++}
++
++auto Interface::videoSize() -> VideoSize {
++  return {160, 228};
++}
++
++auto Interface::videoSize(uint width, uint height, bool arc) -> VideoSize {
++  double w = 160;
++  if(arc) {
++    double squarePixelRate = system.region() == System::Region::NTSC
++    ? 135.0 / 22.0 * 1'000'000.0
++    : 7'375'000.0;
++    w *= squarePixelRate / system.colorburst();
++  }
++  uint h = 228;
++  uint m = min((uint)(width / w), height / h);
++  return {(uint)(w * m), h * m};
++}
++
++auto Interface::videoFrequency() -> double {
++  switch(system.region()) { default:
++  case System::Region::NTSC:  return system.colorburst() / (262.0 * 228.0);
++  case System::Region::PAL:   return system.colorburst() / (312.0 * 228.0);
++  case System::Region::SECAM: return system.colorburst() / (312.0 * 228.0);
++  }
++}
++
++auto Interface::videoColors() -> uint32 {
++  return 1 << 7;
++}
++
++auto Interface::videoColor(uint32 n) -> uint64 {
++  static auto generateNTSCColor = [](uint7 n, double hue, double gamma) -> uint64 {
++    uint4 color = n.bits(3,6);
++    uint3 level = n.bits(0,2);
++
++    double y;
++    double i;
++    double q;
++
++    //TODO: Determine if there is any special circuitry for when both the
++    //luminosity and hue are 0 (black).
++    if(color == 0 && level == 0) y = 0.0;
++    else y = 0.125 + level / 7.0 * 0.875;
++
++    if(color == 0) {
++      i = 0.0;
++      q = 0.0;
++    } else {
++      //hue 15 == hue 1:                   (360.0 / 14.0)°
++      //hue 15 == (hue 1 + hue 2) / 2:     (360.0 / (14.0 - 1.0 / 2.0))°
++      //hue 15 == (hue 1 + hue 2 * 2) / 3: (360.0 / (14.0 - 2.0 / 3.0))°
++      static const double delay = (360.0 / (14.0 - 2.0 / 3.0)) * Math::Pi / 180.0;
++      //phase shift delay only applies to colors 2-15
++      double phase = Math::Pi + hue - (color - 1) * delay;
++      i = std::sin(phase - 33.0 * Math::Pi / 180.0) * 0.25;
++      q = std::cos(phase - 33.0 * Math::Pi / 180.0) * 0.25;
++    }
++
++    auto gammaAdjust = [=](double f) -> double { return f < 0.0 ? 0.0 : std::pow(f, 2.2 / gamma); };
++    //This matrix is from FCC's 1953 NTSC standard.
++    //The Atari 2600 is older than the SMPTE C standard that followed in 1987.
++    uint64 r = uclamp<16>(65535.0 * gammaAdjust(y +  0.946882 * i +  0.623557 * q));
++    uint64 g = uclamp<16>(65535.0 * gammaAdjust(y + -0.274788 * i + -0.635691 * q));
++    uint64 b = uclamp<16>(65535.0 * gammaAdjust(y + -1.108545 * i +  1.709007 * q));
++
++    return r << 32 | g << 16 | b << 0;
++  };
++
++  static auto generatePALColor = [](uint7 n, double gamma) -> uint64 {
++    uint4 color = n.bits(3,6);
++    uint3 level = n.bits(0,2);
++
++    double y;
++    double u;
++    double v;
++
++    //TODO: Determine the real formula for generating colors. The below formula
++    //is a quick hack-up to match colors with publicly-available palettes.
++    if((color.bits(1,3) == 0 || color.bits(1,3) == 7) && level == 0) y = 0.0;
++    else y = 0.125 + level / 7.0 * 0.875;
++
++    if(color.bits(1,3) == 0 || color.bits(1,3) == 7) {
++      u = 0.0;
++      v = 0.0;
++    } else if(color.bit(0) == 0) {
++      double phase = (180.0 - (color >> 1) * 30.0) * Math::Pi / 180.0;
++      u = std::cos(phase) * 0.25;
++      v = std::sin(phase) * 0.25;
++    } else if(color.bit(0) == 1) {
++      double phase = (165.0 + (color >> 1) * 30.0) * Math::Pi / 180.0;
++      u = std::cos(phase) * 0.25;
++      v = std::sin(phase) * 0.25;
++    }
++
++    auto gammaAdjust = [=](double f) -> double { return f < 0.0 ? 0.0 : std::pow(f, 2.2 / gamma); };
++    uint64 r = uclamp<16>(65535.0 * gammaAdjust(y                 +  1.139837 * v));
++    uint64 g = uclamp<16>(65535.0 * gammaAdjust(y + -0.394652 * u + -0.580599 * v));
++    uint64 b = uclamp<16>(65535.0 * gammaAdjust(y +  2.032110 * u                ));
++
++    return r << 32 | g << 16 | b << 0;
++  };
++
++  static auto generateSECAMColor = [](uint7 n, double gamma) -> uint64 {
++    uint3 level = n.bits(0,2);
++
++    //static const uint32 colors[] = {
++    //  0xff000000, 0xff2121ff, 0xfff03c79, 0xffff50ff,
++    //  0xff7fff50, 0xff7fffff, 0xffffff3f, 0xffffffff,
++    //};
++    static const double Y[] = {
++       0.0000000000000000000,  0.2286588235294117800,
++       0.4736235294117646700,  0.5971568627450980000,
++       0.7716784313725490000,  0.8499137254901961000,
++       0.9141647058823529000,  1.0000000000000000000,
++    };
++    static const double Db[] = {
++       0.0000000000000000000,  1.1604941176470587000,
++       0.0012274509803921196,  0.6059803921568627000,
++      -0.6889215686274510000,  0.2258823529411764200,
++      -1.0036705882352940000,  0.0000000000000000000,
++    };
++    static const double Dr[] = {
++       0.0000000000000000000,  0.1889176470588235500,
++      -0.8890313725490195000, -0.7658823529411765000,
++       0.5201921568627452000,  0.6691137254901962000,
++      -0.1633882352941175000,  0.0000000000000000000,
++    };
++
++    double y  = Y[level];
++    double db = Db[level];
++    double dr = Dr[level];
++
++    //uint64 r = image::normalize(colors[level].byte(2), 8, 16);
++    //uint64 g = image::normalize(colors[level].byte(1), 8, 16);
++    //uint64 b = image::normalize(colors[level].byte(0), 8, 16);
++    auto gammaAdjust = [=](double f) -> double { return f < 0.0 ? 0.0 : std::pow(f, 2.2 / gamma); };
++    uint64 r = uclamp<16>(65535.0 * gammaAdjust(y +  0.000092303716148 * db + -0.525912630661865 * dr));
++    uint64 g = uclamp<16>(65535.0 * gammaAdjust(y + -0.129132898890509 * db +  0.267899328207599 * dr));
++    uint64 b = uclamp<16>(65535.0 * gammaAdjust(y +  0.664679059978955 * db + -0.000079202543533 * dr));
++
++    return r << 32 | g << 16 | b << 0;
++  };
++
++  double gamma = settings.colorEmulation ? 1.8 : 2.2;
++  if(system.region() == System::Region::NTSC) {
++    return generateNTSCColor(n, 0.0, gamma);
++  } else if(system.region() == System::Region::PAL) {
++    return generatePALColor(n, gamma);
++  } else if(system.region() == System::Region::SECAM) {
++    return generateSECAMColor(n, gamma);
++  }
++}
++
++auto Interface::audioFrequency() -> double {
++  return system.colorburst() / 114.0;
++}
++
++auto Interface::loaded() -> bool {
++  return system.loaded();
++}
++
++auto Interface::sha256() -> string {
++  return cartridge.sha256();
++}
++
++auto Interface::load(uint id) -> bool {
++  return system.load();
++}
++
++auto Interface::save() -> void {
++  system.save();
++}
++
++auto Interface::unload() -> void {
++  save();
++  system.unload();
++}
++
++auto Interface::connect(uint port, uint device) -> void {
++  Atari2600::peripherals.connect(port, device);
++}
++
++auto Interface::power() -> void {
++  system.power();
++}
++
++auto Interface::reset() -> void {
++  system.power();
++}
++
++auto Interface::run() -> void {
++  system.run();
++}
++
++auto Interface::serialize() -> serializer {
++  system.runToSave();
++  return system.serialize();
++}
++
++auto Interface::unserialize(serializer& s) -> bool {
++  return system.unserialize(s);
++}
++
++auto Interface::cheatSet(const string_vector& list) -> void {
++  cheat.reset();
++  cheat.assign(list);
++}
++
++auto Interface::cap(const string& name) -> bool {
++  if(name == "Color Emulation") return true;
++  if(name == "Scanline Emulation") return true;
++  return false;
++}
++
++auto Interface::get(const string& name) -> any {
++  if(name == "Color Emulation") return settings.colorEmulation;
++  if(name == "Scanline Emulation") return settings.scanlineEmulation;
++  return {};
++}
++
++auto Interface::set(const string& name, const any& value) -> bool {
++  if(name == "Color Emulation" && value.is<bool>()) {
++    settings.colorEmulation = value.get<bool>();
++    system.configureVideoPalette();
++    return true;
++  }
++  if(name == "Scanline Emulation" && value.is<bool>()) {
++    settings.scanlineEmulation = value.get<bool>();
++    system.configureVideoEffects();
++    return true;
++  }
++  return false;
++}
++
++}
+diff --git a/nSide/higan/a2600/interface/interface.hpp b/nSide/higan/a2600/interface/interface.hpp
+new file mode 100644
+index 0000000..fecf880
+--- /dev/null
++++ b/nSide/higan/a2600/interface/interface.hpp
+@@ -0,0 +1,70 @@
++namespace Atari2600 {
++
++struct ID {
++  enum : uint {
++    System,
++    Atari2600,
++  };
++
++  struct Port { enum : uint {
++    Hardware,
++    Controller1,
++    Controller2,
++  };};
++
++  struct Device { enum : uint {
++    Controls,
++    None,
++    Joystick,
++  };};
++};
++
++struct Interface : Emulator::Interface {
++  using Emulator::Interface::load;
++
++  Interface();
++
++  auto manifest() -> string override;
++  auto title() -> string override;
++
++  auto videoSize() -> VideoSize override;
++  auto videoSize(uint width, uint height, bool arc) -> VideoSize override;
++  auto videoFrequency() -> double override;
++  auto videoColors() -> uint32 override;
++  auto videoColor(uint32 color) -> uint64 override;
++
++  auto audioFrequency() -> double override;
++
++  auto loaded() -> bool override;
++  auto sha256() -> string override;
++  auto load(uint id) -> bool override;
++  auto save() -> void override;
++  auto unload() -> void override;
++
++  auto connect(uint port, uint device) -> void override;
++  auto power() -> void override;
++  auto reset() -> void override;
++  auto run() -> void override;
++
++  auto serialize() -> serializer override;
++  auto unserialize(serializer&) -> bool override;
++
++  auto cheatSet(const string_vector&) -> void override;
++
++  auto cap(const string& name) -> bool override;
++  auto get(const string& name) -> any override;
++  auto set(const string& name, const any& value) -> bool override;
++};
++
++struct Settings {
++  bool colorEmulation = true;
++  bool scanlineEmulation = true;
++
++  uint controllerPort1 = 0;
++  uint controllerPort2 = 0;
++};
++
++extern Interface* interface;
++extern Settings settings;
++
++}
+diff --git a/nSide/higan/a2600/pia/io.cpp b/nSide/higan/a2600/pia/io.cpp
+new file mode 100644
+index 0000000..3e18183
+--- /dev/null
++++ b/nSide/higan/a2600/pia/io.cpp
+@@ -0,0 +1,120 @@
++auto PIA::readIO(uint7 addr, uint8 data) -> uint8 {
++  switch(addr & 0x07) {
++
++  case 0x00: {  //SWCHA
++    data = (io.swcha & io.swacnt) | (data & ~io.swacnt);
++    data |= (Atari2600::peripherals.controllerPort1->direction() << 4) & ~io.swacnt;
++    data |= (Atari2600::peripherals.controllerPort2->direction() << 0) & ~io.swacnt;
++    break;
++  }
++
++  case 0x01: {  //SWACNT
++    data = io.swacnt;
++    break;
++  }
++
++  case 0x02: {  //SWCHB
++    data = (io.swchb & io.swbcnt) | (data & ~io.swbcnt);
++    //Reset switch/button
++    if(!io.swbcnt.bit(0)) data.bit(0) = !interface->inputPoll(ID::Port::Hardware, ID::Device::Controls, 1);
++    //Select switch/button
++    if(!io.swbcnt.bit(1)) data.bit(1) = !interface->inputPoll(ID::Port::Hardware, ID::Device::Controls, 0);
++    if(!io.swbcnt.bit(3)) data.bit(3) = io.tvtype;
++    if(!io.swbcnt.bit(6)) data.bit(6) = io.difficulty0;
++    if(!io.swbcnt.bit(7)) data.bit(7) = io.difficulty1;
++    break;
++  }
++
++  case 0x03: {  //SWBCNT
++    data = io.swbcnt;
++    break;
++  }
++
++  case 0x04: case 0x06: {  //INTIM
++    data = io.timer.base;
++    io.timerIRQEnable = addr.bit(3);
++    break;
++  }
++
++  case 0x05: case 0x07: {  //INSTAT
++    data.bits(0,5) = 0;
++    data.bit (  6) = io.timerUnderflowINSTAT;
++    data.bit (  7) = io.timerUnderflowTIM_T;
++    io.timerUnderflowINSTAT = false;
++    break;
++  }
++
++  }
++
++  return data;
++}
++
++auto PIA::writeIO(uint7 addr, uint8 data) -> void {
++  switch(addr & 0x17) {
++
++  case 0x00: case 0x10: {
++    return;
++  }
++
++  case 0x01: case 0x11: {
++    io.swacnt = data;
++    return;
++  }
++
++  case 0x02: case 0x12: {
++    return;
++  }
++
++  case 0x03: case 0x13: {
++    io.swbcnt = data;
++    return;
++  }
++
++  case 0x04: case 0x05: case 0x06: case 0x07: {
++    //PA7 is connected to the left controller port's Right direction.
++    //Because the CPU has no IRQ line, this interrupt is useless.
++    io.pa7EdgeDetect = addr.bit(0);
++    io.pa7IRQEnable  = addr.bit(1);
++    return;
++  }
++
++  case 0x14: {  //TIM1T
++    io.timer.value         = data << 10;
++    io.timerDecrement      = 1024;
++    io.timerUnderflowTIM_T = false;
++    io.timerIRQEnable      = addr.bit(3);
++    runTimer();
++    return;
++  }
++
++  case 0x15: {  //TIM8T
++    io.timer.value         = data << 10;
++    io.timerDecrement      =  128;
++    io.timerUnderflowTIM_T = false;
++    io.timerIRQEnable      = addr.bit(3);
++    runTimer();
++    return;
++  }
++
++  case 0x16: {  //TIM64T
++    io.timer.value         = data << 10;
++    io.timerDecrement      =   16;
++    io.timerUnderflowTIM_T = false;
++    io.timerIRQEnable      = addr.bit(3);
++    runTimer();
++    return;
++  }
++
++  case 0x17: {  //T1024T
++    io.timer.value         = data << 10;
++    io.timerDecrement      =    1;
++    io.timerUnderflowTIM_T = false;
++    io.timerIRQEnable      = addr.bit(3);
++    runTimer();
++    return;
++  }
++
++  }
++
++  unreachable;
++}
+diff --git a/nSide/higan/a2600/pia/memory.cpp b/nSide/higan/a2600/pia/memory.cpp
+new file mode 100644
+index 0000000..c3d1646
+--- /dev/null
++++ b/nSide/higan/a2600/pia/memory.cpp
+@@ -0,0 +1,7 @@
++auto PIA::readRAM(uint7 addr, uint8 data) -> uint8 {
++  return ram[addr];
++}
++
++auto PIA::writeRAM(uint7 addr, uint8 data) -> void {
++  ram[addr] = data;
++}
+diff --git a/nSide/higan/a2600/pia/pia.cpp b/nSide/higan/a2600/pia/pia.cpp
+new file mode 100644
+index 0000000..3fbe3c0
+--- /dev/null
++++ b/nSide/higan/a2600/pia/pia.cpp
+@@ -0,0 +1,100 @@
++#include <a2600/a2600.hpp>
++
++namespace Atari2600 {
++
++PIA pia;
++
++#include "memory.cpp"
++#include "io.cpp"
++#include "serialization.cpp"
++
++PIA::PIA() {
++}
++
++PIA::~PIA() {
++}
++
++auto PIA::step(uint clocks) -> void {
++  Thread::step(clocks);
++  for(auto peripheral : peripherals) synchronize(*peripheral);
++  synchronize(cpu);
++}
++
++auto PIA::Enter() -> void {
++  while(true) scheduler.synchronize(), pia.main();
++}
++
++auto PIA::main() -> void {
++  runTimer();
++  step(3);
++
++  //Behavior not relevant to the Atari 2600:
++  //The MOS 6507 has no IRQ pin, so IRQ functionality is left unused.
++  //This means that timers and PA7 (left controller port pressing Right)
++  //cannot automatically fire IRQs.
++}
++
++auto PIA::load(Markup::Node node) -> bool {
++  return true;
++}
++
++auto PIA::power() -> void {
++  //PIA's clock rate is the same in all regions
++  create(Enter, Emulator::Constants::Colorburst::NTSC);
++
++  io.tvtype = TVType::Color;
++  io.difficulty0 = Difficulty::B;
++  io.difficulty1 = Difficulty::B;
++
++  io.swcha  = 0x00;
++  io.swacnt = 0x00;
++  io.swchb  = 0x00;
++  io.swbcnt = 0x00;
++
++  io.timer.value          = 0x00000;
++  io.timerDecrement       = 1024;
++  io.timerUnderflowINSTAT = false;
++  io.timerUnderflowTIM_T  = false;
++
++  io.timerIRQEnable = false;
++  io.pa7IRQEnable   = false;
++  io.pa7EdgeDetect  = false;
++}
++
++auto PIA::updateIO() -> void {
++  //If this code runs 19912 (262 * 228 / 3) times as fast as it does in other
++  //emulators, it will tremendously slow down emulation.
++  //Therefore, a dirty hack is used where this function is called from within
++  //the TIA.
++  if(interface->inputPoll(ID::Port::Hardware, ID::Device::Controls, 2)) {
++    if(!input.tvtype) io.tvtype = !io.tvtype;
++    input.tvtype = 1;
++  } else {
++    input.tvtype = 0;
++  }
++
++  if(interface->inputPoll(ID::Port::Hardware, ID::Device::Controls, 3)) {
++    if(!input.difficulty0) io.difficulty0 = !io.difficulty0;
++    input.difficulty0 = 1;
++  } else {
++    input.difficulty0 = 0;
++  }
++
++  if(interface->inputPoll(ID::Port::Hardware, ID::Device::Controls, 4)) {
++    if(!input.difficulty1) io.difficulty1 = !io.difficulty1;
++    input.difficulty1 = 1;
++  } else {
++    input.difficulty1 = 0;
++  }
++}
++
++auto PIA::runTimer() -> void {
++  io.timer.value = (io.timer.value - io.timerDecrement) & 0x3ffff;
++  if(io.timer.value == 0) {
++    io.timerUnderflowINSTAT = true;
++    io.timerUnderflowTIM_T  = true;
++    io.timerDecrement = 1024;
++  }
++}
++
++}
+diff --git a/nSide/higan/a2600/pia/pia.hpp b/nSide/higan/a2600/pia/pia.hpp
+new file mode 100644
+index 0000000..6f89133
+--- /dev/null
++++ b/nSide/higan/a2600/pia/pia.hpp
+@@ -0,0 +1,73 @@
++//MOS 6532 RIOT
++
++struct PIA : Thread {
++  PIA();
++  ~PIA();
++
++  alwaysinline auto step(uint clocks) -> void;
++
++  static auto Enter() -> void;
++  auto main() -> void;
++  auto load(Markup::Node) -> bool;
++  auto power() -> void;
++
++  auto updateIO() -> void;
++  auto runTimer() -> void;
++
++  //memory.cpp
++  auto readRAM(uint7 addr, uint8 data) -> uint8;
++  auto writeRAM(uint7 addr, uint8 data) -> void;
++
++  //io.cpp
++  auto readIO(uint7 addr, uint8 data) -> uint8;
++  auto writeIO(uint7 addr, uint8 data) -> void;
++
++  //serialization.cpp
++  auto serialize(serializer&) -> void;
++
++  uint8 ram[128];
++  vector<Thread*> peripherals;
++
++privileged:
++  struct TVType { enum : bool { Monochrome, Color };};
++  struct Difficulty { enum : bool { B, A };};
++
++  struct IO {
++    bool tvtype;
++    bool difficulty0;
++    bool difficulty1;
++
++    //$0280 SWCHA
++    uint8 swcha;
++
++    //$0281 SWACNT
++    uint8 swacnt;
++
++    //$0282 SWCHB
++    uint8 swchb;
++
++    //$0283 SWBCNT
++    uint8 swbcnt;
++
++    union {
++      uint value;
++      NaturalBitField<uint, 0, 9> prescaler;
++      NaturalBitField<uint,10,17> base;
++    } timer;
++    uint10 timerDecrement;
++    bool timerUnderflowINSTAT;
++    bool timerUnderflowTIM_T;
++
++    bool timerIRQEnable;  //useless with MOS 6507
++    bool pa7IRQEnable;  //useless with MOS 6507
++    bool pa7EdgeDetect;
++  } io;
++
++  struct Input {
++    bool tvtype;
++    bool difficulty0;
++    bool difficulty1;
++  } input;
++};
++
++extern PIA pia;
+diff --git a/nSide/higan/a2600/pia/serialization.cpp b/nSide/higan/a2600/pia/serialization.cpp
+new file mode 100644
+index 0000000..50365c5
+--- /dev/null
++++ b/nSide/higan/a2600/pia/serialization.cpp
+@@ -0,0 +1,23 @@
++auto PIA::serialize(serializer& s) -> void {
++  Thread::serialize(s);
++
++  s.array(ram);
++
++  s.integer(io.tvtype);
++  s.integer(io.difficulty0);
++  s.integer(io.difficulty1);
++
++  s.integer(io.swcha);
++  s.integer(io.swacnt);
++  s.integer(io.swchb);
++  s.integer(io.swbcnt);
++
++  s.integer(io.timer.value);
++  s.integer(io.timerDecrement);
++  s.integer(io.timerUnderflowINSTAT);
++  s.integer(io.timerUnderflowTIM_T);
++
++  s.integer(io.timerIRQEnable);
++  s.integer(io.pa7IRQEnable);
++  s.integer(io.pa7EdgeDetect);
++}
+diff --git a/nSide/higan/a2600/system/peripherals.cpp b/nSide/higan/a2600/system/peripherals.cpp
+new file mode 100644
+index 0000000..4cf4878
+--- /dev/null
++++ b/nSide/higan/a2600/system/peripherals.cpp
+@@ -0,0 +1,41 @@
++Peripherals peripherals;
++
++auto Peripherals::unload() -> void {
++  delete controllerPort1;
++  delete controllerPort2;
++  controllerPort1 = nullptr;
++  controllerPort2 = nullptr;
++}
++
++auto Peripherals::reset() -> void {
++  connect(ID::Port::Controller1, settings.controllerPort1);
++  connect(ID::Port::Controller2, settings.controllerPort2);
++}
++
++auto Peripherals::connect(uint port, uint device) -> void {
++  if(port == ID::Port::Controller1) {
++    settings.controllerPort1 = device;
++    if(!system.loaded()) return;
++
++    delete controllerPort1;
++    switch(device) { default:
++    case ID::Device::None:     controllerPort1 = new Controller(ID::Port::Controller1); break;
++    case ID::Device::Joystick: controllerPort1 = new Joystick(ID::Port::Controller1); break;
++    }
++  }
++
++  if(port == ID::Port::Controller2) {
++    settings.controllerPort2 = device;
++    if(!system.loaded()) return;
++
++    delete controllerPort2;
++    switch(device) { default:
++    case ID::Device::None:     controllerPort2 = new Controller(ID::Port::Controller2); break;
++    case ID::Device::Joystick: controllerPort2 = new Joystick(ID::Port::Controller2); break;
++    }
++  }
++
++  pia.peripherals.reset();
++  pia.peripherals.append(controllerPort1);
++  pia.peripherals.append(controllerPort2);
++}
+diff --git a/nSide/higan/a2600/system/serialization.cpp b/nSide/higan/a2600/system/serialization.cpp
+new file mode 100644
+index 0000000..5b7f2b8
+--- /dev/null
++++ b/nSide/higan/a2600/system/serialization.cpp
+@@ -0,0 +1,70 @@
++auto System::serialize() -> serializer {
++  serializer s(serializeSize);
++
++  uint signature = 0x31545342;
++  char version[16] = {};
++  char hash[64] = {};
++  char description[512] = {};
++  memory::copy(&version, (const char*)Emulator::SerializerVersion, Emulator::SerializerVersion.size());
++  memory::copy(&hash, (const char*)cartridge.sha256(), 64);
++
++  s.integer(signature);
++  s.array(version);
++  s.array(hash);
++  s.array(description);
++
++  serializeAll(s);
++  return s;
++}
++
++auto System::unserialize(serializer& s) -> bool {
++  uint signature = 0;
++  char version[16] = {};
++  char hash[64] = {};
++  char description[512] = {};
++
++  s.integer(signature);
++  s.array(version);
++  s.array(hash);
++  s.array(description);
++
++  if(signature != 0x31545342) return false;
++  if(string{version} != Emulator::SerializerVersion) return false;
++
++  power();
++  serializeAll(s);
++  return true;
++}
++
++//internal
++
++auto System::serialize(serializer& s) -> void {
++  s.integer((uint&)information.region);
++}
++
++auto System::serializeAll(serializer& s) -> void {
++  cartridge.serialize(s);
++  system.serialize(s);
++  cpu.serialize(s);
++  tia.serialize(s);
++}
++
++//perform dry-run state save:
++//determines exactly how many bytes are needed to save state for this cartridge,
++//as amount varies per game (eg different RAM sizes, etc.)
++auto System::serializeInit() -> void {
++  serializer s;
++
++  uint signature = 0;
++  char version[16] = {};
++  char hash[64] = {};
++  char description[512] = {};
++
++  s.integer(signature);
++  s.array(version);
++  s.array(hash);
++  s.array(description);
++
++  serializeAll(s);
++  serializeSize = s.size();
++}
+diff --git a/nSide/higan/a2600/system/system.cpp b/nSide/higan/a2600/system/system.cpp
+new file mode 100644
+index 0000000..8159050
+--- /dev/null
++++ b/nSide/higan/a2600/system/system.cpp
+@@ -0,0 +1,92 @@
++#include <a2600/a2600.hpp>
++
++namespace Atari2600 {
++
++System system;
++Scheduler scheduler;
++Cheat cheat;
++#include "video.cpp"
++#include "peripherals.cpp"
++#include "serialization.cpp"
++
++auto System::run() -> void {
++  if(scheduler.enter() == Scheduler::Event::Frame) tia.refresh();
++}
++
++auto System::runToSave() -> void {
++  scheduler.synchronize(cpu);
++  scheduler.synchronize(pia);
++  scheduler.synchronize(tia);
++  for(auto peripheral : pia.peripherals) scheduler.synchronize(*peripheral);
++}
++
++auto System::init() -> void {
++  assert(interface != nullptr);
++}
++
++auto System::load() -> bool {
++  information = Information();
++
++  if(auto fp = interface->open(ID::System, "manifest.bml", File::Read, File::Required)) {
++    information.manifest = fp->reads();
++  } else return false;
++
++  auto document = BML::unserialize(information.manifest);
++  auto system = document["system"];
++
++  if(!cartridge.load()) return false;
++
++  switch(cartridge.region()) {
++  case Cartridge::Region::NTSC:  information.region = Region::NTSC;  break;
++  case Cartridge::Region::PAL:   information.region = Region::PAL;   break;
++  case Cartridge::Region::SECAM: information.region = Region::SECAM; break;
++  }
++  if(system["region"].text() == "NTSC" ) information.region = Region::NTSC;
++  if(system["region"].text() == "PAL"  ) information.region = Region::PAL;
++  if(system["region"].text() == "SECAM") information.region = Region::SECAM;
++
++  if(!cpu.load(system)) return false;
++  if(!pia.load(system)) return false;
++  if(!tia.load(system)) return false;
++
++  information.colorburst = region() == Region::NTSC
++  ? Emulator::Constants::Colorburst::NTSC
++  : Emulator::Constants::Colorburst::PAL * 4.0 / 5.0;
++
++  serializeInit();
++  return information.loaded = true;
++}
++
++auto System::save() -> void {
++  if(!loaded()) return;
++  cartridge.save();
++}
++
++auto System::unload() -> void {
++  if(!loaded()) return;
++  peripherals.unload();
++
++  cartridge.unload();
++  information.loaded = false;
++}
++
++auto System::power() -> void {
++  Emulator::video.reset();
++  Emulator::video.setInterface(interface);
++  configureVideoPalette();
++  configureVideoEffects();
++
++  Emulator::audio.reset();
++  Emulator::audio.setInterface(interface);
++
++  scheduler.reset();
++  cpu.power();
++  cpu.reset();
++  pia.power();
++  tia.power();
++  scheduler.primary(cpu);
++
++  peripherals.reset();
++}
++
++}
+diff --git a/nSide/higan/a2600/system/system.hpp b/nSide/higan/a2600/system/system.hpp
+new file mode 100644
+index 0000000..3bafc99
+--- /dev/null
++++ b/nSide/higan/a2600/system/system.hpp
+@@ -0,0 +1,54 @@
++struct Interface;
++
++struct System {
++  enum class Region : uint { NTSC = 0, PAL = 1, SECAM = 2 };
++
++  inline auto loaded() const -> bool { return information.loaded; }
++  inline auto region() const -> Region { return information.region; }
++  inline auto colorburst() const -> double { return information.colorburst; }
++
++  auto run() -> void;
++  auto runToSave() -> void;
++
++  auto init() -> void;
++  auto load() -> bool;
++  auto save() -> void;
++  auto unload() -> void;
++  auto power() -> void;
++
++  //video.cpp
++  auto configureVideoPalette() -> void;
++  auto configureVideoEffects() -> void;
++
++  //serialization.cpp
++  auto serialize() -> serializer;
++  auto unserialize(serializer&) -> bool;
++
++private:
++  struct Information {
++    string manifest;
++    bool loaded = false;
++    Region region = Region::NTSC;
++    double colorburst = 0.0;
++  } information;
++
++  uint serializeSize = 0;
++
++  auto serialize(serializer&) -> void;
++  auto serializeAll(serializer&) -> void;
++  auto serializeInit() -> void;
++
++  friend class Cartridge;
++};
++
++struct Peripherals {
++  auto unload() -> void;
++  auto reset() -> void;
++  auto connect(uint port, uint device) -> void;
++
++  Controller* controllerPort1 = nullptr;
++  Controller* controllerPort2 = nullptr;
++};
++
++extern System system;
++extern Peripherals peripherals;
+diff --git a/nSide/higan/a2600/system/video.cpp b/nSide/higan/a2600/system/video.cpp
+new file mode 100644
+index 0000000..2faaf57
+--- /dev/null
++++ b/nSide/higan/a2600/system/video.cpp
+@@ -0,0 +1,7 @@
++auto System::configureVideoPalette() -> void {
++  Emulator::video.setPalette();
++}
++
++auto System::configureVideoEffects() -> void {
++  Emulator::video.setEffect(Emulator::Video::Effect::Scanlines, settings.scanlineEmulation);
++}
+diff --git a/nSide/higan/a2600/tia/audio.cpp b/nSide/higan/a2600/tia/audio.cpp
+new file mode 100644
+index 0000000..48605cb
+--- /dev/null
++++ b/nSide/higan/a2600/tia/audio.cpp
+@@ -0,0 +1,88 @@
++auto TIA::runAudio() -> void {
++  if(io.hcounter != 0 && io.hcounter != 114) return;
++
++  for(auto& channel : audio.channel) {
++    if(channel.phase++ < channel.frequency) continue;
++    channel.phase = 0;
++
++    if(channel.control.bits(2,3) == 3) {
++      if(++channel.state3 == 3) channel.state3 = 0;
++      else continue;
++    }
++
++    switch(channel.control) {
++    case 0x0:
++    case 0xb:
++      channel.sample = channel.shift4.bit(0);
++      channel.shift4 = channel.shift4 >> 1 | 0x008;
++      channel.shift5 = channel.shift5 >> 1 | 0x010;
++      break;
++    case 0x1:
++      channel.sample = shift(channel.shift4);
++      break;
++    case 0x2:
++      if((channel.shift5 & 0x00f) == 0x000) channel.sample = shift(channel.shift4);
++      if((channel.shift5 & 0x00f) == 0x00f) channel.sample = shift(channel.shift4);
++      shift(channel.shift5);
++      break;
++    case 0x3:
++      if(shift(channel.shift5)) channel.sample = shift(channel.shift4);
++      break;
++    case 0x4:
++      channel.shift4 = channel.shift4 >> 1 | 0x008;
++      shift(channel.shift5);
++      channel.sample = channel.state1++;
++      break;
++    case 0x5:
++      channel.shift5 = channel.shift5 >> 1 | 0x010;
++      shift(channel.shift4);
++      channel.sample = channel.state1++;
++      break;
++    case 0x6:
++    case 0xa:
++    case 0xe:
++      shift(channel.shift5);
++      if((channel.shift5 & 0x00f) == 0x000) channel.sample = 0;
++      if((channel.shift5 & 0x00f) == 0x00f) channel.sample = 1;
++      break;
++    case 0x7:
++    case 0x9:
++    case 0xf:
++      channel.sample = shift(channel.shift5);
++      break;
++    case 0x8:
++      channel.sample = shift(channel.shift9);
++      break;
++    case 0xc:
++    case 0xd:
++      channel.sample = channel.state1++;
++      break;
++    }
++  }
++
++  double sample = 0.0;
++  sample += audio.channel[0].sample * audio.channel[0].volume * 32768.0 / 15.0 - 16384.0;
++  sample += audio.channel[1].sample * audio.channel[1].volume * 32768.0 / 15.0 - 16384.0;
++
++  //stream->sample(sample / 32768.0);
++  stream->sample(0.0);
++}
++
++auto TIA::shift(uint4& shift) -> bool {
++  bool result = shift.bit(0);
++  shift = shift >> 1 | (shift.bit(1) ^ shift.bit(0)) << 3;
++  return result;
++}
++
++auto TIA::shift(uint5& shift) -> bool {
++  bool result = shift.bit(0);
++  shift = shift >> 1 | (shift.bit(2) ^ shift.bit(0)) << 4;
++  return result;
++}
++
++auto TIA::shift(uint9& shift) -> bool {
++  bool result = shift.bit(0);
++  shift = shift >> 1 | (shift.bit(4) ^ shift.bit(0)) << 8;
++  return result;
++}
++
+diff --git a/nSide/higan/a2600/tia/io.cpp b/nSide/higan/a2600/tia/io.cpp
+new file mode 100644
+index 0000000..a617089
+--- /dev/null
++++ b/nSide/higan/a2600/tia/io.cpp
+@@ -0,0 +1,399 @@
++auto TIA::readIO(uint6 addr, uint8 data) -> uint8 {
++  switch(addr & 0x0f) {
++
++  //CXM0P
++  case 0x0: {
++    data.bit(6) = collision.m0p0;
++    data.bit(7) = collision.m0p1;
++    break;
++  }
++
++  //CXM1P
++  case 0x1: {
++    data.bit(6) = collision.m1p1;
++    data.bit(7) = collision.m1p0;
++    break;
++  }
++
++  //CXP0FB
++  case 0x2: {
++    data.bit(6) = collision.p0bl;
++    data.bit(7) = collision.p0pf;
++    break;
++  }
++
++  //CXP1FB
++  case 0x3: {
++    data.bit(6) = collision.p1bl;
++    data.bit(7) = collision.p1pf;
++    break;
++  }
++
++  //CXM0FB
++  case 0x4: {
++    data.bit(6) = collision.m0bl;
++    data.bit(7) = collision.m0pf;
++    break;
++  }
++
++  //CXM1FB
++  case 0x5: {
++    data.bit(6) = collision.m1bl;
++    data.bit(7) = collision.m1pf;
++    break;
++  }
++
++  //CXBLPF
++  case 0x6: {
++    data.bit(7) = collision.blpf;
++    break;
++  }
++
++  //CXPPMM
++  case 0x7: {
++    data.bit(6) = collision.m0m1;
++    data.bit(7) = collision.p0p1;
++    break;
++  }
++
++  //INPT0
++  case 0x8: {
++    data.bit(7) = peripherals.controllerPort1->pot0();
++    break;
++  }
++
++  //INPT1
++  case 0x9: {
++    data.bit(7) = peripherals.controllerPort1->pot1();
++    break;
++  }
++
++  //INPT2
++  case 0xa: {
++    data.bit(7) = peripherals.controllerPort2->pot0();
++    break;
++  }
++
++  //INPT3
++  case 0xb: {
++    data.bit(7) = peripherals.controllerPort2->pot1();
++    break;
++  }
++
++  //INPT4
++  case 0xc: {
++    data.bit(7) = peripherals.controllerPort1->fire();
++    break;
++  }
++
++  //INPT5
++  case 0xd: {
++    data.bit(7) = peripherals.controllerPort2->fire();
++    break;
++  }
++
++  }
++
++  return data;
++}
++
++auto TIA::writeIO(uint6 addr, uint8 data) -> void {
++  switch(addr) {
++
++  //VSYNC
++  case 0x00: {
++    if(io.vsync && !data.bit(1)) io.vcounter = 0;
++    io.vsync = data.bit(1);
++    return;
++  }
++
++  //VBLANK
++  case 0x01: {
++    io.vblank = data.bit(1);
++    return;
++  }
++
++  //WSYNC
++  case 0x02: {
++    cpu.rdyLine(0);
++    return;
++  }
++
++  //RSYNC
++  case 0x03: {
++    io.hcounter = 0;
++    return;
++  }
++
++  //NUSIZ0
++  case 0x04: {
++    player[0].numberSize = data.bits(0,2);
++    //missile size is 2 ^ data, or {1, 2, 4, 8}[data].
++    missile[0].size      = data.bits(4,5);
++    return;
++  }
++
++  //NUSIZ1
++  case 0x05: {
++    player[1].numberSize = data.bits(0,2);
++    missile[1].size      = data.bits(4,5);
++    return;
++  }
++
++  //COLUP0
++  case 0x06: {
++    io.playerMissile0Color = data >> 1;
++    return;
++  }
++
++  //COLUP1
++  case 0x07: {
++    io.playerMissile1Color = data >> 1;
++    return;
++  }
++
++  //COLUPF
++  case 0x08: {
++    io.playfieldBallColor = data >> 1;
++    return;
++  }
++
++  //COLUBK
++  case 0x09: {
++    io.backgroundColor = data >> 1;
++    return;
++  }
++
++  //CTRLPF
++  case 0x0a: {
++    playfield.reflect        = data.bit (  0);
++    playfield.score          = data.bit (  1);
++    io.playfieldBallPriority = data.bit (  2);
++    ball.size                = data.bits(4,5);
++    return;
++  }
++
++  //REFP0
++  case 0x0b: {
++    player[0].reflect = data.bit(3);
++    return;
++  }
++
++  //REFP1
++  case 0x0c: {
++    player[1].reflect = data.bit(3);
++    return;
++  }
++
++  //PF0
++  case 0x0d: {
++    playfield.graphic0 = data.bits(4,7);
++    return;
++  }
++
++  //PF1
++  case 0x0e: {
++    playfield.graphic1 = data.bits(0,7);
++    return;
++  }
++
++  //PF2
++  case 0x0f: {
++    playfield.graphic2 = data.bits(0,7);
++    return;
++  }
++
++  //RESP0
++  case 0x10: {
++    player[0].position = (hblank() ? 2 : io.hcounter - 68 + 4) % 160;
++    return;
++  }
++
++  //RESP1
++  case 0x11: {
++    player[1].position = (hblank() ? 2 : io.hcounter - 68 + 4) % 160;
++    return;
++  }
++
++  //RESM0
++  case 0x12: {
++    missile[0].position = (hblank() ? 1 : io.hcounter - 68 + 3) % 160;
++    return;
++  }
++
++  //RESM1
++  case 0x13: {
++    missile[1].position = (hblank() ? 1 : io.hcounter - 68 + 3) % 160;
++    return;
++  }
++
++  //RESBL
++  case 0x14: {
++    ball.position = (hblank() ? 1 : io.hcounter - 68 + 3) % 160;
++    return;
++  }
++
++  //AUDC0
++  case 0x15: {
++    audio.channel[0].control = data.bits(0,3);
++    return;
++  }
++
++  //AUDC1
++  case 0x16: {
++    audio.channel[1].control = data.bits(0,3);
++    return;
++  }
++
++  //AUDF0
++  case 0x17: {
++    audio.channel[0].frequency = data.bits(0,4);
++    return;
++  }
++
++  //AUDF1
++  case 0x18: {
++    audio.channel[1].frequency = data.bits(0,4);
++    return;
++  }
++
++  //AUDV0
++  case 0x19: {
++    audio.channel[0].volume = data.bits(0,3);
++    return;
++  }
++
++  //AUDV1
++  case 0x1a: {
++    audio.channel[1].volume = data.bits(0,3);
++    return;
++  }
++
++  //GRP0
++  case 0x1b: {
++    player[0].graphic = data;
++    return;
++  }
++
++  //GRP1
++  case 0x1c: {
++    player[1].graphic = data;
++    return;
++  }
++
++  //ENAM0
++  case 0x1d: {
++    missile[0].enable = data.bit(1);
++    return;
++  }
++
++  //ENAM1
++  case 0x1e: {
++    missile[1].enable = data.bit(1);
++    return;
++  }
++
++  //ENABL
++  case 0x1f: {
++    ball.enable = data.bit(1);
++    return;
++  }
++
++  //HMP0
++  case 0x20: {
++    player[0].motion = data.bits(4,7);
++    return;
++  }
++
++  //HMP1
++  case 0x21: {
++    player[1].motion = data.bits(4,7);
++    return;
++  }
++
++  //HMM0
++  case 0x22: {
++    missile[0].motion = data.bits(4,7);
++    return;
++  }
++
++  //HMM1
++  case 0x23: {
++    missile[1].motion = data.bits(4,7);
++    return;
++  }
++
++  //HMBL
++  case 0x24: {
++    ball.motion = data.bits(4,7);
++    return;
++  }
++
++  //VDELP0
++  case 0x25: {
++    return;
++  }
++
++  //VDELP1
++  case 0x26: {
++    return;
++  }
++
++  //VDELBL
++  case 0x27: {
++    return;
++  }
++
++  //RESMP0
++  case 0x28: {
++    missile[0].reset = data.bit(1);
++    return;
++  }
++
++  //RESMP1
++  case 0x29: {
++    missile[1].reset = data.bit(1);
++    return;
++  }
++
++  //HMOVE
++  case 0x2a: {
++    for(auto& p : player)  p.position = (p.position - p.motion + 160) % 160;
++    for(auto& m : missile) m.position = (m.position - m.motion + 160) % 160;
++    ball.position = (ball.position - ball.motion + 160) % 160;
++    return;
++  }
++
++  //HMCLR
++  case 0x2b: {
++    player[0].motion = 0;
++    player[1].motion = 0;
++    missile[0].motion = 0;
++    missile[1].motion = 0;
++    ball.motion = 0;
++    return;
++  }
++
++  //CXCLR
++  case 0x2c: {
++    collision.m0p1 = false;
++    collision.m0p0 = false;
++    collision.m1p0 = false;
++    collision.m1p1 = false;
++    collision.p0pf = false;
++    collision.p0bl = false;
++    collision.p1pf = false;
++    collision.p1bl = false;
++    collision.m0pf = false;
++    collision.m0bl = false;
++    collision.m1pf = false;
++    collision.m1bl = false;
++    collision.blpf = false;
++    collision.p0p1 = false;
++    collision.m0m1 = false;
++    return;
++  }
++
++  }
++
++}
+diff --git a/nSide/higan/a2600/tia/render.cpp b/nSide/higan/a2600/tia/render.cpp
+new file mode 100644
+index 0000000..57fb315
+--- /dev/null
++++ b/nSide/higan/a2600/tia/render.cpp
+@@ -0,0 +1,110 @@
++auto TIA::frame() -> void {
++}
++
++auto TIA::scanline() -> void {
++  if(io.vcounter == 0) frame();
++
++  if(io.vcounter == 228 + (system.region() == System::Region::NTSC ? 19 : 44)) {
++    //dirty hack to prevent controls for hardware switches from being polled
++    //19912 (262 * 228 / 3) times as fast as joystick/paddle controls and other emulators' controls
++    pia.updateIO();
++
++    scheduler.exit(Scheduler::Event::Frame);
++  }
++}
++
++auto TIA::runVideo() -> void {
++  for(bool i : range(2)) {
++    if(!missile[i].reset) continue;
++    uint offset = player[i].numberSize == 5 ? 6 : player[i].numberSize == 7 ? 10 : 3;
++    missile[i].position = (player[i].position + offset) % 160;
++  }
++
++  uint offsetY = system.region() == System::Region::NTSC ? 19 : 37;
++  if(hblank() || io.vcounter < offsetY) return;
++
++  uint x = io.hcounter - 68;
++  uint y = io.vcounter - offsetY;
++  if(y >= 228) return;
++
++  uint7 pixel = 0;
++
++  if(!io.vblank) {
++    pixel = io.backgroundColor;
++    uint size;
++
++    bool p0 = false;
++    bool p1 = false;
++    bool m0 = false;
++    bool m1 = false;
++    bool bl = false;
++    bool pf = false;
++
++    for(bool i : range(2)) {
++      uint scale;
++      if(player[i].numberSize != 5 && player[i].numberSize != 7) {
++        scale = 0;
++      } else if(player[i].numberSize == 5) {
++        scale = 1;
++      } else if(player[i].numberSize == 7) {
++        scale = 2;
++      }
++      size = 8 << scale;
++      if(player[i].position >= x - (size - 1) && player[i].position <= x) {
++        uint bit = (x - player[i].position) >> scale;
++        if(!player[i].reflect) bit = 7 - bit;
++        if(i == 0) p0 = player[i].graphic.bit(bit);
++        if(i == 1) p1 = player[i].graphic.bit(bit);
++      }
++    }
++
++    for(bool i : range(2)) {
++      if(missile[i].enable && !missile[i].reset) {
++        size = 1 << missile[i].size;
++        if(missile[i].position >= x - (size - 1) && missile[i].position <= x) {
++          if(i == 0) m0 = true;
++          if(i == 1) m1 = true;
++        }
++      }
++    }
++
++    if(ball.enable) {
++      size = 1 << ball.size;
++      if(ball.position >= x - (size - 1) && ball.position <= x) bl = true;
++    }
++
++    uint playfieldX = x >> 2;
++    if(playfieldX >= 20) playfieldX = !playfield.reflect ? playfieldX - 20 : 39 - playfieldX;
++    if(playfieldX >=  0 && playfieldX <  4) pf = playfield.graphic0.bit(playfieldX -  0);
++    if(playfieldX >=  4 && playfieldX < 12) pf = playfield.graphic1.bit(11 - playfieldX);
++    if(playfieldX >= 12 && playfieldX < 20) pf = playfield.graphic2.bit(playfieldX - 12);
++
++    if(m0 && p1) collision.m0p1 = true;
++    if(m0 && p0) collision.m0p0 = true;
++    if(m1 && p0) collision.m1p0 = true;
++    if(m1 && p1) collision.m1p1 = true;
++    if(p0 && pf) collision.p0pf = true;
++    if(p0 && bl) collision.p0bl = true;
++    if(p1 && pf) collision.p1pf = true;
++    if(p1 && bl) collision.p1bl = true;
++    if(m0 && pf) collision.m0pf = true;
++    if(m0 && bl) collision.m0bl = true;
++    if(m1 && pf) collision.m1pf = true;
++    if(m1 && bl) collision.m1bl = true;
++    if(bl && pf) collision.blpf = true;
++    if(p0 && p1) collision.p0p1 = true;
++    if(m0 && m1) collision.m0m1 = true;
++
++    if(playfield.score && pf) {
++      if(x <  80) p0 = m0 = true;
++      if(x >= 80) p1 = m1 = true;
++    }
++    if(io.playfieldBallPriority && (bl || pf)) pixel = io.playfieldBallColor;
++    else if(p0 || m0) pixel = io.playerMissile0Color;
++    else if(p1 || m1) pixel = io.playerMissile1Color;
++    else if(bl || pf) pixel = io.playfieldBallColor;
++  }
++
++  output[y * 160 + x] = pixel;
++}
++
+diff --git a/nSide/higan/a2600/tia/serialization.cpp b/nSide/higan/a2600/tia/serialization.cpp
+new file mode 100644
+index 0000000..0ddc73e
+--- /dev/null
++++ b/nSide/higan/a2600/tia/serialization.cpp
+@@ -0,0 +1,72 @@
++auto TIA::serialize(serializer& s) -> void {
++  Thread::serialize(s);
++
++  s.integer(io.hcounter);
++  s.integer(io.vcounter);
++
++  s.integer(io.vsync);
++  s.integer(io.vblank);
++
++  s.integer(io.playerMissile0Color);
++  s.integer(io.playerMissile1Color);
++  s.integer(io.playfieldBallColor);
++  s.integer(io.backgroundColor);
++
++  s.integer(io.playfieldBallPriority);
++
++  for(auto& p : player) {
++    s.integer(p.numberSize);
++    s.integer(p.reflect);
++    s.integer(p.graphic);
++    s.integer(p.position);
++    s.integer(p.motion);
++  }
++
++  for(auto& m : missile) {
++    s.integer(m.enable);
++    s.integer(m.size);
++    s.integer(m.position);
++    s.integer(m.motion);
++  }
++
++  s.integer(ball.enable);
++  s.integer(ball.size);
++  s.integer(ball.position);
++  s.integer(ball.motion);
++
++  s.integer(playfield.reflect);
++  s.integer(playfield.score);
++
++  s.integer(playfield.graphic0);
++  s.integer(playfield.graphic1);
++  s.integer(playfield.graphic2);
++
++  s.integer(collision.m0p1);
++  s.integer(collision.m0p0);
++  s.integer(collision.m1p0);
++  s.integer(collision.m1p1);
++  s.integer(collision.p0pf);
++  s.integer(collision.p0bl);
++  s.integer(collision.p1pf);
++  s.integer(collision.p1bl);
++  s.integer(collision.m0pf);
++  s.integer(collision.m0bl);
++  s.integer(collision.m1pf);
++  s.integer(collision.m1bl);
++  s.integer(collision.blpf);
++  s.integer(collision.p0p1);
++  s.integer(collision.m0m1);
++
++  for(auto& channel : audio.channel) {
++    s.integer(channel.control);
++    s.integer(channel.frequency);
++    s.integer(channel.volume);
++    s.integer(channel.phase);
++    s.integer(channel.state1);
++    s.integer(channel.state3);
++    s.integer(channel.shift4);
++    s.integer(channel.shift5);
++    s.integer(channel.shift9);
++    s.integer(channel.sample);
++  }
++}
+diff --git a/nSide/higan/a2600/tia/tia.cpp b/nSide/higan/a2600/tia/tia.cpp
+new file mode 100644
+index 0000000..86e8112
+--- /dev/null
++++ b/nSide/higan/a2600/tia/tia.cpp
+@@ -0,0 +1,139 @@
++#include <a2600/a2600.hpp>
++
++namespace Atari2600 {
++
++TIA tia;
++#include "io.cpp"
++#include "render.cpp"
++#include "audio.cpp"
++#include "serialization.cpp"
++
++TIA::TIA() {
++  output = new uint32[160 * 228];
++}
++
++TIA::~TIA() {
++  delete[] output;
++}
++
++auto TIA::step(uint clocks) -> void {
++  while(clocks--) {
++    if(++io.hcounter >= 228) {
++      io.hcounter = 0;
++      if(io.vcounter < 511) io.vcounter++;
++      //Safe-guard against software that does not use VSYNC properly
++      if(io.vcounter >= (system.region() == System::Region::NTSC ? 262 : 312)) io.vcounter = 0;
++    }
++    Thread::step(1);
++    synchronize(cpu);
++  }
++}
++
++auto TIA::Enter() -> void {
++  while(true) scheduler.synchronize(), tia.main();
++}
++
++auto TIA::main() -> void {
++  scanline();
++
++  io.hcounter = 0;
++  for(uint x : range(57)) {
++    if(x == 0) cpu.rdyLine(1);
++    for(uint sub : range(4)) {
++      runVideo();
++      runAudio();
++      step(1);
++    }
++  }
++}
++
++auto TIA::load(Markup::Node node) -> bool {
++  return true;
++}
++
++auto TIA::power() -> void {
++  create(Enter, system.colorburst());
++  stream = Emulator::audio.createStream(1, system.colorburst() / 114.0);
++  memory::fill(output, 160 * 228 * sizeof(uint32));
++
++  io.playerMissile0Color   = 0x00;
++  io.playerMissile1Color   = 0x00;
++  io.playfieldBallColor    = 0x00;
++  io.backgroundColor       = 0x00;
++
++  io.playfieldBallPriority = false;
++
++  player[0].numberSize = 0;
++  player[0].reflect    = 0;
++  player[0].graphic    = 0;
++  player[0].position   = 0;
++  player[0].motion     = 0;
++
++  player[1].numberSize = 0;
++  player[1].reflect    = 0;
++  player[1].graphic    = 0;
++  player[1].position   = 0;
++  player[1].motion     = 0;
++
++  missile[0].enable   = false;
++  missile[0].size     = 0;
++  missile[0].position = 0;
++  missile[0].motion   = 0;
++
++  missile[1].enable   = false;
++  missile[1].size     = 0;
++  missile[1].position = 0;
++  missile[1].motion   = 0;
++
++  ball.enable   = false;
++  ball.size     = 0;
++  ball.position = 0;
++  ball.motion   = 0;
++
++  playfield.reflect = false;
++  playfield.score   = false;
++
++  playfield.graphic0 = 0x00;
++  playfield.graphic1 = 0x00;
++  playfield.graphic2 = 0x00;
++
++  collision.m0p0 = false;
++  collision.m0p1 = false;
++  collision.m1p0 = false;
++  collision.m1p1 = false;
++  collision.p0bl = false;
++  collision.p0pf = false;
++  collision.p1bl = false;
++  collision.p1pf = false;
++  collision.m0bl = false;
++  collision.m0pf = false;
++  collision.m1bl = false;
++  collision.m1pf = false;
++  collision.blpf = false;
++  collision.m0m1 = false;
++  collision.p0p1 = false;
++
++  for(auto& channel : audio.channel) {
++    channel.control = 0;
++    channel.frequency = 0;
++    channel.volume = 0;
++
++    channel.phase = 0;
++    channel.state1 = 1;
++    channel.state3 = 2;
++    channel.shift4 = ~0;
++    channel.shift5 = ~0;
++    channel.shift9 = ~0;
++    channel.sample = 1;
++  }
++}
++
++auto TIA::refresh() -> void {
++  auto output = this->output;
++  auto pitch = 160;
++  auto width = 160;
++  auto height = 228;
++  Emulator::video.refresh(output, pitch * sizeof(uint32), width, height);
++}
++
++}
+diff --git a/nSide/higan/a2600/tia/tia.hpp b/nSide/higan/a2600/tia/tia.hpp
+new file mode 100644
+index 0000000..4ef88b6
+--- /dev/null
++++ b/nSide/higan/a2600/tia/tia.hpp
+@@ -0,0 +1,154 @@
++//Television Interface Adaptor
++
++struct TIA : Thread {
++  shared_pointer<Emulator::Stream> stream;
++
++  TIA();
++  ~TIA();
++
++  alwaysinline auto step(uint clocks) -> void;
++
++  static auto Enter() -> void;
++  auto main() -> void;
++  auto load(Markup::Node) -> bool;
++  auto power() -> void;
++
++  //io.cpp
++  auto readIO(uint6 addr, uint8 data) -> uint8;
++  auto writeIO(uint6 addr, uint8 data) -> void;
++
++  //serialization.cpp
++  auto serialize(serializer&) -> void;
++
++privileged:
++  struct IO {
++    uint8 hcounter;
++    uint vcounter;  //not actually in TIA; needed for rendering
++
++    //$0000 VSYNC
++    bool vsync;
++
++    //$0001 VBLANK
++    bool vblank;
++
++    //$0006 COLUP0
++    uint7 playerMissile0Color;
++
++    //$0007 COLUP1
++    uint7 playerMissile1Color;
++
++    //$0008 COLUPF
++    uint7 playfieldBallColor;
++
++    //$0009 COLUBK
++    uint7 backgroundColor;
++
++    //$000a CTRLPF
++    bool playfieldBallPriority;
++  } io;
++
++  struct Player {
++    uint3 numberSize;  //also affects missiles
++    bool reflect;
++    uint8 graphic;
++    uint8 position;
++    int3 motion;
++  } player[2];
++
++  struct Missile {
++    bool enable;
++    uint2 size;
++    uint8 position;
++    int3 motion;
++    bool reset;
++  } missile[2];
++
++  struct Ball {
++    bool enable;
++    uint2 size;
++    uint8 position;
++    int3 motion;
++  } ball;
++
++  struct Playfield {
++    bool reflect;
++    bool score;
++
++    uint4 graphic0;
++    uint8 graphic1;
++    uint8 graphic2;
++  } playfield;
++
++  struct HMove {
++    bool enable;
++    uint2 counter;
++    uint3 delay;
++
++    bool latchP0;
++    bool latchP1;
++    bool latchM0;
++    bool latchM1;
++    bool latchBL;
++
++    uint4 counterP0;
++    uint4 counterP1;
++    uint4 counterM0;
++    uint4 counterM1;
++    uint4 counterBL;
++  } hmove;
++
++  struct Collision {
++    bool m0p1;
++    bool m0p0;
++    bool m1p0;
++    bool m1p1;
++    bool p0pf;
++    bool p0bl;
++    bool p1pf;
++    bool p1bl;
++    bool m0pf;
++    bool m0bl;
++    bool m1pf;
++    bool m1bl;
++    bool blpf;
++    bool p0p1;
++    bool m0m1;
++  } collision;
++
++  struct Audio {
++    struct Channel {
++      uint4 control;
++      uint5 frequency;
++      uint4 volume;
++
++      uint5 phase;
++      bool state1;
++      uint2 state3;
++      uint4 shift4;
++      uint5 shift5;
++      uint9 shift9;
++      bool sample;
++    } channel[2];
++  } audio;
++
++  alwaysinline auto hblank() -> bool { return io.hcounter < 68; }
++
++  auto refresh() -> void;
++
++  //render.cpp
++  auto frame() -> void;
++  auto scanline() -> void;
++  auto runVideo() -> void;
++
++  //audio.cpp
++  auto runAudio() -> void;
++  alwaysinline auto shift(uint4& shift) -> bool;
++  alwaysinline auto shift(uint5& shift) -> bool;
++  alwaysinline auto shift(uint9& shift) -> bool;
++
++  friend class System;
++
++  uint32* output = nullptr;
++};
++
++extern TIA tia;
+
