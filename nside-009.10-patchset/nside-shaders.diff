@@ -1,14 +1,7 @@
-diff --git a/higan-hack/shaders/Curvature.shader/curvature.fs b/nSide/higan/shaders/Curvature.shader/curvature.fs
-similarity index 100%
-rename from higan-hack/shaders/Curvature.shader/curvature.fs
-rename to nSide/higan/shaders/Curvature.shader/curvature.fs
-diff --git a/higan-hack/shaders/Curvature.shader/manifest.bml b/nSide/higan/shaders/Curvature.shader/manifest.bml
-similarity index 90%
-rename from higan-hack/shaders/Curvature.shader/manifest.bml
-rename to nSide/higan/shaders/Curvature.shader/manifest.bml
+diff --git a/higan-hack/shaders/Curvature.shader/manifest.bml b/higan-hack/shaders/Curvature.shader/manifest.bml
 index 7bec470..2f9b930 100644
 --- a/higan-hack/shaders/Curvature.shader/manifest.bml
-+++ b/nSide/higan/shaders/Curvature.shader/manifest.bml
++++ b/higan-hack/shaders/Curvature.shader/manifest.bml
 @@ -1,4 +1,6 @@
 -program
 +input
@@ -17,11 +10,11 @@ index 7bec470..2f9b930 100644
 +
 +program
    fragment: curvature.fs
-diff --git a/nSide/higan/shaders/Display Emulation/Famicom.shader/famicom.fs b/nSide/higan/shaders/Display Emulation/Famicom.shader/famicom.fs
+diff --git a/higan-hack/shaders/Display Emulation/Famicom.shader/famicom.fs b/higan-hack/shaders/Display Emulation/Famicom.shader/famicom.fs
 new file mode 100644
 index 0000000..32799f6
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/Famicom.shader/famicom.fs	
++++ b/higan-hack/shaders/Display Emulation/Famicom.shader/famicom.fs	
 @@ -0,0 +1,72 @@
 +#version 150
 +
@@ -95,12 +88,11 @@ index 0000000..32799f6
 +    0.0
 +  );
 +}
-\ No newline at end of file
-diff --git a/nSide/higan/shaders/Display Emulation/Famicom.shader/manifest.bml b/nSide/higan/shaders/Display Emulation/Famicom.shader/manifest.bml
+diff --git a/higan-hack/shaders/Display Emulation/Famicom.shader/manifest.bml b/higan-hack/shaders/Display Emulation/Famicom.shader/manifest.bml
 new file mode 100644
 index 0000000..4d37e5e
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/Famicom.shader/manifest.bml	
++++ b/higan-hack/shaders/Display Emulation/Famicom.shader/manifest.bml	
 @@ -0,0 +1,15 @@
 +settings
 +  saturation: 2.0
@@ -117,12 +109,11 @@ index 0000000..4d37e5e
 +  wrap: border
 +program
 +  fragment: famicom.fs
-\ No newline at end of file
-diff --git a/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/DAC.fs b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/DAC.fs
+diff --git a/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/DAC.fs b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/DAC.fs
 new file mode 100644
 index 0000000..068fed9
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/DAC.fs	
++++ b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/DAC.fs	
 @@ -0,0 +1,30 @@
 +#version 150
 +
@@ -154,12 +145,11 @@ index 0000000..068fed9
 +	
 +	fragColor.r=texture(pixmap[0], pixmapCoord.xy).r;
 +}
-\ No newline at end of file
-diff --git a/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/DAC.vs b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/DAC.vs
+diff --git a/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/DAC.vs b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/DAC.vs
 new file mode 100644
 index 0000000..c35b062
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/DAC.vs	
++++ b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/DAC.vs	
 @@ -0,0 +1,29 @@
 +#version 150
 +
@@ -190,11 +180,11 @@ index 0000000..c35b062
 +	vec2 pos = (texCoord.xy*targetSize.xy)-0.5;	
 +	vertexOut.colorPhase=8.0+pos.x+pos.y*4.0+(phase%2)*4.0;
 +}
-diff --git a/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/combFilter.fs b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/combFilter.fs
+diff --git a/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/combFilter.fs b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/combFilter.fs
 new file mode 100644
 index 0000000..a581015
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/combFilter.fs	
++++ b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/combFilter.fs	
 @@ -0,0 +1,31 @@
 +#version 150
 +
@@ -227,11 +217,11 @@ index 0000000..a581015
 +
 +	fragColor.rgb = vec3(signal,I+0.5,Q+0.5);
 +}
-diff --git a/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/combFilter.vs b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/combFilter.vs
+diff --git a/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/combFilter.vs b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/combFilter.vs
 new file mode 100644
 index 0000000..73f79e1
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/combFilter.vs	
++++ b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/combFilter.vs	
 @@ -0,0 +1,27 @@
 +#version 150
 +
@@ -260,11 +250,11 @@ index 0000000..73f79e1
 +	vec2 pos = (texCoord.xy*targetSize.xy)-0.5;	
 +	vertexOut.colorPhase=8.0+pos.x+pos.y*4.0+ (phase%2)*4.0+4.0+phaseOffset*12.0;
 +}
-diff --git a/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/manifest.bml b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/manifest.bml
+diff --git a/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/manifest.bml b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/manifest.bml
 new file mode 100644
 index 0000000..f55e58c
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/manifest.bml	
++++ b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/manifest.bml	
 @@ -0,0 +1,68 @@
 +// GTUfamicomLite
 +// by aliaspider
@@ -334,12 +324,11 @@ index 0000000..f55e58c
 +  fragment: scaleY.fs
 +output
 +  filter: nearest
-\ No newline at end of file
-diff --git a/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/scaleX.fs b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/scaleX.fs
+diff --git a/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/scaleX.fs b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/scaleX.fs
 new file mode 100644
 index 0000000..5cc59f1
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/scaleX.fs	
++++ b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/scaleX.fs	
 @@ -0,0 +1,83 @@
 +#version 150
 +
@@ -424,11 +413,11 @@ index 0000000..5cc59f1
 +	tempColor=clamp(YIQ_to_RGB*tempColor,0.0,1.0);
 +	fragColor.rgb = tempColor;
 +}
-diff --git a/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/scaleX.vs b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/scaleX.vs
+diff --git a/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/scaleX.vs b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/scaleX.vs
 new file mode 100644
 index 0000000..a051750
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/scaleX.vs	
++++ b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/scaleX.vs	
 @@ -0,0 +1,29 @@
 +#version 150
 +
@@ -459,11 +448,11 @@ index 0000000..a051750
 +	
 +	vertexOut.texCoord=texCoord;	
 +}
-diff --git a/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/scaleY.fs b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/scaleY.fs
+diff --git a/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/scaleY.fs b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/scaleY.fs
 new file mode 100644
 index 0000000..51dc284
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/scaleY.fs	
++++ b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/scaleY.fs	
 @@ -0,0 +1,71 @@
 +#version 150
 +
@@ -536,12 +525,11 @@ index 0000000..51dc284
 +	tempColor=pow(tempColor,vec3(gamma));
 +	fragColor = vec4(tempColor, 1.0);
 +}
-\ No newline at end of file
-diff --git a/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/scaleY.vs b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/scaleY.vs
+diff --git a/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/scaleY.vs b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/scaleY.vs
 new file mode 100644
 index 0000000..a55cdd4
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/GTUfamicomLite.shader/scaleY.vs	
++++ b/higan-hack/shaders/Display Emulation/GTUfamicomLite.shader/scaleY.vs	
 @@ -0,0 +1,29 @@
 +#version 150
 +
@@ -572,11 +560,11 @@ index 0000000..a55cdd4
 +	
 +	vertexOut.texCoord=texCoord;		
 +}
-diff --git a/nSide/higan/shaders/Display Emulation/Game Boy Advance.shader/game-boy-advance.fs b/nSide/higan/shaders/Display Emulation/Game Boy Advance.shader/game-boy-advance.fs
+diff --git a/higan-hack/shaders/Display Emulation/Game Boy Advance.shader/game-boy-advance.fs b/higan-hack/shaders/Display Emulation/Game Boy Advance.shader/game-boy-advance.fs
 new file mode 100644
 index 0000000..f68d8c0
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/Game Boy Advance.shader/game-boy-advance.fs	
++++ b/higan-hack/shaders/Display Emulation/Game Boy Advance.shader/game-boy-advance.fs	
 @@ -0,0 +1,68 @@
 +#version 150
 +
@@ -646,11 +634,11 @@ index 0000000..f68d8c0
 +  );
 +  #endif
 +}
-diff --git a/nSide/higan/shaders/Display Emulation/Game Boy Advance.shader/manifest.bml b/nSide/higan/shaders/Display Emulation/Game Boy Advance.shader/manifest.bml
+diff --git a/higan-hack/shaders/Display Emulation/Game Boy Advance.shader/manifest.bml b/higan-hack/shaders/Display Emulation/Game Boy Advance.shader/manifest.bml
 new file mode 100644
 index 0000000..2e49040
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/Game Boy Advance.shader/manifest.bml	
++++ b/higan-hack/shaders/Display Emulation/Game Boy Advance.shader/manifest.bml	
 @@ -0,0 +1,9 @@
 +settings
 +  //coloremulation
@@ -661,12 +649,11 @@ index 0000000..2e49040
 +  wrap: border
 +program
 +  fragment: game-boy-advance.fs
-\ No newline at end of file
-diff --git a/nSide/higan/shaders/Display Emulation/Game Boy Color.shader/game-boy-color.fs b/nSide/higan/shaders/Display Emulation/Game Boy Color.shader/game-boy-color.fs
+diff --git a/higan-hack/shaders/Display Emulation/Game Boy Color.shader/game-boy-color.fs b/higan-hack/shaders/Display Emulation/Game Boy Color.shader/game-boy-color.fs
 new file mode 100644
 index 0000000..918cc18
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/Game Boy Color.shader/game-boy-color.fs	
++++ b/higan-hack/shaders/Display Emulation/Game Boy Color.shader/game-boy-color.fs	
 @@ -0,0 +1,28 @@
 +#version 150
 +
@@ -696,11 +683,11 @@ index 0000000..918cc18
 +  );
 +  #endif
 +}
-diff --git a/nSide/higan/shaders/Display Emulation/Game Boy Color.shader/manifest.bml b/nSide/higan/shaders/Display Emulation/Game Boy Color.shader/manifest.bml
+diff --git a/higan-hack/shaders/Display Emulation/Game Boy Color.shader/manifest.bml b/higan-hack/shaders/Display Emulation/Game Boy Color.shader/manifest.bml
 new file mode 100644
 index 0000000..c83a3b2
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/Game Boy Color.shader/manifest.bml	
++++ b/higan-hack/shaders/Display Emulation/Game Boy Color.shader/manifest.bml	
 @@ -0,0 +1,7 @@
 +settings
 +  //coloremulation
@@ -709,12 +696,11 @@ index 0000000..c83a3b2
 +  wrap: border
 +program
 +  fragment: game-boy-color.fs
-\ No newline at end of file
-diff --git a/nSide/higan/shaders/Display Emulation/Game Boy.shader/game-boy.fs b/nSide/higan/shaders/Display Emulation/Game Boy.shader/game-boy.fs
+diff --git a/higan-hack/shaders/Display Emulation/Game Boy.shader/game-boy.fs b/higan-hack/shaders/Display Emulation/Game Boy.shader/game-boy.fs
 new file mode 100644
 index 0000000..5490a6c
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/Game Boy.shader/game-boy.fs	
++++ b/higan-hack/shaders/Display Emulation/Game Boy.shader/game-boy.fs	
 @@ -0,0 +1,40 @@
 +#version 150
 +
@@ -756,12 +742,11 @@ index 0000000..5490a6c
 +  );
 +  #endif
 +}
-\ No newline at end of file
-diff --git a/nSide/higan/shaders/Display Emulation/Game Boy.shader/manifest.bml b/nSide/higan/shaders/Display Emulation/Game Boy.shader/manifest.bml
+diff --git a/higan-hack/shaders/Display Emulation/Game Boy.shader/manifest.bml b/higan-hack/shaders/Display Emulation/Game Boy.shader/manifest.bml
 new file mode 100644
 index 0000000..ee6c782
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/Game Boy.shader/manifest.bml	
++++ b/higan-hack/shaders/Display Emulation/Game Boy.shader/manifest.bml	
 @@ -0,0 +1,11 @@
 +settings
 +  // Color emulation: green, yellow
@@ -774,12 +759,11 @@ index 0000000..ee6c782
 +  wrap: border
 +program
 +  fragment: game-boy.fs
-\ No newline at end of file
-diff --git a/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/manifest.bml b/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/manifest.bml
+diff --git a/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/manifest.bml b/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/manifest.bml
 new file mode 100644
 index 0000000..cf0de77
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/manifest.bml	
++++ b/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/manifest.bml	
 @@ -0,0 +1,37 @@
 +// Gameboy-Display-Emulation
 +// by aliaspider
@@ -818,12 +802,11 @@ index 0000000..cf0de77
 +  fragment: pass3.fs
 +output
 +  filter: nearest
-\ No newline at end of file
-diff --git a/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass1.fs b/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass1.fs
+diff --git a/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass1.fs b/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass1.fs
 new file mode 100644
 index 0000000..cae668d
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass1.fs	
++++ b/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass1.fs	
 @@ -0,0 +1,55 @@
 +// This is a port of the original CG shader to the quark format
 +// the original shader can be found here :
@@ -880,11 +863,11 @@ index 0000000..cae668d
 +	c0+=(GET_ALPHA(frame[0],texCoord) - c0) * pow(responseTime,7.0);
 +	fragColor=vec4(c0*(1.0-baselineAlpha)+baselineAlpha);
 +}
-diff --git a/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass2.fs b/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass2.fs
+diff --git a/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass2.fs b/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass2.fs
 new file mode 100644
 index 0000000..37b1089
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass2.fs	
++++ b/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass2.fs	
 @@ -0,0 +1,67 @@
 +// This is a port of the original CG shader to the quark format
 +// the original shader can be found here :
@@ -953,11 +936,11 @@ index 0000000..37b1089
 +	fragColor=vec4(c0,blur,a,a);
 +
 +}
-diff --git a/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass2.vs b/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass2.vs
+diff --git a/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass2.vs b/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass2.vs
 new file mode 100644
 index 0000000..2fca668
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass2.vs	
++++ b/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass2.vs	
 @@ -0,0 +1,48 @@
 +// This is a port of the original CG shader to the quark format
 +// the original shader can be found here :
@@ -1007,11 +990,11 @@ index 0000000..2fca668
 +	vertexOut.texCoord.x=texCoord.x;
 +	vertexOut.texCoord.y=coord.y*vertexOut.newSize.w;
 +}
-diff --git a/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass3.fs b/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass3.fs
+diff --git a/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass3.fs b/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass3.fs
 new file mode 100644
 index 0000000..59bdfde
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass3.fs	
++++ b/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass3.fs	
 @@ -0,0 +1,82 @@
 +// This is a port of the original CG shader to the quark format
 +// the original shader can be found here :
@@ -1095,11 +1078,11 @@ index 0000000..59bdfde
 +	// fragColor=vec4(1.0-a);
 +
 +}
-diff --git a/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass3.vs b/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass3.vs
+diff --git a/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass3.vs b/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass3.vs
 new file mode 100644
 index 0000000..45fe09a
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass3.vs	
++++ b/higan-hack/shaders/Display Emulation/Gameboy-Display-Emulation.shader/pass3.vs	
 @@ -0,0 +1,48 @@
 +// This is a port of the original CG shader to the quark format
 +// the original shader can be found here :
@@ -1149,11 +1132,11 @@ index 0000000..45fe09a
 +	vertexOut.texCoord.x=coord.x*vertexOut.newSize.z;	
 +	vertexOut.texCoord.y=texCoord.y;
 +}
-diff --git a/nSide/higan/shaders/Display Emulation/PlayChoice-10.shader/manifest.bml b/nSide/higan/shaders/Display Emulation/PlayChoice-10.shader/manifest.bml
+diff --git a/higan-hack/shaders/Display Emulation/PlayChoice-10.shader/manifest.bml b/higan-hack/shaders/Display Emulation/PlayChoice-10.shader/manifest.bml
 new file mode 100644
 index 0000000..7cadb62
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/PlayChoice-10.shader/manifest.bml	
++++ b/higan-hack/shaders/Display Emulation/PlayChoice-10.shader/manifest.bml	
 @@ -0,0 +1,6 @@
 +input
 +  filter: nearest
@@ -1161,11 +1144,11 @@ index 0000000..7cadb62
 +
 +program
 +  fragment: playchoice-10.fs
-diff --git a/nSide/higan/shaders/Display Emulation/PlayChoice-10.shader/playchoice-10.fs b/nSide/higan/shaders/Display Emulation/PlayChoice-10.shader/playchoice-10.fs
+diff --git a/higan-hack/shaders/Display Emulation/PlayChoice-10.shader/playchoice-10.fs b/higan-hack/shaders/Display Emulation/PlayChoice-10.shader/playchoice-10.fs
 new file mode 100644
 index 0000000..f21a770
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/PlayChoice-10.shader/playchoice-10.fs	
++++ b/higan-hack/shaders/Display Emulation/PlayChoice-10.shader/playchoice-10.fs	
 @@ -0,0 +1,18 @@
 +#version 150
 +
@@ -1185,11 +1168,11 @@ index 0000000..f21a770
 +    fragColor = vec4(rgbs[0], rgbs[1], rgbs[2], 0.0);
 +  }
 +}
-diff --git a/nSide/higan/shaders/Display Emulation/Super Famicom.shader/manifest.bml b/nSide/higan/shaders/Display Emulation/Super Famicom.shader/manifest.bml
+diff --git a/higan-hack/shaders/Display Emulation/Super Famicom.shader/manifest.bml b/higan-hack/shaders/Display Emulation/Super Famicom.shader/manifest.bml
 new file mode 100644
 index 0000000..f0b2b33
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/Super Famicom.shader/manifest.bml	
++++ b/higan-hack/shaders/Display Emulation/Super Famicom.shader/manifest.bml	
 @@ -0,0 +1,7 @@
 +settings
 +  //coloremulation
@@ -1198,12 +1181,11 @@ index 0000000..f0b2b33
 +  wrap: border
 +program
 +  fragment: super-famicom.fs
-\ No newline at end of file
-diff --git a/nSide/higan/shaders/Display Emulation/Super Famicom.shader/super-famicom.fs b/nSide/higan/shaders/Display Emulation/Super Famicom.shader/super-famicom.fs
+diff --git a/higan-hack/shaders/Display Emulation/Super Famicom.shader/super-famicom.fs b/higan-hack/shaders/Display Emulation/Super Famicom.shader/super-famicom.fs
 new file mode 100644
 index 0000000..db1675b
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/Super Famicom.shader/super-famicom.fs	
++++ b/higan-hack/shaders/Display Emulation/Super Famicom.shader/super-famicom.fs	
 @@ -0,0 +1,41 @@
 +#version 150
 +
@@ -1246,11 +1228,11 @@ index 0000000..db1675b
 +    0.0
 +  );
 +}
-diff --git a/nSide/higan/shaders/Display Emulation/VS. System.shader/manifest.bml b/nSide/higan/shaders/Display Emulation/VS. System.shader/manifest.bml
+diff --git a/higan-hack/shaders/Display Emulation/VS. System.shader/manifest.bml b/higan-hack/shaders/Display Emulation/VS. System.shader/manifest.bml
 new file mode 100644
 index 0000000..09267d5
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/VS. System.shader/manifest.bml	
++++ b/higan-hack/shaders/Display Emulation/VS. System.shader/manifest.bml	
 @@ -0,0 +1,6 @@
 +input
 +  filter: nearest
@@ -1258,11 +1240,11 @@ index 0000000..09267d5
 +
 +program
 +  fragment: vs-system.fs
-diff --git a/nSide/higan/shaders/Display Emulation/VS. System.shader/vs-system.fs b/nSide/higan/shaders/Display Emulation/VS. System.shader/vs-system.fs
+diff --git a/higan-hack/shaders/Display Emulation/VS. System.shader/vs-system.fs b/higan-hack/shaders/Display Emulation/VS. System.shader/vs-system.fs
 new file mode 100644
 index 0000000..24283b7
 --- /dev/null
-+++ b/nSide/higan/shaders/Display Emulation/VS. System.shader/vs-system.fs	
++++ b/higan-hack/shaders/Display Emulation/VS. System.shader/vs-system.fs	
 @@ -0,0 +1,14 @@
 +#version 150
 +
@@ -1278,17 +1260,10 @@ index 0000000..24283b7
 +  vec4 rgba = texture(source[0], texCoord);
 +  fragColor = rgba;
 +}
-diff --git a/higan-hack/shaders/Edge Detection.shader/edge-detection.fs b/nSide/higan/shaders/Edge Detection.shader/edge-detection.fs
-similarity index 100%
-rename from higan-hack/shaders/Edge Detection.shader/edge-detection.fs
-rename to nSide/higan/shaders/Edge Detection.shader/edge-detection.fs
-diff --git a/higan-hack/shaders/Edge Detection.shader/manifest.bml b/nSide/higan/shaders/Edge Detection.shader/manifest.bml
-similarity index 90%
-rename from higan-hack/shaders/Edge Detection.shader/manifest.bml
-rename to nSide/higan/shaders/Edge Detection.shader/manifest.bml
+diff --git a/higan-hack/shaders/Edge Detection.shader/manifest.bml b/higan-hack/shaders/Edge Detection.shader/manifest.bml
 index 166db6d..d921065 100644
 --- a/higan-hack/shaders/Edge Detection.shader/manifest.bml	
-+++ b/nSide/higan/shaders/Edge Detection.shader/manifest.bml	
++++ b/higan-hack/shaders/Edge Detection.shader/manifest.bml	
 @@ -1,4 +1,6 @@
 -program
 +input
@@ -1297,17 +1272,24 @@ index 166db6d..d921065 100644
 +
 +program
    fragment: edge-detection.fs
-diff --git a/higan-hack/shaders/Makefile b/nSide/higan/shaders/GNUmakefile
-similarity index 100%
+diff --git a/higan-hack/shaders/Makefile b/higan-hack/shaders/GNUmakefile
+similarity index 64%
 rename from higan-hack/shaders/Makefile
-rename to nSide/higan/shaders/GNUmakefile
-diff --git a/higan-hack/shaders/Scanline.shader/manifest.bml b/nSide/higan/shaders/Scanline.shader/manifest.bml
-similarity index 90%
-rename from higan-hack/shaders/Scanline.shader/manifest.bml
-rename to nSide/higan/shaders/Scanline.shader/manifest.bml
+rename to higan-hack/shaders/GNUmakefile
+index 80d315c..42e2eae 100644
+--- a/higan-hack/shaders/Makefile
++++ b/higan-hack/shaders/GNUmakefile
+@@ -2,4 +2,6 @@ install:
+ 	if [ -d /usr/share/higan/Video\ Shaders ]; then sudo rm -r /usr/share/higan/Video\ Shaders; fi
+ 	sudo mkdir -p /usr/share/higan/Video\ Shaders
+ 	sudo cp -r *.shader /usr/share/higan/Video\ Shaders
++	sudo mkdir -p /usr/share/higan/Video\ Shaders/Display\ Emulation
++	sudo cp -r /Display\ Emulation/*.shader /usr/share/higan/Video\ Shaders/Display\ Emulation
+ 	sudo chmod -R 777 /usr/share/higan/Video\ Shaders
+diff --git a/higan-hack/shaders/Scanline.shader/manifest.bml b/higan-hack/shaders/Scanline.shader/manifest.bml
 index a5db635..b09323a 100644
 --- a/higan-hack/shaders/Scanline.shader/manifest.bml
-+++ b/nSide/higan/shaders/Scanline.shader/manifest.bml
++++ b/higan-hack/shaders/Scanline.shader/manifest.bml
 @@ -1,4 +1,6 @@
 -program
 +input
@@ -1316,8 +1298,4 @@ index a5db635..b09323a 100644
 +
 +program
    fragment: scanline.fs
-diff --git a/higan-hack/shaders/Scanline.shader/scanline.fs b/nSide/higan/shaders/Scanline.shader/scanline.fs
-similarity index 100%
-rename from higan-hack/shaders/Scanline.shader/scanline.fs
-rename to nSide/higan/shaders/Scanline.shader/scanline.fs
 
