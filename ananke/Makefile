@@ -42,7 +42,7 @@ else
 	#if [ ! -d ~/.config/ananke ]; then install -d ~/.config/ananke; fi
 	install -d $(DESTDIR)$(prefix)
 	cp libananke.so $(DESTDIR)$(prefix)/libananke.so.1
-	ln -s $(DESTDIR)$(prefix)/libananke.so.1 $(DESTDIR)$(prefix)/libananke.so
+	ln -s $(prefix)/libananke.so.1 $(DESTDIR)$(prefix)/libananke.so
 endif
 
 uninstall:
